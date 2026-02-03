@@ -1,0 +1,53 @@
+{
+  "manifest_version": 2,
+  "name": "Drawer - Highlight & Save Text",
+  "version": "0.1.0",
+  "description": "Save and organize text highlights from any webpage with notes, tags, and a draggable drawer interface.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["src/background/index.ts"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.tsx"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "browser_action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png"
+    },
+    "default_title": "Drawer - View Highlights"
+  },
+  "commands": {
+    "toggle-drawer": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D"
+      },
+      "description": "Toggle drawer visibility"
+    },
+    "create-highlight": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+H"
+      },
+      "description": "Highlight selected text"
+    }
+  },
+  "web_accessible_resources": [
+    "src/content/styles.css"
+  ]
+}
