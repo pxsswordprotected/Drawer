@@ -1,1 +1,1 @@
-Drawer is an open source browser extension meant to support reading and taking notes.
+Drawer is an open source browser extension to support reading and taking notes.

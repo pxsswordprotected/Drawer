@@ -1,5 +1,5 @@
 /* Import Geist font */
-@import 'geist/dist/geist.css';
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
 
 /* Tailwind directives */
 @tailwind base;
@@ -7,7 +7,6 @@
 @tailwind utilities;
 
 @layer base {
-  /* Set Geist as default font with light weight */
   body {
     font-family: 'Geist', system-ui, -apple-system, sans-serif;
     font-weight: 300;

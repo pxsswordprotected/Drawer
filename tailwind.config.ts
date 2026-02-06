@@ -7,18 +7,18 @@ export default {
       colors: {
         // Dark mode colors (default theme)
         bg: {
-          main: '#1A1A1A',      // Main background
-          elevated: '#242424',  // Slightly lighter for cards/drawer
+          main: '#1A1A1A', // Main background
+          elevated: '#242424', // Slightly lighter for cards/drawer
         },
         text: {
-          main: '#F5F5F5',      // Main text
+          main: '#F5F5F5', // Main text
           secondary: '#8C8C8C', // Secondary/muted text
         },
-        divider: '#484848',     // Dividers/borders
+        divider: '#484848', // Dividers/borders
 
         // Semantic colors
         error: '#CC2424',
-        success: '#14C935',     // Also for "on/good-to-go" states
+        success: '#14C935', // Also for "on/good-to-go" states
 
         // Highlight colors (for text highlighting feature)
         highlight: {
@@ -42,7 +42,7 @@ export default {
 
       // Default font weight is light (300)
       fontWeight: {
-        light: '300',    // Default for most text
+        light: '300', // Default for most text
         normal: '400',
         medium: '500',
         semibold: '600',
@@ -50,11 +50,11 @@ export default {
       },
 
       fontSize: {
-        xs: ['0.75rem', { lineHeight: '1rem', fontWeight: '300' }],     // 12px
+        xs: ['0.75rem', { lineHeight: '1rem', fontWeight: '300' }], // 12px
         sm: ['0.875rem', { lineHeight: '1.25rem', fontWeight: '300' }], // 14px
-        base: ['1rem', { lineHeight: '1.5rem', fontWeight: '300' }],    // 16px
+        base: ['1rem', { lineHeight: '1.5rem', fontWeight: '300' }], // 16px
         lg: ['1.125rem', { lineHeight: '1.75rem', fontWeight: '300' }], // 18px
-        xl: ['1.25rem', { lineHeight: '1.75rem', fontWeight: '300' }],  // 20px
+        xl: ['1.25rem', { lineHeight: '1.75rem', fontWeight: '300' }], // 20px
       },
 
       // Simple shadows for dark mode (subtle)
@@ -65,8 +65,8 @@ export default {
 
       // Simple border radius
       borderRadius: {
-        DEFAULT: '0.5rem',  // 8px
-        lg: '0.75rem',      // 12px
+        DEFAULT: '0.5rem', // 8px
+        lg: '0.75rem', // 12px
       },
 
       // Animation durations

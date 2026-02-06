@@ -1,0 +1,90 @@
+.highlightText {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+.highlightItem {
+  transition:
+    filter 200ms ease-out,
+    opacity 200ms ease-out,
+    mask-image 200ms ease-out;
+  position: relative;
+  cursor: pointer;
+}
+
+/* Extended clickable hitbox for non-focused items */
+.highlightItem:not([data-focused='true'])::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  /* Invisible but captures clicks */
+  background: transparent;
+  cursor: pointer;
+}
+
+.highlightItem[data-focused='true'] {
+  cursor: default;
+}
+
+/* Center item - no blur or mask */
+.highlightItem[data-position='center'] {
+  filter: blur(0px);
+  opacity: 1;
+  mask-image: none;
+}
+
+/* Items above center - subtle blur, keep readable */
+.highlightItem[data-position='above'][data-blur='1'] {
+  filter: blur(0.3px);
+  opacity: 0.92;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 1));
+}
+
+.highlightItem[data-position='above'][data-blur='2'] {
+  filter: blur(0.6px);
+  opacity: 0.8;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.98));
+}
+
+.highlightItem[data-position='above'][data-blur='3'] {
+  filter: blur(1px);
+  opacity: 0.65;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.9));
+}
+
+/* Items below center - subtle blur, keep readable */
+.highlightItem[data-position='below'][data-blur='1'] {
+  filter: blur(0.3px);
+  opacity: 0.92;
+  mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 1));
+}
+
+.highlightItem[data-position='below'][data-blur='2'] {
+  filter: blur(0.6px);
+  opacity: 0.8;
+  mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.98));
+}
+
+.highlightItem[data-position='below'][data-blur='3'] {
+  filter: blur(1px);
+  opacity: 0.65;
+  mask-image: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.9));
+}
+
+/* Disable blur transitions for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .highlightItem {
+    transition: none;
+    filter: none !important;
+    opacity: 1 !important;
+    mask-image: none !important;
+  }
+}
