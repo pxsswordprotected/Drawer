@@ -31,3 +31,5 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+
+my_own_plans.md
