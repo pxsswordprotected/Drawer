@@ -1,7 +1,7 @@
 // Storage abstraction layer for browser.storage operations
 // This enables seamless migration to database backend in the future
 
-import { Highlight, Settings } from './types';
+import { Highlight, Note, Settings } from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 
 // Detect if we're in a browser extension context
@@ -54,10 +54,33 @@ export class StorageService {
   }
 
   /**
+   * Migrate highlights from old note?: string field to notes: Note[] array
+   */
+  private migrateHighlights(highlights: any[]): { migrated: Highlight[]; didMigrate: boolean } {
+    let didMigrate = false;
+    const migrated = highlights.map((h) => {
+      if (h.notes !== undefined) return h as Highlight;
+      didMigrate = true;
+      const notes: Note[] = [];
+      if (h.note) {
+        notes.push({ id: crypto.randomUUID(), text: h.note, timestamp: h.timestamp });
+      }
+      const { note, ...rest } = h;
+      return { ...rest, notes } as Highlight;
+    });
+    return { migrated, didMigrate };
+  }
+
+  /**
    * Get all highlights, optionally filtered by URL
    */
   async getHighlights(url?: string): Promise<Highlight[]> {
-    const highlights: Highlight[] = (await this.getFromStorage(STORAGE_KEYS.HIGHLIGHTS)) || [];
+    const raw: any[] = (await this.getFromStorage(STORAGE_KEYS.HIGHLIGHTS)) || [];
+    const { migrated: highlights, didMigrate } = this.migrateHighlights(raw);
+
+    if (didMigrate) {
+      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
+    }
 
     if (url) {
       return highlights.filter((h) => h.url === url);
@@ -103,6 +126,48 @@ export class StorageService {
     const highlights = await this.getHighlights();
     const filtered = highlights.filter((h) => h.url !== url);
     await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, filtered);
+  }
+
+  /**
+   * Add a note to a highlight
+   */
+  async addNoteToHighlight(highlightId: string, note: Note): Promise<void> {
+    const highlights = await this.getHighlights();
+    const index = highlights.findIndex((h) => h.id === highlightId);
+
+    if (index !== -1) {
+      highlights[index].notes.push(note);
+      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
+    }
+  }
+
+  /**
+   * Update a note's text in a highlight
+   */
+  async updateNoteInHighlight(highlightId: string, noteId: string, text: string): Promise<void> {
+    const highlights = await this.getHighlights();
+    const index = highlights.findIndex((h) => h.id === highlightId);
+
+    if (index !== -1) {
+      const noteIndex = highlights[index].notes.findIndex((n) => n.id === noteId);
+      if (noteIndex !== -1) {
+        highlights[index].notes[noteIndex].text = text;
+        await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
+      }
+    }
+  }
+
+  /**
+   * Delete a note from a highlight
+   */
+  async deleteNoteFromHighlight(highlightId: string, noteId: string): Promise<void> {
+    const highlights = await this.getHighlights();
+    const index = highlights.findIndex((h) => h.id === highlightId);
+
+    if (index !== -1) {
+      highlights[index].notes = highlights[index].notes.filter((n) => n.id !== noteId);
+      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
+    }
   }
 
   /**

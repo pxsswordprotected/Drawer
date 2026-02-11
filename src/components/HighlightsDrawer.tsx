@@ -1,8 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo, memo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { HighlightItem } from './HighlightItem';
+import { HighlightDetailView } from './HighlightDetailView';
 import { Highlight } from '@/shared/types';
 import styles from './HighlightsDrawer.module.css';
+import detailStyles from './HighlightDetailView.module.css';
 
 // Memoized list item to prevent re-renders when other items change
 interface HighlightListItemProps {
@@ -52,8 +54,23 @@ const HighlightListItem = memo<HighlightListItemProps>(
 HighlightListItem.displayName = 'HighlightListItem';
 
 export const HighlightsDrawer: React.FC = () => {
-  const { isOpen, currentPageHighlights, isLoading, logoPosition, closeDrawer, loadHighlights } =
-    useDrawerStore();
+  const {
+    isOpen,
+    currentPageHighlights,
+    isLoading,
+    logoPosition,
+    closeDrawer,
+    loadHighlights,
+    selectedHighlightId,
+  } = useDrawerStore();
+
+  const selectedHighlight = useMemo(
+    () =>
+      selectedHighlightId
+        ? (currentPageHighlights.find((h) => h.id === selectedHighlightId) ?? null)
+        : null,
+    [selectedHighlightId, currentPageHighlights]
+  );
   const drawerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -98,23 +115,20 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [isOpen, loadHighlights]);
 
-  // Click outside handler
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      // We check if the click target is NOT inside our drawerRef
-      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-        closeDrawer();
-      }
-    };
-
-    const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
-
-    // Use 'mousedown' as it's more responsive for closing UI elements
-    root.addEventListener('mousedown', handleClickOutside);
-    return () => root.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, closeDrawer]);
+  // Click outside handler (temporarily disabled)
+  // useEffect(() => {
+  //   if (!isOpen) return;
+  //
+  //   const handleClickOutside = (e: MouseEvent) => {
+  //     if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
+  //       closeDrawer();
+  //     }
+  //   };
+  //
+  //   const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
+  //   root.addEventListener('mousedown', handleClickOutside);
+  //   return () => root.removeEventListener('mousedown', handleClickOutside);
+  // }, [isOpen, closeDrawer]);
 
   // ESC key handler
   useEffect(() => {
@@ -235,43 +249,59 @@ export const HighlightsDrawer: React.FC = () => {
         `,
       }}
     >
-      <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`} tabIndex={0}>
-        <div className="px-[38px] space-y-4" style={{ paddingTop: '20px', paddingBottom: '20px' }}>
-          {isLoading ? (
-            <>
-              {/* Skeleton Item 1 */}
-              <div className="bg-[#373737] rounded-md animate-pulse" style={{ height: '64px' }} />
-
-              {/* Divider */}
-              <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-
-              {/* Skeleton Item 2 */}
-              <div className="bg-[#373737] rounded-md animate-pulse" style={{ height: '48px' }} />
-
-              {/* Divider */}
-              <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-
-              {/* Skeleton Item 3 */}
-              <div className="bg-[#373737] rounded-md animate-pulse" style={{ height: '56px' }} />
-            </>
-          ) : currentPageHighlights.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-text-secondary text-center">No highlights on this page</p>
+      <div
+        className={detailStyles.slideContainer}
+        data-detail-active={selectedHighlight ? 'true' : 'false'}
+      >
+        {/* List pane */}
+        <div className={detailStyles.listPane}>
+          <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`} tabIndex={0}>
+            <div
+              className="px-[38px] space-y-4"
+              style={{ paddingTop: '20px', paddingBottom: '20px' }}
+            >
+              {isLoading ? (
+                <>
+                  <div
+                    className="bg-[#373737] rounded-md animate-pulse"
+                    style={{ height: '64px' }}
+                  />
+                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                  <div
+                    className="bg-[#373737] rounded-md animate-pulse"
+                    style={{ height: '48px' }}
+                  />
+                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                  <div
+                    className="bg-[#373737] rounded-md animate-pulse"
+                    style={{ height: '56px' }}
+                  />
+                </>
+              ) : currentPageHighlights.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-text-secondary text-center">No highlights on this page</p>
+                </div>
+              ) : (
+                currentPageHighlights.map((highlight, index) => (
+                  <HighlightListItem
+                    key={highlight.id}
+                    highlight={highlight}
+                    index={index}
+                    currentIndex={currentIndex}
+                    totalItems={currentPageHighlights.length}
+                    itemRefs={itemRefs}
+                    setCurrentIndex={setCurrentIndex}
+                    navigateToIndex={navigateToIndex}
+                  />
+                ))
+              )}
             </div>
-          ) : (
-            currentPageHighlights.map((highlight, index) => (
-              <HighlightListItem
-                key={highlight.id}
-                highlight={highlight}
-                index={index}
-                currentIndex={currentIndex}
-                totalItems={currentPageHighlights.length}
-                itemRefs={itemRefs}
-                setCurrentIndex={setCurrentIndex}
-                navigateToIndex={navigateToIndex}
-              />
-            ))
-          )}
+          </div>
+        </div>
+
+        {/* Detail pane */}
+        <div className={detailStyles.detailPane}>
+          {selectedHighlight && <HighlightDetailView highlight={selectedHighlight} />}
         </div>
       </div>
     </div>

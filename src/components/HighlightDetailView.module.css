@@ -1,0 +1,71 @@
+/* Slide transition container */
+.slideContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.listPane,
+.detailPane {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transition: transform 300ms ease-out;
+  will-change: transform;
+}
+
+.listPane {
+  transform: translateX(0);
+}
+
+.detailPane {
+  transform: translateX(100%);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.detailPane::-webkit-scrollbar {
+  display: none;
+}
+
+/* When detail is active, slide list out left, detail in from right */
+.slideContainer[data-detail-active='true'] .listPane {
+  transform: translateX(-100%);
+}
+
+.slideContainer[data-detail-active='true'] .detailPane {
+  transform: translateX(0);
+}
+
+/* Note expand/collapse using grid-template-rows trick */
+.noteItem {
+  cursor: pointer;
+}
+
+.noteTextClamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+.noteTextFull {
+  font-size: 14px;
+  font-weight: 300;
+  line-height: 1.5;
+}
+
+/* Disable transitions for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .listPane,
+  .detailPane {
+    transition: none;
+  }
+}

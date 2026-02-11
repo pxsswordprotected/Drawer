@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Highlight } from '@/shared/types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Highlight, Note } from '@/shared/types';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
 
@@ -18,6 +18,57 @@ export function useSelectionHandler() {
     selectedText: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const hasSeeded = useRef(false);
+
+  // Seed a test highlight with 3 notes on first load
+  useEffect(() => {
+    if (hasSeeded.current) return;
+    hasSeeded.current = true;
+
+    const seedTestData = async () => {
+      const existing = await storageService.getHighlights(window.location.href);
+      if (existing.length > 0) return; // Don't seed if highlights already exist
+
+      const testNotes: Note[] = [
+        {
+          id: crypto.randomUUID(),
+          text: 'How do I become more embodied as a nerd?',
+          timestamp: Date.now() - 60000,
+        },
+        {
+          id: crypto.randomUUID(),
+          text: 'The deepest limitation though: all of these are still me generating the "other perspective" from my own weights. It\'s like asking one person to play both...',
+          timestamp: Date.now() - 30000,
+        },
+        {
+          id: crypto.randomUUID(),
+          text: 'What does embodied entail in this context? I think there\'s something about physical awareness, proprioception, and the felt sense of being in a body that goes beyond intellectual understanding. The author seems to suggest that nerds tend to live primarily in their heads, disconnected from somatic experience, and that this disconnection prevents the kind of open, responsive engagement that vibing requires. This connects to Alexander\'s concept of unfolding — you can\'t unfold if you\'re not in touch with what your body is telling you about the current moment.',
+          timestamp: Date.now(),
+        },
+      ];
+
+      const testHighlight: Highlight = {
+        id: crypto.randomUUID(),
+        text: 'Being open to your own body, being embodied, is a precondition for vibing. Which is why nerds can\'t vibe.',
+        url: window.location.href,
+        pageTitle: document.title,
+        notes: testNotes,
+        color: DEFAULT_SETTINGS.defaultColor,
+        timestamp: new Date(2026, 1, 2, 13, 34).getTime(), // SUN FEB 2 1:34PM
+        position: {
+          startXPath: '',
+          endXPath: '',
+          startOffset: 0,
+          endOffset: 0,
+          textContext: { before: '', after: '' },
+        },
+      };
+
+      await storageService.saveHighlight(testHighlight);
+    };
+
+    seedTestData();
+  }, []);
 
   // Handle mouse up - fires once when selection is done
   const handleMouseUp = useCallback((event: MouseEvent) => {
@@ -81,6 +132,7 @@ export function useSelectionHandler() {
       text: selectionState.selectedText,
       url: window.location.href,
       pageTitle: document.title,
+      notes: [],
       color: DEFAULT_SETTINGS.defaultColor,
       timestamp: Date.now(),
       position: {

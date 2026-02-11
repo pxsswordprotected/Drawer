@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Highlight } from '@/shared/types';
+import { useDrawerStore } from '@/store/drawerStore';
 import styles from './HighlightItem.module.css';
 
 interface HighlightItemProps {
@@ -17,6 +18,16 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
   index,
   currentIndex,
 }) => {
+  const selectHighlight = useDrawerStore((s) => s.selectHighlight);
+
+  const handleClick = useCallback(() => {
+    if (isFocused) {
+      selectHighlight(highlight.id);
+    } else if (onClick) {
+      onClick();
+    }
+  }, [isFocused, highlight.id, selectHighlight, onClick]);
+
   // Calculate blur and position attributes declaratively
   const blurLevel = isFocused ? '0' : '3';
   const position = isFocused ? 'center' : index < currentIndex ? 'above' : 'below';
@@ -28,7 +39,7 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
       data-focused={isFocused ? 'true' : 'false'}
       data-blur={blurLevel}
       data-position={position}
-      onClick={isFocused ? undefined : onClick}
+      onClick={handleClick}
     >
       <p className={`${styles.highlightText} text-text-main`}>
         {highlight.text}

@@ -1,11 +1,17 @@
 // Core data models for Drawer extension
 
+export interface Note {
+  id: string; // UUID
+  text: string; // Note content
+  timestamp: number; // Creation timestamp
+}
+
 export interface Highlight {
   id: string; // UUID
   text: string; // Highlighted text content
   url: string; // Page URL
   pageTitle: string; // Page title
-  note?: string; // Optional user note
+  notes: Note[]; // User notes
   color: string; // Highlight color (#hex)
   timestamp: number; // Creation timestamp
   position: HighlightPosition; // DOM position for restoration
