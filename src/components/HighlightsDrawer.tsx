@@ -98,33 +98,36 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [isOpen, loadHighlights]);
 
-  // Click outside handler - DISABLED FOR TESTING
-  // useEffect(() => {
-  //   const handleClickOutside = (e: MouseEvent) => {
-  //     if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-  //       closeDrawer();
-  //     }
-  //   };
+  // Click outside handler
+  useEffect(() => {
+    if (!isOpen) return;
 
-  //   if (isOpen) {
-  //     const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
-  //     root.addEventListener('mousedown', handleClickOutside);
-  //     return () => root.removeEventListener('mousedown', handleClickOutside);
-  //   }
-  // }, [isOpen, closeDrawer]);
+    const handleClickOutside = (e: MouseEvent) => {
+      // We check if the click target is NOT inside our drawerRef
+      if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
+        closeDrawer();
+      }
+    };
 
-  // ESC key handler - DISABLED FOR TESTING
-  // useEffect(() => {
-  //   const handleEscape = (e: KeyboardEvent) => {
-  //     if (e.key === 'Escape') closeDrawer();
-  //   };
+    const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
 
-  //   if (isOpen) {
-  //     const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
-  //     root.addEventListener('keydown', handleEscape);
-  //     return () => root.removeEventListener('keydown', handleEscape);
-  //   }
-  // }, [isOpen, closeDrawer]);
+    // Use 'mousedown' as it's more responsive for closing UI elements
+    root.addEventListener('mousedown', handleClickOutside);
+    return () => root.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, closeDrawer]);
+
+  // ESC key handler
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDrawer();
+    };
+
+    const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
+    root.addEventListener('keydown', handleEscape);
+    return () => root.removeEventListener('keydown', handleEscape);
+  }, [isOpen, closeDrawer]);
 
   // Initialize current index when drawer opens
   useEffect(() => {

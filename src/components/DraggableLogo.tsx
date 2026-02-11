@@ -1,16 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { GalleryVerticalEnd } from 'lucide-react';
 import { useDrawerStore } from '@/store/drawerStore';
 
+const EDGE_MARGIN = 24;
+const LOGO_SIZE = 40;
+
 export const DraggableLogo: React.FC = () => {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({
+    x: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
+    y: window.innerHeight - EDGE_MARGIN - LOGO_SIZE
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [bounds, setBounds] = useState({
+    left: EDGE_MARGIN,
+    top: EDGE_MARGIN,
+    right: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
+    bottom: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
+  });
   const logoRef = React.useRef<HTMLDivElement>(null);
 
   const toggleDrawer = useDrawerStore((state) => state.toggleDrawer);
   const setLogoPosition = useDrawerStore((state) => state.setLogoPosition);
+
+  useEffect(() => {
+    const updateBounds = () => {
+      setBounds({
+        left: EDGE_MARGIN,
+        top: EDGE_MARGIN,
+        right: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
+        bottom: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
+      });
+    };
+
+    window.addEventListener('resize', updateBounds);
+    return () => window.removeEventListener('resize', updateBounds);
+  }, []);
 
   const handleDragStart = () => {
     setDragStart(position);
@@ -25,7 +51,8 @@ export const DraggableLogo: React.FC = () => {
     setPosition({ x: data.x, y: data.y });
   };
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!isDragging && logoRef.current) {
       // Get logo's center position in viewport
       const rect = logoRef.current.getBoundingClientRect();
@@ -39,16 +66,11 @@ export const DraggableLogo: React.FC = () => {
   };
 
   return (
-    <Draggable
-      position={position}
-      onStart={handleDragStart}
-      onDrag={handleDrag}
-      bounds="parent"
-    >
+    <Draggable position={position} onStart={handleDragStart} onDrag={handleDrag} bounds={bounds}>
       <div
         ref={logoRef}
         onClick={handleClick}
-        className="absolute cursor-pointer bg-bg-main rounded-lg flex items-center justify-center"
+        className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} bg-bg-main rounded-lg flex items-center justify-center`}
         style={{
           width: '40px',
           height: '40px',

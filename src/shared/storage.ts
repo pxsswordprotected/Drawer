@@ -1,26 +1,63 @@
 // Storage abstraction layer for browser.storage operations
 // This enables seamless migration to database backend in the future
 
-import browser from 'webextension-polyfill';
 import { Highlight, Settings } from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 
+// Detect if we're in a browser extension context
+const isExtensionContext = (): boolean => {
+  try {
+    return typeof chrome !== 'undefined' && chrome.storage !== undefined;
+  } catch {
+    return false;
+  }
+};
+
 export class StorageService {
+  private isExtension = isExtensionContext();
+
+  /**
+   * Get data from storage (browser.storage or localStorage)
+   */
+  private async getFromStorage(key: string): Promise<any> {
+    if (this.isExtension) {
+      const browser = (await import('webextension-polyfill')).default;
+      const result = await browser.storage.local.get(key);
+      return result[key];
+    } else {
+      // Use localStorage for test environment
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : undefined;
+    }
+  }
+
+  /**
+   * Set data in storage (browser.storage or localStorage)
+   */
+  private async setInStorage(key: string, value: any): Promise<void> {
+    if (this.isExtension) {
+      const browser = (await import('webextension-polyfill')).default;
+      await browser.storage.local.set({ [key]: value });
+    } else {
+      // Use localStorage for test environment
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  }
+
   /**
    * Save a new highlight to storage
    */
   async saveHighlight(highlight: Highlight): Promise<void> {
     const highlights = await this.getHighlights();
     highlights.push(highlight);
-    await browser.storage.local.set({ [STORAGE_KEYS.HIGHLIGHTS]: highlights });
+    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
   }
 
   /**
    * Get all highlights, optionally filtered by URL
    */
   async getHighlights(url?: string): Promise<Highlight[]> {
-    const result = await browser.storage.local.get(STORAGE_KEYS.HIGHLIGHTS);
-    const highlights: Highlight[] = result[STORAGE_KEYS.HIGHLIGHTS] || [];
+    const highlights: Highlight[] = (await this.getFromStorage(STORAGE_KEYS.HIGHLIGHTS)) || [];
 
     if (url) {
       return highlights.filter((h) => h.url === url);
@@ -46,7 +83,7 @@ export class StorageService {
 
     if (index !== -1) {
       highlights[index] = { ...highlights[index], ...updates };
-      await browser.storage.local.set({ [STORAGE_KEYS.HIGHLIGHTS]: highlights });
+      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
     }
   }
 
@@ -56,7 +93,7 @@ export class StorageService {
   async deleteHighlight(id: string): Promise<void> {
     const highlights = await this.getHighlights();
     const filtered = highlights.filter((h) => h.id !== id);
-    await browser.storage.local.set({ [STORAGE_KEYS.HIGHLIGHTS]: filtered });
+    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, filtered);
   }
 
   /**
@@ -65,15 +102,14 @@ export class StorageService {
   async deleteHighlightsByUrl(url: string): Promise<void> {
     const highlights = await this.getHighlights();
     const filtered = highlights.filter((h) => h.url !== url);
-    await browser.storage.local.set({ [STORAGE_KEYS.HIGHLIGHTS]: filtered });
+    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, filtered);
   }
 
   /**
    * Get user settings (uses browser.storage.sync for cross-device sync)
    */
   async getSettings(): Promise<Settings> {
-    const result = await browser.storage.sync.get(STORAGE_KEYS.SETTINGS);
-    const savedSettings = result[STORAGE_KEYS.SETTINGS] || {};
+    const savedSettings = (await this.getFromStorage(STORAGE_KEYS.SETTINGS)) || {};
     return { ...DEFAULT_SETTINGS, ...savedSettings };
   }
 
@@ -83,18 +119,26 @@ export class StorageService {
   async updateSettings(updates: Partial<Settings>): Promise<void> {
     const currentSettings = await this.getSettings();
     const newSettings = { ...currentSettings, ...updates };
-    await browser.storage.sync.set({ [STORAGE_KEYS.SETTINGS]: newSettings });
+    await this.setInStorage(STORAGE_KEYS.SETTINGS, newSettings);
   }
 
   /**
    * Listen for changes to highlights
    */
   onHighlightsChanged(callback: (highlights: Highlight[]) => void): void {
-    browser.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'local' && changes[STORAGE_KEYS.HIGHLIGHTS]) {
-        const newValue = changes[STORAGE_KEYS.HIGHLIGHTS].newValue || [];
-        callback(newValue);
-      }
+    if (!this.isExtension) {
+      console.warn('Storage change listeners are only available in extension context');
+      return;
+    }
+
+    // Only available in extension context
+    import('webextension-polyfill').then(({ default: browser }) => {
+      browser.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local' && changes[STORAGE_KEYS.HIGHLIGHTS]) {
+          const newValue = changes[STORAGE_KEYS.HIGHLIGHTS].newValue || [];
+          callback(newValue);
+        }
+      });
     });
   }
 
@@ -102,11 +146,19 @@ export class StorageService {
    * Listen for changes to settings
    */
   onSettingsChanged(callback: (settings: Settings) => void): void {
-    browser.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'sync' && changes[STORAGE_KEYS.SETTINGS]) {
-        const newValue = changes[STORAGE_KEYS.SETTINGS].newValue || DEFAULT_SETTINGS;
-        callback(newValue);
-      }
+    if (!this.isExtension) {
+      console.warn('Storage change listeners are only available in extension context');
+      return;
+    }
+
+    // Only available in extension context
+    import('webextension-polyfill').then(({ default: browser }) => {
+      browser.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'sync' && changes[STORAGE_KEYS.SETTINGS]) {
+          const newValue = changes[STORAGE_KEYS.SETTINGS].newValue || DEFAULT_SETTINGS;
+          callback(newValue);
+        }
+      });
     });
   }
 
@@ -140,7 +192,7 @@ export class StorageService {
         const unique = merged.filter(
           (highlight, index, self) => index === self.findIndex((h) => h.id === highlight.id)
         );
-        await browser.storage.local.set({ [STORAGE_KEYS.HIGHLIGHTS]: unique });
+        await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, unique);
       }
     } catch (error) {
       console.error('Failed to import highlights:', error);
@@ -152,7 +204,7 @@ export class StorageService {
    * Clear all highlights (use with caution)
    */
   async clearAllHighlights(): Promise<void> {
-    await browser.storage.local.set({ [STORAGE_KEYS.HIGHLIGHTS]: [] });
+    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, []);
   }
 }
 
