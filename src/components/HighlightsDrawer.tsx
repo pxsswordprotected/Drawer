@@ -166,10 +166,10 @@ export const HighlightsDrawer: React.FC = () => {
 
   // Auto-focus scroll container for keyboard navigation
   useEffect(() => {
-    if (isOpen && scrollContainerRef.current) {
+    if (isOpen && scrollContainerRef.current && !selectedHighlightId) {
       scrollContainerRef.current.focus();
     }
-  }, [isOpen]);
+  }, [isOpen, selectedHighlightId]);
 
   // Helper to determine correct scroll alignment based on position
   const getScrollIntoViewOptions = useCallback(
