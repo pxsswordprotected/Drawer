@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import Draggable from 'react-draggable';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { GalleryVerticalEnd } from 'lucide-react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { DRAWER_CONFIG } from '@/shared/constants';
+import styles from './DraggableLogo.module.css';
+
+const Draggable = lazy(() => import('react-draggable'));
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 const LOGO_SIZE = 40;
@@ -24,6 +26,7 @@ export const DraggableLogo: React.FC = () => {
   const logoRef = React.useRef<HTMLDivElement>(null);
   const lastThrottleTime = useRef<number>(0);
   const pendingUpdate = useRef<boolean>(false);
+  const wasDragged = useRef<boolean>(false); // Synchronous drag logic flag
 
   const toggleDrawer = useDrawerStore((state) => state.toggleDrawer);
   const setLogoPosition = useDrawerStore((state) => state.setLogoPosition);
@@ -58,11 +61,13 @@ export const DraggableLogo: React.FC = () => {
   const handleDragStart = () => {
     setDragStart(position);
     setIsDragging(false);
+    wasDragged.current = false; // Reset drag flag
     lastThrottleTime.current = 0; // Reset throttle on drag start
     pendingUpdate.current = false;
   };
 
   const handleDragStop = (_e: any, data: { x: number; y: number }) => {
+    setIsDragging(false);
     // Trailing edge: ensure final position is sent if there was a pending update
     if (pendingUpdate.current) {
       const centerX = data.x + LOGO_SIZE / 2;
@@ -76,7 +81,10 @@ export const DraggableLogo: React.FC = () => {
     const distance = Math.sqrt(
       Math.pow(data.x - dragStart.x, 2) + Math.pow(data.y - dragStart.y, 2)
     );
-    if (distance > 5) setIsDragging(true);
+    if (distance > 5) {
+      wasDragged.current = true; // Logic: "This is now a drag"
+      setIsDragging(true);       // Visual: "Show grabbing cursor"
+    }
     setPosition({ x: data.x, y: data.y });
 
     // Update CSS variables immediately for smooth 60fps tracking
@@ -98,7 +106,9 @@ export const DraggableLogo: React.FC = () => {
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isDragging && logoRef.current) {
+
+    // Check the synchronous ref, not the async state
+    if (!wasDragged.current && logoRef.current) {
       // Get logo's center position in viewport
       const rect = logoRef.current.getBoundingClientRect();
       setLogoPosition({
@@ -107,26 +117,42 @@ export const DraggableLogo: React.FC = () => {
       });
       toggleDrawer();
     }
-    setIsDragging(false);
+
+    // No need to reset wasDragged here, handleDragStart handles it
   };
 
   return (
-    <Draggable position={position} onStart={handleDragStart} onDrag={handleDrag} onStop={handleDragStop} bounds={bounds}>
-      <div
-        ref={logoRef}
-        onClick={handleClick}
-        className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} bg-bg-main rounded-lg flex items-center justify-center`}
-        style={{
-          width: '40px',
-          height: '40px',
-          boxShadow: `
-            inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65),
-            0 2px 5px -1px rgba(0, 0, 0, 0.35)
-          `,
-        }}
-      >
-        <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />
-      </div>
-    </Draggable>
+    <Suspense
+      fallback={
+        <div
+          ref={logoRef}
+          className="absolute cursor-pointer"
+          style={{
+            width: '40px',
+            height: '40px',
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+          }}
+        >
+          <div className={styles.logoInner}>
+            <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />
+          </div>
+        </div>
+      }
+    >
+      <Draggable position={position} onStart={handleDragStart} onDrag={handleDrag} onStop={handleDragStop} bounds={bounds}>
+        <div
+          ref={logoRef}
+          onClick={handleClick}
+          data-dragging={isDragging}
+          className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
+          style={{ width: '40px', height: '40px' }}
+        >
+          <div className={styles.logoInner}>
+            <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />
+          </div>
+        </div>
+      </Draggable>
+    </Suspense>
   );
 };

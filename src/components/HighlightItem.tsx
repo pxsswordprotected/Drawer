@@ -34,7 +34,7 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
 
   return (
     <div
-      className={styles.highlightItem}
+      className={`${styles.highlightItem} ${isFocused ? 'transition-transform duration-75 active:scale-[0.98]' : ''}`}
       data-in-view="true"
       data-focused={isFocused ? 'true' : 'false'}
       data-blur={blurLevel}

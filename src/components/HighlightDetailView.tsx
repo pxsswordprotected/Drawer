@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import shave from 'shave';
 import { Highlight } from '@/shared/types';
@@ -178,8 +178,11 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
   const highlightTextRef = useRef<HTMLSpanElement>(null);
   const originalTextRef = useRef<string>(highlight.text);
 
-  // Sort notes by timestamp descending (most recent first)
-  const sortedNotes = [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp);
+  // Sort notes by timestamp descending (most recent first) - memoized to avoid re-sorting on every render
+  const sortedNotes = useMemo(
+    () => [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp),
+    [highlight.notes]
+  );
 
   useEffect(() => {
     if (highlightTextRef.current && !highlightExpanded) {
@@ -196,7 +199,7 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
       {/* Back button + date */}
       <button
         onClick={clearSelectedHighlight}
-        className="flex items-center gap-2 mb-4 text-text-secondary text-sm uppercase tracking-wide hover:text-text-main transition-colors duration-fast"
+        className="flex items-center gap-2 mb-4 text-text-secondary text-sm uppercase tracking-wide hover:text-text-main transition-all duration-fast active:scale-95"
       >
         <ArrowLeft size={16} />
         <span>{formatDate(highlight.timestamp)}</span>

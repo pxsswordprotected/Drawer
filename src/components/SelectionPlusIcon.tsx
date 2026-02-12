@@ -23,7 +23,7 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
       onClick={onClick}
       disabled={disabled}
       data-selection-plus-icon="true"
-      className="fixed z-[999] bg-bg-main rounded-full p-1.5 shadow-lg hover:scale-110 transition-transform cursor-pointer border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="fixed z-[999] bg-bg-main rounded-full p-1.5 shadow-lg hover:scale-110 active:scale-100 transition-transform cursor-pointer border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
       style={{
         left: `${x}px`,
         top: `${y}px`,

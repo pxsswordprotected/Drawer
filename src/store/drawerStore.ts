@@ -21,6 +21,9 @@ interface DrawerState {
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
 }
 
+// Request deduplication map - prevents duplicate concurrent requests for the same URL
+const loadingPromises = new Map<string, Promise<void>>();
+
 export const useDrawerStore = create<DrawerState>((set) => ({
   isOpen: false,
   currentPageHighlights: [],
@@ -90,14 +93,27 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   },
 
   loadHighlights: async (url: string) => {
-    set({ isLoading: true });
-
-    try {
-      const highlights = await storageService.getHighlights(url);
-      set({ currentPageHighlights: highlights, isLoading: false });
-    } catch (error) {
-      console.error('Failed to load highlights:', error);
-      set({ currentPageHighlights: [], isLoading: false });
+    // Request deduplication: if already loading this URL, return existing promise
+    if (loadingPromises.has(url)) {
+      return loadingPromises.get(url);
     }
+
+    const promise = (async () => {
+      set({ isLoading: true });
+
+      try {
+        const highlights = await storageService.getHighlights(url);
+        set({ currentPageHighlights: highlights, isLoading: false });
+      } catch (error) {
+        console.error('Failed to load highlights:', error);
+        set({ currentPageHighlights: [], isLoading: false });
+      } finally {
+        // Clean up promise from map after completion
+        loadingPromises.delete(url);
+      }
+    })();
+
+    loadingPromises.set(url, promise);
+    return promise;
   },
 }));
