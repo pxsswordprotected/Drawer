@@ -31,7 +31,7 @@
 }
 
 .highlightItem[data-focused='true'] {
-  cursor: default;
+  cursor: pointer;
 }
 
 /* Center item - no blur or mask */

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Highlight, Note } from '@/shared/types';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
+import { useDrawerStore } from '@/store/drawerStore';
 
 interface SelectionState {
   visible: boolean;
@@ -92,6 +93,20 @@ export function useSelectionHandler() {
       if (!selectedText || selectedText.length === 0) {
         setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
         return;
+      }
+
+      // Check if drawer is open and selection is inside the drawer
+      const isOpen = useDrawerStore.getState().isOpen;
+      if (isOpen) {
+        const range = selection.getRangeAt(0);
+        const container = range.commonAncestorContainer;
+        const element = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+
+        // Check if selection is inside drawer (look for parent with data-drawer attribute or specific class)
+        if (element?.closest('[data-drawer]') || element?.closest('.fixed.bg-bg-main')) {
+          setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+          return;
+        }
       }
 
       // Get the bounding rect of the selection

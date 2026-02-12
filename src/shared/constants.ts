@@ -32,6 +32,7 @@ export const DRAWER_CONFIG = {
   MIN_HEIGHT: 400,
   SHADOW_DOM_ID: 'drawer-extension-root',
   Z_INDEX: 2147483647, // Max z-index to ensure drawer is always on top
+  EDGE_MARGIN: 24, // Margin from viewport edges for logo and drawer
 } as const;
 
 export const TOAST_CONFIG = {

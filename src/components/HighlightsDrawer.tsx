@@ -3,8 +3,11 @@ import { useDrawerStore } from '@/store/drawerStore';
 import { HighlightItem } from './HighlightItem';
 import { HighlightDetailView } from './HighlightDetailView';
 import { Highlight } from '@/shared/types';
+import { DRAWER_CONFIG } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
 import detailStyles from './HighlightDetailView.module.css';
+
+const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
 // Memoized list item to prevent re-renders when other items change
 interface HighlightListItemProps {
@@ -76,6 +79,7 @@ export const HighlightsDrawer: React.FC = () => {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [drawerStyle, setDrawerStyle] = useState<React.CSSProperties>({});
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [drawerSide, setDrawerSide] = useState<'left' | 'right'>('right');
 
   // Calculate drawer position based on logo position
   useEffect(() => {
@@ -83,30 +87,40 @@ export const HighlightsDrawer: React.FC = () => {
 
     const drawerWidth = 376;
     const drawerHeight = 270;
-    const gap = 10;
+    const LOGO_SIZE = 40; // Logo width/height (should match DraggableLogo.tsx)
+    const LOGO_RADIUS = LOGO_SIZE / 2; // Half the logo size (20px)
+    const DESIRED_GAP = 10; // Actual spacing between logo and drawer
+    const gap = LOGO_RADIUS + DESIRED_GAP; // 30px total - clears logo + adds spacing
+    const hysteresisBuffer = 30; // Buffer zone to prevent rapid flipping
 
-    // Default: position to the right of logo
-    let left = logoPosition.x + 20 + gap;
-    let top = logoPosition.y - drawerHeight / 2;
+    // Calculate distance from edges
+    const distanceFromRightEdge = window.innerWidth - logoPosition.x;
+    const distanceFromLeftEdge = logoPosition.x;
+    const flipThreshold = EDGE_MARGIN + drawerWidth + gap;
 
-    // Flip to left if too close to right edge
-    if (left + drawerWidth > window.innerWidth - 20) {
-      left = logoPosition.x - drawerWidth - 20 - gap;
+    // Side-aware hysteresis: only check flip condition for transitioning to other side
+    if (drawerSide === 'right' && distanceFromRightEdge < flipThreshold && distanceFromRightEdge < distanceFromLeftEdge) {
+      setDrawerSide('left');
+    } else if (drawerSide === 'left' && distanceFromLeftEdge < flipThreshold && distanceFromLeftEdge < distanceFromRightEdge) {
+      setDrawerSide('right');
     }
 
-    // Clamp to viewport
-    if (left < 20) left = 20;
-    if (top < 20) top = 20;
-    if (top + drawerHeight > window.innerHeight - 20) {
-      top = window.innerHeight - drawerHeight - 20;
-    }
+    // Calculate offset based on which side drawer is on
+    const offset = drawerSide === 'right' ? gap : -drawerWidth - gap;
 
+    // Use CSS variables with transform for GPU-accelerated smooth movement
     setDrawerStyle({
-      left: `${left}px`,
-      top: `${top}px`,
-      transformOrigin: `${logoPosition.x - left}px ${logoPosition.y - top}px`,
+      transform: `translate3d(
+        clamp(${EDGE_MARGIN}px, calc(var(--logo-x, 50vw) + ${offset}px), ${window.innerWidth - drawerWidth - EDGE_MARGIN}px),
+        clamp(${EDGE_MARGIN}px, calc(var(--logo-y, 50vh) - ${drawerHeight / 2}px), ${window.innerHeight - drawerHeight - EDGE_MARGIN}px),
+        0
+      )`,
+      willChange: 'transform',
+      transformOrigin: drawerSide === 'right'
+        ? `${-gap}px ${drawerHeight / 2}px`
+        : `${drawerWidth + gap}px ${drawerHeight / 2}px`,
     });
-  }, [logoPosition]);
+  }, [logoPosition, drawerSide]);
 
   // Load highlights when drawer opens
   useEffect(() => {
@@ -236,6 +250,7 @@ export const HighlightsDrawer: React.FC = () => {
   return (
     <div
       ref={drawerRef}
+      data-drawer
       className="fixed bg-bg-elevated rounded-lg overflow-hidden"
       style={{
         width: '376px',

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import shave from 'shave';
 import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
 import styles from './HighlightDetailView.module.css';
@@ -174,9 +175,21 @@ const NoteItem: React.FC<NoteItemProps> = ({ noteId, highlightId, text }) => {
 export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highlight }) => {
   const clearSelectedHighlight = useDrawerStore((s) => s.clearSelectedHighlight);
   const [highlightExpanded, setHighlightExpanded] = useState(false);
+  const highlightTextRef = useRef<HTMLSpanElement>(null);
+  const originalTextRef = useRef<string>(highlight.text);
 
   // Sort notes by timestamp descending (most recent first)
   const sortedNotes = [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp);
+
+  useEffect(() => {
+    if (highlightTextRef.current && !highlightExpanded) {
+      // Apply shave with 3 lines (assuming line-height of 1.5, so 3 * 1.5 = 4.5em = 72px for 16px base)
+      shave(highlightTextRef.current, 72);
+    } else if (highlightTextRef.current && highlightExpanded) {
+      // Restore original text
+      highlightTextRef.current.textContent = originalTextRef.current;
+    }
+  }, [highlightExpanded, highlight.text]);
 
   return (
     <div className="px-[38px]" style={{ paddingTop: '20px', paddingBottom: '20px' }}>
@@ -191,22 +204,17 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
 
       {/* Highlight text block */}
       <div className="mb-4">
-        <p
-          className="text-base leading-relaxed"
-          style={{
-            maxHeight: highlightExpanded ? 'none' : '4.5em',
-            overflow: 'hidden',
-            cursor: 'pointer',
-          }}
-          onClick={() => setHighlightExpanded((prev) => !prev)}
-        >
+        <p className="text-base leading-relaxed">
           <span
+            ref={highlightTextRef}
             className="bg-white text-bg-main"
             style={{
               padding: '3px 4px',
               boxDecorationBreak: 'clone',
               WebkitBoxDecorationBreak: 'clone',
+              cursor: 'pointer',
             }}
+            onClick={() => setHighlightExpanded((prev) => !prev)}
           >
             {highlight.text}
           </span>
