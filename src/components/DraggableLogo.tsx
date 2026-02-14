@@ -30,6 +30,7 @@ export const DraggableLogo: React.FC = () => {
 
   const toggleDrawer = useDrawerStore((state) => state.toggleDrawer);
   const setLogoPosition = useDrawerStore((state) => state.setLogoPosition);
+  const isOpen = useDrawerStore((state) => state.isOpen);
 
   useEffect(() => {
     const updateBounds = () => {
@@ -126,7 +127,7 @@ export const DraggableLogo: React.FC = () => {
       fallback={
         <div
           ref={logoRef}
-          className="absolute cursor-pointer"
+          className={`absolute cursor-pointer ${isOpen ? styles.logoDrawerOpen : ''}`}
           style={{
             width: '40px',
             height: '40px',
@@ -145,7 +146,7 @@ export const DraggableLogo: React.FC = () => {
           ref={logoRef}
           onClick={handleClick}
           data-dragging={isDragging}
-          className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'}`}
+          className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} ${isOpen ? styles.logoDrawerOpen : ''}`}
           style={{ width: '40px', height: '40px' }}
         >
           <div className={styles.logoInner}>
