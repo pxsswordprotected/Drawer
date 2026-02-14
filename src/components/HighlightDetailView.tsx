@@ -197,16 +197,18 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
   return (
     <div className="px-[38px]" style={{ paddingTop: '20px', paddingBottom: '20px' }}>
       {/* Back button + date */}
-      <button
-        onClick={clearSelectedHighlight}
-        className="flex items-center gap-2 mb-4 text-text-secondary text-sm uppercase tracking-wide hover:text-text-main transition-all duration-fast active:scale-95"
-      >
-        <ArrowLeft size={16} />
-        <span>{formatDate(highlight.timestamp)}</span>
-      </button>
+      <div className={styles.detailStagger} style={{ animationDelay: '80ms' }}>
+        <button
+          onClick={clearSelectedHighlight}
+          className={`flex items-center gap-2 mb-4 text-text-secondary text-sm uppercase tracking-wide hover:text-text-main transition-all duration-fast ${styles.backButton}`}
+        >
+          <ArrowLeft size={16} />
+          <span>{formatDate(highlight.timestamp)}</span>
+        </button>
+      </div>
 
       {/* Highlight text block */}
-      <div className="mb-4">
+      <div className={`mb-4 ${styles.detailStagger}`} style={{ animationDelay: '115ms' }}>
         <p className="text-base leading-relaxed">
           <span
             ref={highlightTextRef}
@@ -225,6 +227,7 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
       </div>
 
       {/* Notes section */}
+      <div className={styles.detailStagger} style={{ animationDelay: '150ms' }}>
       <p className="text-text-secondary text-xs mb-1">Notes</p>
 
       <div className="space-y-0">
@@ -243,6 +246,7 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
             {index < sortedNotes.length - 1 && <div className="border-t border-divider" />}
           </React.Fragment>
         ))}
+      </div>
       </div>
     </div>
   );

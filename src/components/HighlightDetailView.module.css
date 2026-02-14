@@ -13,16 +13,19 @@
   left: 0;
   width: 100%;
   height: 100%;
-  transition: transform 300ms ease-out;
-  will-change: transform;
+  transition: transform 250ms cubic-bezier(0.19, 1, 0.22, 1),
+              opacity 250ms cubic-bezier(0.19, 1, 0.22, 1);
+  will-change: transform, opacity;
 }
 
 .listPane {
   transform: translateX(0);
+  opacity: 1;
 }
 
 .detailPane {
-  transform: translateX(100%);
+  transform: translateX(100%) scale(0.98);
+  opacity: 0;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -32,13 +35,15 @@
   display: none;
 }
 
-/* When detail is active, slide list out left, detail in from right */
+/* When detail is active, list recedes behind, detail slides in from right */
 .slideContainer[data-detail-active='true'] .listPane {
-  transform: translateX(-100%);
+  transform: translateX(-30%) scale(0.95);
+  opacity: 0.5;
 }
 
 .slideContainer[data-detail-active='true'] .detailPane {
-  transform: translateX(0);
+  transform: translateX(0) scale(1);
+  opacity: 1;
 }
 
 /* Note expand/collapse using grid-template-rows trick */
@@ -62,10 +67,35 @@
   line-height: 1.5;
 }
 
+/* Stagger animation for detail content */
+@keyframes detailContentEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.detailStagger {
+  animation: detailContentEnter 250ms cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+/* Back button directional press feedback */
+.backButton:active svg {
+  transform: translateX(-2px);
+  transition: transform 75ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+
 /* Disable transitions for reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .listPane,
   .detailPane {
     transition: none;
+  }
+  .detailStagger {
+    animation: none;
   }
 }
