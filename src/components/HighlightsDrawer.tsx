@@ -285,10 +285,7 @@ export const HighlightsDrawer: React.FC = () => {
         height: '270px',
         zIndex: 1000,
         ...drawerStyle,
-        boxShadow: `
-          inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65),
-          0 2px 5px -1px rgba(0, 0, 0, 0.35)
-        `,
+        boxShadow: '0 2px 5px -1px rgba(0, 0, 0, 0.35)',
       }}
       onAnimationEnd={handleDrawerAnimationEnd}
     >

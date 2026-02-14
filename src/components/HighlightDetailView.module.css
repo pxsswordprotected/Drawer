@@ -26,6 +26,8 @@
 .detailPane {
   transform: translateX(100%) scale(0.98);
   opacity: 0;
+  background-color: #242424;
+  border-radius: 8px;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
