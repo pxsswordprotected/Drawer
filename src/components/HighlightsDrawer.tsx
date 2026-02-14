@@ -18,10 +18,12 @@ interface HighlightListItemProps {
   itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
   setCurrentIndex: React.Dispatch<React.SetStateAction<number>>;
   navigateToIndex: (index: number) => void;
+  isStaggering: boolean;
+  onStaggerEnd?: () => void;
 }
 
 const HighlightListItem = memo<HighlightListItemProps>(
-  ({ highlight, index, currentIndex, totalItems, itemRefs, setCurrentIndex, navigateToIndex }) => {
+  ({ highlight, index, currentIndex, totalItems, itemRefs, setCurrentIndex, navigateToIndex, isStaggering, onStaggerEnd }) => {
     const isFocused = index === currentIndex;
     const isFirst = index === 0;
     const isLast = index === totalItems - 1;
@@ -44,10 +46,18 @@ const HighlightListItem = memo<HighlightListItemProps>(
             index={index}
             currentIndex={currentIndex}
             onClick={handleClick}
+            isStaggering={isStaggering}
+            onStaggerEnd={isLast ? onStaggerEnd : undefined}
           />
         </div>
         {index < totalItems - 1 && (
-          <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+          <div
+            className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+            style={{
+              width: '300px',
+              ...(isStaggering ? { animationDelay: `${20 + index * 35 + 17}ms` } : {}),
+            }}
+          />
         )}
       </React.Fragment>
     );
@@ -79,7 +89,31 @@ export const HighlightsDrawer: React.FC = () => {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [drawerStyle, setDrawerStyle] = useState<React.CSSProperties>({});
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [drawerSide, setDrawerSide] = useState<'left' | 'right'>('right');
+  const [isClosing, setIsClosing] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isStaggering, setIsStaggering] = useState(false);
+
+  // Sync visibility with isOpen for exit animation support
+  useEffect(() => {
+    if (isOpen) {
+      setIsVisible(true);
+      setIsClosing(false);
+      setIsStaggering(true);
+    } else if (isVisible) {
+      setIsClosing(true);
+    }
+  }, [isOpen]);
+
+  const handleDrawerAnimationEnd = useCallback((e: React.AnimationEvent) => {
+    if (e.target === e.currentTarget && isClosing) {
+      setIsVisible(false);
+      setIsClosing(false);
+    }
+  }, [isClosing]);
+
+  const handleStaggerEnd = useCallback(() => {
+    setIsStaggering(false);
+  }, []);
 
   // Calculate drawer position based on logo position
   useEffect(() => {
@@ -91,36 +125,30 @@ export const HighlightsDrawer: React.FC = () => {
     const LOGO_RADIUS = LOGO_SIZE / 2; // Half the logo size (20px)
     const DESIRED_GAP = 10; // Actual spacing between logo and drawer
     const gap = LOGO_RADIUS + DESIRED_GAP; // 30px total - clears logo + adds spacing
-    const hysteresisBuffer = 30; // Buffer zone to prevent rapid flipping
-
-    // Calculate distance from edges
-    const distanceFromRightEdge = window.innerWidth - logoPosition.x;
-    const distanceFromLeftEdge = logoPosition.x;
-    const flipThreshold = EDGE_MARGIN + drawerWidth + gap;
-
-    // Side-aware hysteresis: only check flip condition for transitioning to other side
-    if (drawerSide === 'right' && distanceFromRightEdge < flipThreshold && distanceFromRightEdge < distanceFromLeftEdge) {
-      setDrawerSide('left');
-    } else if (drawerSide === 'left' && distanceFromLeftEdge < flipThreshold && distanceFromLeftEdge < distanceFromRightEdge) {
-      setDrawerSide('right');
-    }
+    // Determine which side of the FAB the drawer opens on
+    const spaceOnRight = window.innerWidth - logoPosition.x;
+    const minSpaceNeeded = EDGE_MARGIN + drawerWidth + gap;
+    const drawerSide = spaceOnRight >= minSpaceNeeded ? 'right' : 'left';
 
     // Calculate offset based on which side drawer is on
     const offset = drawerSide === 'right' ? gap : -drawerWidth - gap;
 
-    // Use CSS variables with transform for GPU-accelerated smooth movement
+    // Calculate the drawer's actual Y position (matching the clamp logic) for transform-origin
+    const drawerY = Math.max(
+      EDGE_MARGIN,
+      Math.min(logoPosition.y - drawerHeight / 2, window.innerHeight - drawerHeight - EDGE_MARGIN)
+    );
+    const originY = logoPosition.y - drawerY; // FAB's Y offset within drawer's local space
+
+    // Use individual translate property so transform-origin governs the scale animation
     setDrawerStyle({
-      transform: `translate3d(
-        clamp(${EDGE_MARGIN}px, calc(var(--logo-x, 50vw) + ${offset}px), ${window.innerWidth - drawerWidth - EDGE_MARGIN}px),
-        clamp(${EDGE_MARGIN}px, calc(var(--logo-y, 50vh) - ${drawerHeight / 2}px), ${window.innerHeight - drawerHeight - EDGE_MARGIN}px),
-        0
-      )`,
-      willChange: 'transform',
+      translate: `clamp(${EDGE_MARGIN}px, calc(var(--logo-x, 50vw) + ${offset}px), ${window.innerWidth - drawerWidth - EDGE_MARGIN}px) clamp(${EDGE_MARGIN}px, calc(var(--logo-y, 50vh) - ${drawerHeight / 2}px), ${window.innerHeight - drawerHeight - EDGE_MARGIN}px)`,
+      willChange: 'translate, transform',
       transformOrigin: drawerSide === 'right'
-        ? `${-gap}px ${drawerHeight / 2}px`
-        : `${drawerWidth + gap}px ${drawerHeight / 2}px`,
+        ? `${-gap}px ${originY}px`
+        : `${drawerWidth + gap}px ${originY}px`,
     });
-  }, [logoPosition, drawerSide]);
+  }, [logoPosition]);
 
   // Load highlights when drawer opens
   useEffect(() => {
@@ -245,24 +273,24 @@ export const HighlightsDrawer: React.FC = () => {
     return () => container.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, currentPageHighlights, navigateToIndex]);
 
-  if (!isOpen) return null;
+  if (!isVisible) return null;
 
   return (
     <div
       ref={drawerRef}
       data-drawer
-      className="fixed bg-bg-elevated rounded-lg overflow-hidden"
+      className={`fixed top-0 left-0 bg-bg-elevated rounded-lg overflow-hidden ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
       style={{
         width: '376px',
         height: '270px',
         zIndex: 1000,
         ...drawerStyle,
-        animation: 'drawerEnter 200ms cubic-bezier(0.23, 1, 0.32, 1)',
         boxShadow: `
           inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65),
           0 2px 5px -1px rgba(0, 0, 0, 0.35)
         `,
       }}
+      onAnimationEnd={handleDrawerAnimationEnd}
     >
       <div
         className={detailStyles.slideContainer}
@@ -307,6 +335,8 @@ export const HighlightsDrawer: React.FC = () => {
                     itemRefs={itemRefs}
                     setCurrentIndex={setCurrentIndex}
                     navigateToIndex={navigateToIndex}
+                    isStaggering={isStaggering}
+                    onStaggerEnd={handleStaggerEnd}
                   />
                 ))
               )}

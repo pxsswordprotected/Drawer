@@ -9,6 +9,8 @@ interface HighlightItemProps {
   isFocused?: boolean;
   index: number;
   currentIndex: number;
+  isStaggering?: boolean;
+  onStaggerEnd?: () => void;
 }
 
 export const HighlightItem: React.FC<HighlightItemProps> = ({
@@ -17,6 +19,8 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
   isFocused = false,
   index,
   currentIndex,
+  isStaggering = false,
+  onStaggerEnd,
 }) => {
   const selectHighlight = useDrawerStore((s) => s.selectHighlight);
 
@@ -32,14 +36,24 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
   const blurLevel = isFocused ? '0' : '3';
   const position = isFocused ? 'center' : index < currentIndex ? 'above' : 'below';
 
+  const handleAnimationEnd = useCallback((e: React.AnimationEvent) => {
+    if (e.animationName === 'itemStaggerEnter') {
+      onStaggerEnd?.();
+    }
+  }, [onStaggerEnd]);
+
+  const staggerDelay = 20 + index * 35;
+
   return (
     <div
-      className={`${styles.highlightItem} ${isFocused ? 'transition-transform duration-75 active:scale-[0.98]' : ''}`}
+      className={`${styles.highlightItem} ${isStaggering ? styles.staggerEntry : ''} ${isFocused ? 'transition-transform duration-75 active:scale-[0.98]' : ''}`}
+      style={isStaggering ? { animationDelay: `${staggerDelay}ms` } : undefined}
       data-in-view="true"
       data-focused={isFocused ? 'true' : 'false'}
       data-blur={blurLevel}
       data-position={position}
       onClick={handleClick}
+      onAnimationEnd={isStaggering ? handleAnimationEnd : undefined}
     >
       <p className={`${styles.highlightText} text-text-main`}>
         {highlight.text}
