@@ -49,11 +49,12 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
       onClick={onClick}
       disabled={disabled}
       data-selection-plus-icon="true"
-      className="fixed z-[999] bg-bg-main rounded-full p-1.5 shadow-lg hover:bg-[#2a2a2a] cursor-pointer border border-white/20 disabled:cursor-not-allowed"
+      className="fixed z-[999] bg-bg-main rounded-full p-1.5 shadow-lg hover:bg-[#2a2a2a] cursor-pointer border border-white/20 disabled:cursor-default"
       style={{
         left: `${x}px`,
         top: `${y}px`,
-        transition: 'opacity 150ms cubic-bezier(.19, 1, .22, 1), transform 150ms cubic-bezier(.19, 1, .22, 1), color 200ms ease',
+        transition:
+          'opacity 150ms cubic-bezier(.19, 1, .22, 1), transform 150ms cubic-bezier(.19, 1, .22, 1), color 200ms ease',
         opacity: isDismissing ? 0 : 1,
         transform: isDismissing ? 'scale(0.9)' : 'scale(1)',
       }}
@@ -129,8 +130,22 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
 
           {/* STROKE 3: Utility Stroke */}
           <polyline points="8,8 8,8" opacity="0">
-            <animate data-anim="toCheck" attributeName="opacity" dur="1ms" begin="indefinite" fill="freeze" to="0" />
-            <animate data-anim="toPlus" attributeName="opacity" dur="1ms" begin="indefinite" fill="freeze" to="0" />
+            <animate
+              data-anim="toCheck"
+              attributeName="opacity"
+              dur="1ms"
+              begin="indefinite"
+              fill="freeze"
+              to="0"
+            />
+            <animate
+              data-anim="toPlus"
+              attributeName="opacity"
+              dur="1ms"
+              begin="indefinite"
+              fill="freeze"
+              to="0"
+            />
           </polyline>
         </g>
       </svg>

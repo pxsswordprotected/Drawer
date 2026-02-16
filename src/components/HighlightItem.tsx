@@ -49,16 +49,14 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
 
   return (
     <div
-      className={`${styles.highlightItem} ${isStaggering ? styles.staggerEntry : ''} ${isFocused ? 'transition-transform duration-75 active:scale-[0.98]' : 'opacity-85'}`}
-      style={isStaggering ? { animationDelay: `${staggerDelay}ms` } : undefined}
-      data-in-view="true"
+      className={`${styles.highlightItem} ${isStaggering ? styles.staggerEntry : ''}`}
       data-focused={isFocused ? 'true' : 'false'}
-      data-blur={blurLevel}
-      data-position={position}
       onClick={handleClick}
       onAnimationEnd={isStaggering ? handleAnimationEnd : undefined}
     >
-      <p className={`${styles.highlightText} text-text-main`}>{highlight.text}</p>
+      <div className={styles.highlightVisual} data-blur={blurLevel} data-position={position}>
+        <p className={`${styles.highlightText} text-text-main`}>{highlight.text}</p>
+      </div>
     </div>
   );
 };

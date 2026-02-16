@@ -21,12 +21,8 @@
 .highlightItem:not([data-focused='true'])::before {
   content: '';
   position: absolute;
-  top: -8px;
-  bottom: -8px;
-  left: 0;
-  right: 0;
+  inset: -6px 0;
   /* Invisible but captures clicks */
-  background: transparent;
   cursor: pointer;
 }
 
@@ -39,6 +35,10 @@
   filter: blur(0px);
   opacity: 1;
   mask-image: none;
+}
+
+.highlightItem:not([data-focused='true']) .highlightVisual {
+  opacity: 0.4;
 }
 
 /* Items above center - subtle blur, keep readable */
