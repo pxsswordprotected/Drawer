@@ -1,125 +1,142 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import type { DraggableData, DraggableEvent } from 'react-draggable';
 import { GalleryVerticalEnd } from 'lucide-react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { DRAWER_CONFIG } from '@/shared/constants';
+import { getDrawerElement, getDrawerLayout } from '@/shared/drawerDom';
 import styles from './DraggableLogo.module.css';
 
 const Draggable = lazy(() => import('react-draggable'));
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 const LOGO_SIZE = 44;
-const THROTTLE_MS = 50;
+
+type Pos = { x: number; y: number };
+type Bounds = { left: number; top: number; right: number; bottom: number };
+
+const getBounds = (): Bounds => ({
+  left: EDGE_MARGIN,
+  top: EDGE_MARGIN,
+  right: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
+  bottom: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
+});
+
+const clampPos = (pos: Pos, b: Bounds): Pos => ({
+  x: Math.max(b.left, Math.min(pos.x, b.right)),
+  y: Math.max(b.top, Math.min(pos.y, b.bottom)),
+});
+
+const getInitialPosition = (): Pos => ({
+  x: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
+  y: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
+});
 
 export const DraggableLogo: React.FC = () => {
-  const [position, setPosition] = useState({
-    x: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
-    y: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
-  });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [bounds, setBounds] = useState({
-    left: EDGE_MARGIN,
-    top: EDGE_MARGIN,
-    right: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
-    bottom: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
-  });
-  const logoRef = React.useRef<HTMLDivElement>(null);
-  const lastThrottleTime = useRef<number>(0);
-  const pendingUpdate = useRef<boolean>(false);
-  const wasDragged = useRef<boolean>(false); // Synchronous drag logic flag
+  const [position, setPosition] = useState<Pos>(getInitialPosition);
+  const [bounds, setBounds] = useState<Bounds>(getBounds);
+
+  const logoRef = useRef<HTMLDivElement>(null);
+  const wasDragged = useRef(false);
+  const latestCenterRef = useRef<Pos>({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
 
   const toggleDrawer = useDrawerStore((state) => state.toggleDrawer);
+  const closeDrawer = useDrawerStore((state) => state.closeDrawer);
   const setLogoPosition = useDrawerStore((state) => state.setLogoPosition);
   const isOpen = useDrawerStore((state) => state.isOpen);
 
   useEffect(() => {
-    const updateBounds = () => {
-      setBounds({
-        left: EDGE_MARGIN,
-        top: EDGE_MARGIN,
-        right: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
-        bottom: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
-      });
+    const onResize = () => {
+      const nextBounds = getBounds();
+      setBounds(nextBounds);
+      setPosition((prev) => clampPos(prev, nextBounds));
     };
 
-    window.addEventListener('resize', updateBounds);
-    return () => window.removeEventListener('resize', updateBounds);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Set CSS variables for drawer positioning
   useEffect(() => {
-    const centerX = position.x + LOGO_SIZE / 2;
-    const centerY = position.y + LOGO_SIZE / 2;
-    document.documentElement.style.setProperty('--logo-x', `${centerX}px`);
-    document.documentElement.style.setProperty('--logo-y', `${centerY}px`);
-
     return () => {
-      document.documentElement.style.removeProperty('--logo-x');
-      document.documentElement.style.removeProperty('--logo-y');
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [position]);
+  }, []);
+
+  const scheduleDrawerWrite = () => {
+    if (rafRef.current != null) return;
+
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+
+      const drawer = getDrawerElement();
+      const layout = getDrawerLayout();
+      if (!drawer || !layout) return;
+
+      const { x: cx, y: cy } = latestCenterRef.current;
+      const { width, height, offset } = layout;
+
+      const x = Math.max(
+        EDGE_MARGIN,
+        Math.min(cx + offset, window.innerWidth - width - EDGE_MARGIN)
+      );
+      const y = Math.max(
+        EDGE_MARGIN,
+        Math.min(cy - height / 2, window.innerHeight - height - EDGE_MARGIN)
+      );
+
+      drawer.style.translate = `${x}px ${y}px`;
+    });
+  };
 
   const handleDragStart = () => {
-    setDragStart(position);
-    setIsDragging(false);
-    wasDragged.current = false; // Reset drag flag
-    lastThrottleTime.current = 0; // Reset throttle on drag start
-    pendingUpdate.current = false;
+    wasDragged.current = false;
   };
 
-  const handleDragStop = (_e: any, data: { x: number; y: number }) => {
-    setIsDragging(false);
-    // Trailing edge: ensure final position is sent if there was a pending update
-    if (pendingUpdate.current) {
-      const centerX = data.x + LOGO_SIZE / 2;
-      const centerY = data.y + LOGO_SIZE / 2;
-      setLogoPosition({ x: centerX, y: centerY });
-      pendingUpdate.current = false;
+  const handleDrag = (_e: DraggableEvent, data: DraggableData) => {
+    if (!wasDragged.current) {
+      wasDragged.current = true;
+      if (isOpen) closeDrawer();
     }
+
+    const nextPos = { x: data.x, y: data.y };
+    setPosition(nextPos);
+
+    latestCenterRef.current = {
+      x: data.x + LOGO_SIZE / 2,
+      y: data.y + LOGO_SIZE / 2,
+    };
+    scheduleDrawerWrite();
   };
 
-  const handleDrag = (_e: any, data: { x: number; y: number }) => {
-    const distance = Math.sqrt(
-      Math.pow(data.x - dragStart.x, 2) + Math.pow(data.y - dragStart.y, 2)
-    );
-    if (distance > 5) {
-      wasDragged.current = true; // Logic: "This is now a drag"
-      setIsDragging(true); // Visual: "Show grabbing cursor"
-    }
-    setPosition({ x: data.x, y: data.y });
+  const handleDragStop = (_e: DraggableEvent, data: DraggableData) => {
+    setTimeout(() => {
+      wasDragged.current = false;
+    }, 0);
 
-    // Update CSS variables immediately for smooth 60fps tracking
-    const centerX = data.x + LOGO_SIZE / 2;
-    const centerY = data.y + LOGO_SIZE / 2;
-    document.documentElement.style.setProperty('--logo-x', `${centerX}px`);
-    document.documentElement.style.setProperty('--logo-y', `${centerY}px`);
+    const center = {
+      x: data.x + LOGO_SIZE / 2,
+      y: data.y + LOGO_SIZE / 2,
+    };
 
-    // Throttled position update for drawer flip logic (leading edge)
-    const now = Date.now();
-    if (now - lastThrottleTime.current >= THROTTLE_MS) {
-      lastThrottleTime.current = now;
-      pendingUpdate.current = false;
-      setLogoPosition({ x: centerX, y: centerY });
-    } else {
-      pendingUpdate.current = true;
-    }
+    latestCenterRef.current = center;
+    scheduleDrawerWrite();
+    setLogoPosition(center);
   };
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (wasDragged.current) return;
 
-    // Check the synchronous ref, not the async state
-    if (!wasDragged.current && logoRef.current) {
-      // Get logo's center position in viewport
+    if (logoRef.current) {
       const rect = logoRef.current.getBoundingClientRect();
-      setLogoPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-      });
-      toggleDrawer();
+      const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+
+      latestCenterRef.current = center;
+      scheduleDrawerWrite();
+      setLogoPosition(center);
     }
 
-    // No need to reset wasDragged here, handleDragStart handles it
+    toggleDrawer();
   };
 
   return (
@@ -129,8 +146,8 @@ export const DraggableLogo: React.FC = () => {
           ref={logoRef}
           className={`absolute cursor-pointer ${isOpen ? styles.logoDrawerOpen : ''}`}
           style={{
-            width: '44px',
-            height: '44px',
+            width: `${LOGO_SIZE}px`,
+            height: `${LOGO_SIZE}px`,
             left: `${position.x}px`,
             top: `${position.y}px`,
           }}
@@ -142,6 +159,7 @@ export const DraggableLogo: React.FC = () => {
       }
     >
       <Draggable
+        nodeRef={logoRef}
         position={position}
         onStart={handleDragStart}
         onDrag={handleDrag}
@@ -151,9 +169,8 @@ export const DraggableLogo: React.FC = () => {
         <div
           ref={logoRef}
           onClick={handleClick}
-          data-dragging={isDragging}
-          className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} ${isOpen ? styles.logoDrawerOpen : ''}`}
-          style={{ width: '44px', height: '44px' }}
+          className={`absolute cursor-pointer ${isOpen ? styles.logoDrawerOpen : ''}`}
+          style={{ width: `${LOGO_SIZE}px`, height: `${LOGO_SIZE}px` }}
         >
           <div className={styles.logoInner}>
             <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />

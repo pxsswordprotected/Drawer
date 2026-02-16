@@ -1,38 +1,40 @@
 .logoInner {
   width: 100%;
   height: 100%;
-  background-color: #1a1a1a; /* default bg-bg-main */
+  background-color: #1a1a1a;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+
+  will-change: transform;
+
   transition:
-    transform 200ms cubic-bezier(0.19, 1, 0.22, 1),
+    transform 180ms cubic-bezier(0.19, 1, 0.22, 1),
+    box-shadow 180ms cubic-bezier(0.19, 1, 0.22, 1),
     opacity 200ms cubic-bezier(0.19, 1, 0.22, 1),
     background-color 150ms ease-out;
+
   box-shadow:
     inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65),
     0 2px 5px -1px rgba(0, 0, 0, 0.35);
 }
 
-/* Hover effect - lighter background to show interactivity */
 .logoInner:hover {
   background-color: #2a2a2a;
 }
 
-/* Apply scale effect on active (pressed) state */
+/* Faster on press, slower on release */
 .logoInner:active {
-  transform: scale(0.95);
+  transform: translateY(1px) scale(0.94);
+  transition-duration: 80ms, 80ms, 200ms, 150ms;
+  box-shadow:
+    inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.55),
+    0 1px 2px -1px rgba(0, 0, 0, 0.45);
 }
 
-/* FAB reacts to drawer open - scale down and dim */
+/* Drawer open state */
 .logoDrawerOpen .logoInner {
   transform: scale(0.9);
   opacity: 1;
-}
-
-/* Disable transition and hover effect during drag */
-:global([data-dragging='true']) .logoInner {
-  transition: none;
-  background-color: #1a1a1a !important; /* override hover during drag */
 }

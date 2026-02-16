@@ -6,6 +6,7 @@ import { Highlight } from '@/shared/types';
 import { DRAWER_CONFIG } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
 import detailStyles from './HighlightDetailView.module.css';
+import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -79,10 +80,12 @@ export const HighlightsDrawer: React.FC = () => {
         : null,
     [selectedHighlightId, currentPageHighlights]
   );
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [drawerStyle, setDrawerStyle] = useState<React.CSSProperties>({});
+  const [innerStyle, setInnerStyle] = useState<React.CSSProperties>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -135,17 +138,28 @@ export const HighlightsDrawer: React.FC = () => {
     // Calculate offset based on which side drawer is on
     const offset = drawerSide === 'right' ? gap : -drawerWidth - gap;
 
-    // Calculate the drawer's actual Y position (matching the clamp logic) for transform-origin
-    const drawerY = Math.max(
+    // Store layout for DraggableLogo rAF writes
+    setDrawerLayout({ width: drawerWidth, height: drawerHeight, side: drawerSide, offset });
+
+    // Compute numeric x/y clamped to viewport
+    const x = Math.max(
+      EDGE_MARGIN,
+      Math.min(logoPosition.x + offset, window.innerWidth - drawerWidth - EDGE_MARGIN)
+    );
+    const y = Math.max(
       EDGE_MARGIN,
       Math.min(logoPosition.y - drawerHeight / 2, window.innerHeight - drawerHeight - EDGE_MARGIN)
     );
-    const originY = logoPosition.y - drawerY; // FAB's Y offset within drawer's local space
+    const originY = logoPosition.y - y; // FAB's Y offset within drawer's local space
 
-    // Use individual translate property so transform-origin governs the scale animation
+    // Outer div: translate only (positioning)
     setDrawerStyle({
-      translate: `clamp(${EDGE_MARGIN}px, calc(var(--logo-x, 50vw) + ${offset}px), ${window.innerWidth - drawerWidth - EDGE_MARGIN}px) clamp(${EDGE_MARGIN}px, calc(var(--logo-y, 50vh) - ${drawerHeight / 2}px), ${window.innerHeight - drawerHeight - EDGE_MARGIN}px)`,
-      willChange: 'translate, transform',
+      translate: `${x}px ${y}px`,
+      willChange: 'translate',
+    });
+
+    // Inner div: transformOrigin for scale animation pivot
+    setInnerStyle({
       transformOrigin: drawerSide === 'right'
         ? `${-gap}px ${originY}px`
         : `${drawerWidth + gap}px ${originY}px`,
@@ -197,10 +211,10 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [isOpen]);
 
-  // Focus drawer on open for keyboard navigation
+  // Focus inner div on open for keyboard navigation
   useEffect(() => {
-    if (isOpen && drawerRef.current) {
-      drawerRef.current.focus();
+    if (isOpen && innerRef.current) {
+      innerRef.current.focus();
     }
   }, [isOpen]);
 
@@ -372,79 +386,101 @@ export const HighlightsDrawer: React.FC = () => {
     };
   }, []);
 
+  // Unregister drawer element and layout on unmount
+  useEffect(() => {
+    return () => {
+      setDrawerElement(null);
+      setDrawerLayout(null);
+    };
+  }, []);
+
   if (!isVisible) return null;
 
   return (
+    /* Outer div — positioning only, translate updated by FAB rAF */
     <div
-      ref={drawerRef}
+      ref={(el) => {
+        drawerRef.current = el;
+        setDrawerElement(el);
+      }}
       data-drawer
-      tabIndex={0}
-      className={`fixed top-0 left-0 bg-bg-elevated rounded-lg overflow-hidden ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
+      className="fixed top-0 left-0"
       style={{
         width: '376px',
         height: '270px',
         zIndex: 1000,
         ...drawerStyle,
-        boxShadow: '0 2px 5px -1px rgba(0, 0, 0, 0.35)',
-        outline: 'none',
       }}
-      onAnimationEnd={handleDrawerAnimationEnd}
-      onKeyDown={handleKeyDown}
     >
+      {/* Inner div — visuals + animation */}
       <div
-        className={detailStyles.slideContainer}
-        data-detail-active={selectedHighlight ? 'true' : 'false'}
+        ref={innerRef}
+        tabIndex={0}
+        className={`w-full h-full bg-bg-elevated rounded-lg overflow-hidden ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
+        style={{
+          contain: 'paint',
+          boxShadow: '0 2px 5px -1px rgba(0, 0, 0, 0.35)',
+          outline: 'none',
+          ...innerStyle,
+        }}
+        onAnimationEnd={handleDrawerAnimationEnd}
+        onKeyDown={handleKeyDown}
       >
-        {/* List pane */}
-        <div className={detailStyles.listPane}>
-          <div ref={scrollContainerRef} onScroll={handleScroll} className={`${styles.scrollContainer} h-full`}>
-            <div
-              className="px-[38px] space-y-4"
-              style={{ paddingTop: '20px', paddingBottom: '20px' }}
-            >
-              {isLoading ? (
-                <>
-                  <div
-                    className="bg-[#373737] rounded-md animate-pulse"
-                    style={{ height: '64px' }}
-                  />
-                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                  <div
-                    className="bg-[#373737] rounded-md animate-pulse"
-                    style={{ height: '48px' }}
-                  />
-                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                  <div
-                    className="bg-[#373737] rounded-md animate-pulse"
-                    style={{ height: '56px' }}
-                  />
-                </>
-              ) : currentPageHighlights.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-text-secondary text-center">No highlights on this page</p>
-                </div>
-              ) : (
-                currentPageHighlights.map((highlight, index) => (
-                  <HighlightListItem
-                    key={highlight.id}
-                    highlight={highlight}
-                    index={index}
-                    currentIndex={currentIndex}
-                    totalItems={currentPageHighlights.length}
-                    itemRefs={itemRefs}
-                    onClick={selectIndex}
-                    isStaggering={isStaggering}
-                    onStaggerEnd={handleStaggerEnd}
-                  />
-                ))
-              )}
+        <div
+          className={detailStyles.slideContainer}
+          data-detail-active={selectedHighlight ? 'true' : 'false'}
+        >
+          {/* List pane */}
+          <div className={detailStyles.listPane}>
+            <div ref={scrollContainerRef} onScroll={handleScroll} className={`${styles.scrollContainer} h-full`}>
+              <div
+                className="px-[38px] space-y-4"
+                style={{ paddingTop: '20px', paddingBottom: '20px' }}
+              >
+                {isLoading ? (
+                  <>
+                    <div
+                      className="bg-[#373737] rounded-md animate-pulse"
+                      style={{ height: '64px' }}
+                    />
+                    <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                    <div
+                      className="bg-[#373737] rounded-md animate-pulse"
+                      style={{ height: '48px' }}
+                    />
+                    <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                    <div
+                      className="bg-[#373737] rounded-md animate-pulse"
+                      style={{ height: '56px' }}
+                    />
+                  </>
+                ) : currentPageHighlights.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-text-secondary text-center">No highlights on this page</p>
+                  </div>
+                ) : (
+                  currentPageHighlights.map((highlight, index) => (
+                    <HighlightListItem
+                      key={highlight.id}
+                      highlight={highlight}
+                      index={index}
+                      currentIndex={currentIndex}
+                      totalItems={currentPageHighlights.length}
+                      itemRefs={itemRefs}
+                      onClick={selectIndex}
+                      isStaggering={isStaggering}
+                      onStaggerEnd={handleStaggerEnd}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Detail pane */}
-        <div className={detailStyles.detailPane}>
-          {selectedHighlight && <HighlightDetailView highlight={selectedHighlight} />}
+          {/* Detail pane */}
+          <div className={detailStyles.detailPane}>
+            {selectedHighlight && <HighlightDetailView highlight={selectedHighlight} />}
+          </div>
         </div>
       </div>
     </div>

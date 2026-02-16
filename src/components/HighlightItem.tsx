@@ -36,17 +36,20 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
   const blurLevel = isFocused ? '0' : '3';
   const position = isFocused ? 'center' : index < currentIndex ? 'above' : 'below';
 
-  const handleAnimationEnd = useCallback((e: React.AnimationEvent) => {
-    if (e.animationName === 'itemStaggerEnter') {
-      onStaggerEnd?.();
-    }
-  }, [onStaggerEnd]);
+  const handleAnimationEnd = useCallback(
+    (e: React.AnimationEvent) => {
+      if (e.animationName === 'itemStaggerEnter') {
+        onStaggerEnd?.();
+      }
+    },
+    [onStaggerEnd]
+  );
 
   const staggerDelay = 20 + index * 35;
 
   return (
     <div
-      className={`${styles.highlightItem} ${isStaggering ? styles.staggerEntry : ''} ${isFocused ? 'transition-transform duration-75 active:scale-[0.98]' : ''}`}
+      className={`${styles.highlightItem} ${isStaggering ? styles.staggerEntry : ''} ${isFocused ? 'transition-transform duration-75 active:scale-[0.98]' : 'opacity-85'}`}
       style={isStaggering ? { animationDelay: `${staggerDelay}ms` } : undefined}
       data-in-view="true"
       data-focused={isFocused ? 'true' : 'false'}
@@ -55,9 +58,7 @@ export const HighlightItem: React.FC<HighlightItemProps> = ({
       onClick={handleClick}
       onAnimationEnd={isStaggering ? handleAnimationEnd : undefined}
     >
-      <p className={`${styles.highlightText} text-text-main`}>
-        {highlight.text}
-      </p>
+      <p className={`${styles.highlightText} text-text-main`}>{highlight.text}</p>
     </div>
   );
 };
