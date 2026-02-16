@@ -7,13 +7,13 @@ import styles from './DraggableLogo.module.css';
 const Draggable = lazy(() => import('react-draggable'));
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
-const LOGO_SIZE = 40;
+const LOGO_SIZE = 44;
 const THROTTLE_MS = 50;
 
 export const DraggableLogo: React.FC = () => {
   const [position, setPosition] = useState({
     x: window.innerWidth - EDGE_MARGIN - LOGO_SIZE,
-    y: window.innerHeight - EDGE_MARGIN - LOGO_SIZE
+    y: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
   });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -84,7 +84,7 @@ export const DraggableLogo: React.FC = () => {
     );
     if (distance > 5) {
       wasDragged.current = true; // Logic: "This is now a drag"
-      setIsDragging(true);       // Visual: "Show grabbing cursor"
+      setIsDragging(true); // Visual: "Show grabbing cursor"
     }
     setPosition({ x: data.x, y: data.y });
 
@@ -129,8 +129,8 @@ export const DraggableLogo: React.FC = () => {
           ref={logoRef}
           className={`absolute cursor-pointer ${isOpen ? styles.logoDrawerOpen : ''}`}
           style={{
-            width: '40px',
-            height: '40px',
+            width: '44px',
+            height: '44px',
             left: `${position.x}px`,
             top: `${position.y}px`,
           }}
@@ -141,13 +141,19 @@ export const DraggableLogo: React.FC = () => {
         </div>
       }
     >
-      <Draggable position={position} onStart={handleDragStart} onDrag={handleDrag} onStop={handleDragStop} bounds={bounds}>
+      <Draggable
+        position={position}
+        onStart={handleDragStart}
+        onDrag={handleDrag}
+        onStop={handleDragStop}
+        bounds={bounds}
+      >
         <div
           ref={logoRef}
           onClick={handleClick}
           data-dragging={isDragging}
           className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} ${isOpen ? styles.logoDrawerOpen : ''}`}
-          style={{ width: '40px', height: '40px' }}
+          style={{ width: '44px', height: '44px' }}
         >
           <div className={styles.logoInner}>
             <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />

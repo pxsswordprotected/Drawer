@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, useMemo, memo } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo, memo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { HighlightItem } from './HighlightItem';
 import { HighlightDetailView } from './HighlightDetailView';
@@ -16,29 +16,24 @@ interface HighlightListItemProps {
   currentIndex: number;
   totalItems: number;
   itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
-  setCurrentIndex: React.Dispatch<React.SetStateAction<number>>;
-  navigateToIndex: (index: number) => void;
+  onClick: (index: number) => void;
   isStaggering: boolean;
   onStaggerEnd?: () => void;
 }
 
 const HighlightListItem = memo<HighlightListItemProps>(
-  ({ highlight, index, currentIndex, totalItems, itemRefs, setCurrentIndex, navigateToIndex, isStaggering, onStaggerEnd }) => {
+  ({ highlight, index, currentIndex, totalItems, itemRefs, onClick, isStaggering, onStaggerEnd }) => {
     const isFocused = index === currentIndex;
-    const isFirst = index === 0;
     const isLast = index === totalItems - 1;
 
     const handleClick = useCallback(() => {
-      setCurrentIndex(index);
-      navigateToIndex(index);
-    }, [index, setCurrentIndex, navigateToIndex]);
+      onClick(index);
+    }, [index, onClick]);
 
     return (
       <React.Fragment>
         <div
           ref={(el) => (itemRefs.current[index] = el)}
-          className={styles.snapItem}
-          data-snap-position={isFirst ? 'start' : isLast ? 'end' : 'center'}
         >
           <HighlightItem
             highlight={highlight}
@@ -93,6 +88,13 @@ export const HighlightsDrawer: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
 
+  // Scroll intent tracking refs
+  const scrollIntentRef = useRef<'programmatic' | 'user' | null>(null);
+  const scrollRaf = useRef(0);
+  const intentFailsafe = useRef(0);
+  const itemCentersRef = useRef<number[]>([]);
+  const lastScrollIndex = useRef(0);
+
   // Sync visibility with isOpen for exit animation support
   useEffect(() => {
     if (isOpen) {
@@ -102,7 +104,7 @@ export const HighlightsDrawer: React.FC = () => {
     } else if (isVisible) {
       setIsClosing(true);
     }
-  }, [isOpen]);
+  }, [isOpen, isVisible]);
 
   const handleDrawerAnimationEnd = useCallback((e: React.AnimationEvent) => {
     if (e.target === e.currentTarget && isClosing) {
@@ -185,93 +187,190 @@ export const HighlightsDrawer: React.FC = () => {
     return () => root.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeDrawer]);
 
-  // Initialize current index when drawer opens
+  // Initialize current index and reset scroll intent when drawer opens
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
+      lastScrollIndex.current = 0;
+      scrollIntentRef.current = null;
+      clearTimeout(intentFailsafe.current);
     }
   }, [isOpen]);
 
-  // Auto-focus scroll container for keyboard navigation
+  // Focus drawer on open for keyboard navigation
   useEffect(() => {
-    if (isOpen && scrollContainerRef.current && !selectedHighlightId) {
-      scrollContainerRef.current.focus();
+    if (isOpen && drawerRef.current) {
+      drawerRef.current.focus();
     }
-  }, [isOpen, selectedHighlightId]);
+  }, [isOpen]);
 
-  // Helper to determine correct scroll alignment based on position
-  const getScrollIntoViewOptions = useCallback(
-    (index: number, totalItems: number): ScrollIntoViewOptions => {
-      const isFirst = index === 0;
-      const isLast = index === totalItems - 1;
+  // Clamp stale itemRefs when highlights change pages
+  useEffect(() => {
+    itemRefs.current = itemRefs.current.slice(0, currentPageHighlights.length);
+  }, [currentPageHighlights.length]);
 
-      return {
-        behavior: 'smooth',
-        block: isFirst ? 'start' : isLast ? 'end' : 'center',
-      };
-    },
-    []
+  // Precompute item centers for scroll tracking
+  const highlightIds = useMemo(
+    () => currentPageHighlights.map((h) => h.id).join(','),
+    [currentPageHighlights]
   );
 
-  // Centralized navigation handler
-  const navigateToIndex = useCallback(
-    (newIndex: number) => {
-      const target = itemRefs.current[newIndex];
-      if (target) {
-        const options = getScrollIntoViewOptions(newIndex, currentPageHighlights.length);
-        target.scrollIntoView(options);
+  const recomputeCenters = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const centers: number[] = [];
+    itemRefs.current.forEach((el, i) => {
+      if (!el) return;
+      const elRect = el.getBoundingClientRect();
+      // Convert viewport-relative rect to container-scroll-relative coordinate
+      const topInContainer = elRect.top - containerRect.top + container.scrollTop;
+      centers[i] = topInContainer + elRect.height / 2;
+    });
+    itemCentersRef.current = centers;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isOpen || !isVisible || isLoading) return;
+
+    recomputeCenters();
+    requestAnimationFrame(recomputeCenters);
+  }, [isOpen, isVisible, isLoading, highlightIds, recomputeCenters]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!isOpen || !isVisible || isLoading || !container) return;
+
+    const ro = new ResizeObserver(() => recomputeCenters());
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [isOpen, isVisible, isLoading, recomputeCenters]);
+
+  // Click handler: set index directly with programmatic intent
+  const selectIndex = useCallback((i: number) => {
+    scrollIntentRef.current = 'programmatic';
+    lastScrollIndex.current = i;
+    setCurrentIndex(i);
+  }, []);
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+
+    scrollIntentRef.current = 'programmatic';
+
+    setCurrentIndex((prev) => {
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      const next = Math.max(0, Math.min(currentPageHighlights.length - 1, prev + dir));
+      lastScrollIndex.current = next;
+      return next;
+    });
+  }, [currentPageHighlights.length]);
+
+  // Programmatic scroll effect + failsafe
+  useEffect(() => {
+    if (scrollIntentRef.current !== 'programmatic') return;
+
+    const el = itemRefs.current[currentIndex];
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    clearTimeout(intentFailsafe.current);
+    intentFailsafe.current = window.setTimeout(() => {
+      scrollIntentRef.current = null;
+    }, 800);
+  }, [currentIndex]);
+
+  // Wheel + pointerdown: immediately override programmatic intent
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!isOpen || !container) return;
+
+    const clearProgrammatic = () => {
+      if (scrollIntentRef.current === 'programmatic') {
+        scrollIntentRef.current = null;
+        clearTimeout(intentFailsafe.current);
       }
-    },
-    [currentPageHighlights.length, getScrollIntoViewOptions]
-  );
-
-  // Custom scroll - one highlight at a time, no skipping
-  useEffect(() => {
-    if (!isOpen || !scrollContainerRef.current) return;
-
-    const container = scrollContainerRef.current;
-
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-
-      const direction = e.deltaY > 0 ? 1 : -1;
-      setCurrentIndex((prev) => {
-        const newIndex = Math.max(0, Math.min(itemRefs.current.length - 1, prev + direction));
-
-        navigateToIndex(newIndex);
-
-        return newIndex;
-      });
     };
 
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, [isOpen, currentPageHighlights, navigateToIndex]);
-
-  // Arrow key navigation - one highlight at a time
-  useEffect(() => {
-    if (!isOpen || !scrollContainerRef.current) return;
-
-    const container = scrollContainerRef.current;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-
-      e.preventDefault(); // Prevent default browser scroll
-
-      const direction = e.key === 'ArrowDown' ? 1 : -1;
-      setCurrentIndex((prev) => {
-        const newIndex = Math.max(0, Math.min(itemRefs.current.length - 1, prev + direction));
-
-        navigateToIndex(newIndex);
-
-        return newIndex;
-      });
+    container.addEventListener('wheel', clearProgrammatic, { passive: true });
+    container.addEventListener('pointerdown', clearProgrammatic);
+    return () => {
+      container.removeEventListener('wheel', clearProgrammatic);
+      container.removeEventListener('pointerdown', clearProgrammatic);
     };
+  }, [isOpen]);
 
-    container.addEventListener('keydown', handleKeyDown);
-    return () => container.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentPageHighlights, navigateToIndex]);
+  // Scroll handler: detect user scroll vs programmatic scroll
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Programmatic smooth scroll in progress: clear intent when centered enough
+    if (scrollIntentRef.current === 'programmatic') {
+      const centers = itemCentersRef.current;
+      const i = lastScrollIndex.current;
+      const itemCenter = centers[i];
+
+      if (itemCenter !== undefined) {
+        const containerCenter = container.scrollTop + container.clientHeight / 2;
+        const epsilon = 10;
+        const delta = Math.abs(itemCenter - containerCenter);
+
+        if (delta < epsilon) {
+          scrollIntentRef.current = null;
+          clearTimeout(intentFailsafe.current);
+        }
+      }
+      return;
+    }
+
+    cancelAnimationFrame(scrollRaf.current);
+    scrollRaf.current = requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      const centers = itemCentersRef.current;
+      if (!container) return;
+
+      const targetCenter = container.scrollTop + container.clientHeight / 2;
+
+      let closestIndex = 0;
+      let closestDist = Infinity;
+
+      for (let i = 0; i < centers.length; i++) {
+        const c = centers[i];
+        if (c === undefined) continue;
+        const dist = Math.abs(c - targetCenter);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIndex = i;
+        }
+      }
+
+      if (closestIndex !== lastScrollIndex.current) {
+        lastScrollIndex.current = closestIndex;
+        scrollIntentRef.current = 'user';
+        setCurrentIndex(closestIndex);
+      }
+    });
+  }, []);
+
+  // Clamp currentIndex when list shrinks
+  useEffect(() => {
+    setCurrentIndex((prev) =>
+      Math.min(prev, Math.max(0, currentPageHighlights.length - 1))
+    );
+  }, [currentPageHighlights.length]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cancelAnimationFrame(scrollRaf.current);
+      clearTimeout(intentFailsafe.current);
+    };
+  }, []);
 
   if (!isVisible) return null;
 
@@ -279,6 +378,7 @@ export const HighlightsDrawer: React.FC = () => {
     <div
       ref={drawerRef}
       data-drawer
+      tabIndex={0}
       className={`fixed top-0 left-0 bg-bg-elevated rounded-lg overflow-hidden ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
       style={{
         width: '376px',
@@ -286,8 +386,10 @@ export const HighlightsDrawer: React.FC = () => {
         zIndex: 1000,
         ...drawerStyle,
         boxShadow: '0 2px 5px -1px rgba(0, 0, 0, 0.35)',
+        outline: 'none',
       }}
       onAnimationEnd={handleDrawerAnimationEnd}
+      onKeyDown={handleKeyDown}
     >
       <div
         className={detailStyles.slideContainer}
@@ -295,7 +397,7 @@ export const HighlightsDrawer: React.FC = () => {
       >
         {/* List pane */}
         <div className={detailStyles.listPane}>
-          <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`} tabIndex={0}>
+          <div ref={scrollContainerRef} onScroll={handleScroll} className={`${styles.scrollContainer} h-full`}>
             <div
               className="px-[38px] space-y-4"
               style={{ paddingTop: '20px', paddingBottom: '20px' }}
@@ -330,8 +432,7 @@ export const HighlightsDrawer: React.FC = () => {
                     currentIndex={currentIndex}
                     totalItems={currentPageHighlights.length}
                     itemRefs={itemRefs}
-                    setCurrentIndex={setCurrentIndex}
-                    navigateToIndex={navigateToIndex}
+                    onClick={selectIndex}
                     isStaggering={isStaggering}
                     onStaggerEnd={handleStaggerEnd}
                   />

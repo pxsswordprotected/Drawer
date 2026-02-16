@@ -75,13 +75,6 @@
   position: relative;
   height: 100%;
 
-  /* Snap scrolling - each highlight snaps to center */
-  scroll-snap-type: y mandatory;
-
-  /* Padding for snap positions - keeps items away from edges */
-  scroll-padding-top: 50px;
-  scroll-padding-bottom: 50px;
-
   /* Hide scrollbar but keep functionality */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -93,18 +86,6 @@
 
 .scrollContainer:focus {
   outline: none; /* Remove default outline since drawer has visual focus */
-}
-
-.snapItem[data-snap-position='start'] {
-  scroll-snap-align: start;
-}
-
-.snapItem[data-snap-position='center'] {
-  scroll-snap-align: center;
-}
-
-.snapItem[data-snap-position='end'] {
-  scroll-snap-align: end;
 }
 
 /* No gradient masks needed - using progressive blur instead */

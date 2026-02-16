@@ -19,6 +19,9 @@ export function useSelectionHandler() {
     selectedText: '',
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSeeded = useRef(false);
 
   // Seed a test highlight with 3 notes on first load
@@ -131,6 +134,13 @@ export function useSelectionHandler() {
   // Hide icon on scroll (prevents "ghost" icon floating in wrong position)
   const handleScroll = useCallback(() => {
     if (selectionState.visible) {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+        hideTimeoutRef.current = null;
+      }
+      setIsSaving(false);
+      setIsSaved(false);
+      setIsDismissing(false);
       setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
     }
   }, [selectionState.visible]);
@@ -164,13 +174,25 @@ export function useSelectionHandler() {
       await storageService.saveHighlight(highlight);
       console.log('Highlight saved:', selectionState.selectedText.substring(0, 50) + '...');
 
-      // Clear the selection and hide the icon
+      // Clear the selection, trigger morph animation, then hide after 500ms
       window.getSelection()?.removeAllRanges();
-      setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+      setIsSaved(true);
+
+      hideTimeoutRef.current = setTimeout(() => {
+        setIsDismissing(true);
+        setTimeout(() => {
+          setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+          setIsSaving(false);
+          setIsSaved(false);
+          setIsDismissing(false);
+          hideTimeoutRef.current = null;
+        }, 150);
+      }, 500);
     } catch (error) {
       console.error('Failed to save highlight:', error);
-    } finally {
+      setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
       setIsSaving(false);
+      setIsSaved(false);
     }
   }, [selectionState.selectedText, isSaving]);
 
@@ -196,5 +218,7 @@ export function useSelectionHandler() {
     selectionState,
     handleSaveHighlight,
     isSaving,
+    isSaved,
+    isDismissing,
   };
 }

@@ -6,7 +6,7 @@ import { useSelectionHandler } from './useSelectionHandler';
 import { Agentation } from 'agentation';
 
 export const TestApp: React.FC = () => {
-  const { selectionState, handleSaveHighlight, isSaving } = useSelectionHandler();
+  const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } = useSelectionHandler();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
@@ -65,6 +65,8 @@ export const TestApp: React.FC = () => {
         y={selectionState.y}
         onClick={handleSaveHighlight}
         disabled={isSaving}
+        isSuccess={isSaved}
+        isDismissing={isDismissing}
       />
     </div>
   );
