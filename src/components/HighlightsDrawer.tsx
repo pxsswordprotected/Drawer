@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo, memo } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useMemo,
+  memo,
+} from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { HighlightItem } from './HighlightItem';
 import { HighlightDetailView } from './HighlightDetailView';
@@ -23,7 +31,16 @@ interface HighlightListItemProps {
 }
 
 const HighlightListItem = memo<HighlightListItemProps>(
-  ({ highlight, index, currentIndex, totalItems, itemRefs, onClick, isStaggering, onStaggerEnd }) => {
+  ({
+    highlight,
+    index,
+    currentIndex,
+    totalItems,
+    itemRefs,
+    onClick,
+    isStaggering,
+    onStaggerEnd,
+  }) => {
     const isFocused = index === currentIndex;
     const isLast = index === totalItems - 1;
 
@@ -33,9 +50,7 @@ const HighlightListItem = memo<HighlightListItemProps>(
 
     return (
       <React.Fragment>
-        <div
-          ref={(el) => (itemRefs.current[index] = el)}
-        >
+        <div ref={(el) => (itemRefs.current[index] = el)}>
           <HighlightItem
             highlight={highlight}
             isFocused={isFocused}
@@ -109,12 +124,15 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [isOpen, isVisible]);
 
-  const handleDrawerAnimationEnd = useCallback((e: React.AnimationEvent) => {
-    if (e.target === e.currentTarget && isClosing) {
-      setIsVisible(false);
-      setIsClosing(false);
-    }
-  }, [isClosing]);
+  const handleDrawerAnimationEnd = useCallback(
+    (e: React.AnimationEvent) => {
+      if (e.target === e.currentTarget && isClosing) {
+        setIsVisible(false);
+        setIsClosing(false);
+      }
+    },
+    [isClosing]
+  );
 
   const handleStaggerEnd = useCallback(() => {
     setIsStaggering(false);
@@ -160,9 +178,8 @@ export const HighlightsDrawer: React.FC = () => {
 
     // Inner div: transformOrigin for scale animation pivot
     setInnerStyle({
-      transformOrigin: drawerSide === 'right'
-        ? `${-gap}px ${originY}px`
-        : `${drawerWidth + gap}px ${originY}px`,
+      transformOrigin:
+        drawerSide === 'right' ? `${-gap}px ${originY}px` : `${drawerWidth + gap}px ${originY}px`,
     });
   }, [logoPosition]);
 
@@ -213,10 +230,10 @@ export const HighlightsDrawer: React.FC = () => {
 
   // Focus inner div on open for keyboard navigation
   useEffect(() => {
-    if (isOpen && innerRef.current) {
+    if (isOpen && isVisible && innerRef.current) {
       innerRef.current.focus();
     }
-  }, [isOpen]);
+  }, [isOpen, isVisible]);
 
   // Clamp stale itemRefs when highlights change pages
   useEffect(() => {
@@ -269,19 +286,22 @@ export const HighlightsDrawer: React.FC = () => {
   }, []);
 
   // Keyboard navigation handler
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    e.preventDefault();
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
 
-    scrollIntentRef.current = 'programmatic';
+      scrollIntentRef.current = 'programmatic';
 
-    setCurrentIndex((prev) => {
-      const dir = e.key === 'ArrowDown' ? 1 : -1;
-      const next = Math.max(0, Math.min(currentPageHighlights.length - 1, prev + dir));
-      lastScrollIndex.current = next;
-      return next;
-    });
-  }, [currentPageHighlights.length]);
+      setCurrentIndex((prev) => {
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        const next = Math.max(0, Math.min(currentPageHighlights.length - 1, prev + dir));
+        lastScrollIndex.current = next;
+        return next;
+      });
+    },
+    [currentPageHighlights.length]
+  );
 
   // Programmatic scroll effect + failsafe
   useEffect(() => {
@@ -350,16 +370,27 @@ export const HighlightsDrawer: React.FC = () => {
 
       const targetCenter = container.scrollTop + container.clientHeight / 2;
 
+      const isAtTop = container.scrollTop <= 5;
+      const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 5;
+
       let closestIndex = 0;
       let closestDist = Infinity;
 
-      for (let i = 0; i < centers.length; i++) {
-        const c = centers[i];
-        if (c === undefined) continue;
-        const dist = Math.abs(c - targetCenter);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestIndex = i;
+      if (isAtTop) {
+        closestIndex = 0;
+      } else if (isAtBottom) {
+        closestIndex = centers.length - 1;
+      } else {
+        // Only run the loop if we aren't at the very top or bottom
+        let closestDist = Infinity;
+        for (let i = 0; i < centers.length; i++) {
+          const c = centers[i];
+          if (c === undefined) continue;
+          const dist = Math.abs(c - targetCenter);
+          if (dist < closestDist) {
+            closestDist = dist;
+            closestIndex = i;
+          }
         }
       }
 
@@ -373,9 +404,7 @@ export const HighlightsDrawer: React.FC = () => {
 
   // Clamp currentIndex when list shrinks
   useEffect(() => {
-    setCurrentIndex((prev) =>
-      Math.min(prev, Math.max(0, currentPageHighlights.length - 1))
-    );
+    setCurrentIndex((prev) => Math.min(prev, Math.max(0, currentPageHighlights.length - 1)));
   }, [currentPageHighlights.length]);
 
   // Cleanup on unmount
@@ -393,6 +422,13 @@ export const HighlightsDrawer: React.FC = () => {
       setDrawerLayout(null);
     };
   }, []);
+
+  useEffect(() => {
+    // If we just transitioned from having a selected highlight to NOT having one
+    if (!selectedHighlightId && isOpen && innerRef.current) {
+      innerRef.current.focus();
+    }
+  }, [selectedHighlightId, isOpen]);
 
   if (!isVisible) return null;
 
@@ -432,7 +468,11 @@ export const HighlightsDrawer: React.FC = () => {
         >
           {/* List pane */}
           <div className={detailStyles.listPane}>
-            <div ref={scrollContainerRef} onScroll={handleScroll} className={`${styles.scrollContainer} h-full`}>
+            <div
+              ref={scrollContainerRef}
+              onScroll={handleScroll}
+              className={`${styles.scrollContainer} h-full`}
+            >
               <div
                 className="px-[38px] space-y-4"
                 style={{ paddingTop: '20px', paddingBottom: '20px' }}

@@ -88,6 +88,8 @@ export const DraggableLogo: React.FC = () => {
     });
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+
   const handleDragStart = () => {
     wasDragged.current = false;
   };
@@ -95,6 +97,7 @@ export const DraggableLogo: React.FC = () => {
   const handleDrag = (_e: DraggableEvent, data: DraggableData) => {
     if (!wasDragged.current) {
       wasDragged.current = true;
+      setIsDragging(true);
       if (isOpen) closeDrawer();
     }
 
@@ -109,6 +112,7 @@ export const DraggableLogo: React.FC = () => {
   };
 
   const handleDragStop = (_e: DraggableEvent, data: DraggableData) => {
+    setIsDragging(false);
     setTimeout(() => {
       wasDragged.current = false;
     }, 0);
@@ -169,7 +173,7 @@ export const DraggableLogo: React.FC = () => {
         <div
           ref={logoRef}
           onClick={handleClick}
-          className={`absolute cursor-pointer ${isOpen ? styles.logoDrawerOpen : ''}`}
+          className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} ${isOpen ? styles.logoDrawerOpen : ''}`}
           style={{ width: `${LOGO_SIZE}px`, height: `${LOGO_SIZE}px` }}
         >
           <div className={styles.logoInner}>

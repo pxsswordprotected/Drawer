@@ -32,7 +32,7 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   selectedHighlightId: null,
 
   openDrawer: () => set({ isOpen: true }),
-  closeDrawer: () => set({ isOpen: false, selectedHighlightId: null }),
+  closeDrawer: () => set({ isOpen: false }),
   toggleDrawer: () =>
     set((state) => ({
       isOpen: !state.isOpen,

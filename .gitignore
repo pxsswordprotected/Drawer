@@ -12,7 +12,7 @@ dist/
 .env.local
 
 # IDE
-.vscode/
+.vscode/s
 .idea/
 *.swp
 *.swo
@@ -33,3 +33,5 @@ coverage/
 .nyc_output/
 
 my_own_plans.md
+
+dev-details-analysis.md
