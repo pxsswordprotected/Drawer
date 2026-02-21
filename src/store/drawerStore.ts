@@ -8,6 +8,7 @@ interface DrawerState {
   isLoading: boolean;
   logoPosition: { x: number; y: number } | null;
   selectedHighlightId: string | null;
+  lastAddedHighlightId: string | null;
 
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -16,6 +17,8 @@ interface DrawerState {
   loadHighlights: (url: string) => Promise<void>;
   selectHighlight: (id: string) => void;
   clearSelectedHighlight: () => void;
+  addHighlight: (highlight: Highlight) => void;
+  clearLastAdded: () => void;
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
@@ -30,6 +33,7 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   isLoading: false,
   logoPosition: null,
   selectedHighlightId: null,
+  lastAddedHighlightId: null,
 
   openDrawer: () => set({ isOpen: true }),
   closeDrawer: () => set({ isOpen: false }),
@@ -42,6 +46,13 @@ export const useDrawerStore = create<DrawerState>((set) => ({
 
   selectHighlight: (id: string) => set({ selectedHighlightId: id }),
   clearSelectedHighlight: () => set({ selectedHighlightId: null }),
+
+  addHighlight: (highlight: Highlight) =>
+    set((state) => ({
+      currentPageHighlights: [...state.currentPageHighlights, highlight],
+      lastAddedHighlightId: highlight.id,
+    })),
+  clearLastAdded: () => set({ lastAddedHighlightId: null }),
 
   addNote: async (highlightId: string, text: string) => {
     const note: Note = {

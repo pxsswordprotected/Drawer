@@ -86,6 +86,8 @@ export const HighlightsDrawer: React.FC = () => {
     closeDrawer,
     loadHighlights,
     selectedHighlightId,
+    lastAddedHighlightId,
+    clearLastAdded,
   } = useDrawerStore();
 
   const selectedHighlight = useMemo(
@@ -406,6 +408,19 @@ export const HighlightsDrawer: React.FC = () => {
   useEffect(() => {
     setCurrentIndex((prev) => Math.min(prev, Math.max(0, currentPageHighlights.length - 1)));
   }, [currentPageHighlights.length]);
+
+  // Auto-focus newly added highlight
+  useEffect(() => {
+    if (!lastAddedHighlightId) return;
+
+    const index = currentPageHighlights.findIndex((h) => h.id === lastAddedHighlightId);
+    if (index === -1) return;
+
+    scrollIntentRef.current = 'programmatic';
+    lastScrollIndex.current = index;
+    setCurrentIndex(index);
+    clearLastAdded();
+  }, [lastAddedHighlightId, currentPageHighlights, clearLastAdded]);
 
   // Cleanup on unmount
   useEffect(() => {

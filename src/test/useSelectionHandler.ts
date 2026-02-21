@@ -174,6 +174,11 @@ export function useSelectionHandler() {
       await storageService.saveHighlight(highlight);
       console.log('Highlight saved:', selectionState.selectedText.substring(0, 50) + '...');
 
+      // Live-update drawer if it's open
+      if (useDrawerStore.getState().isOpen) {
+        useDrawerStore.getState().addHighlight(highlight);
+      }
+
       // Clear the selection, trigger morph animation, then hide after 500ms
       window.getSelection()?.removeAllRanges();
       setIsSaved(true);
