@@ -5,13 +5,13 @@ import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
 import styles from './HighlightDetailView.module.css';
 
-interface NoteInputProps {
+export interface NoteInputProps {
   highlightId: string;
   hasNotes: boolean;
   onNoteAdded: () => void;
 }
 
-const NoteInput: React.FC<NoteInputProps> = ({ highlightId, hasNotes, onNoteAdded }) => {
+export const NoteInput: React.FC<NoteInputProps> = ({ highlightId, hasNotes, onNoteAdded }) => {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const addNote = useDrawerStore((s) => s.addNote);
@@ -98,13 +98,13 @@ function formatDate(timestamp: number): string {
   return `${day} ${month} ${dateNum}  ${hours}${minuteStr}${ampm}`;
 }
 
-interface NoteItemProps {
+export interface NoteItemProps {
   noteId: string;
   highlightId: string;
   text: string;
 }
 
-const NoteItem: React.FC<NoteItemProps> = ({ noteId, highlightId, text }) => {
+export const NoteItem: React.FC<NoteItemProps> = ({ noteId, highlightId, text }) => {
   const [value, setValue] = useState(text);
   const [isEditing, setIsEditing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);

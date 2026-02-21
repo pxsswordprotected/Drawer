@@ -15,6 +15,9 @@ import { DRAWER_CONFIG } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
 import detailStyles from './HighlightDetailView.module.css';
 import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
+import { HighlightItemExpandable } from './HighlightItemExpandable';
+
+const USE_INLINE_EXPAND = true;
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -77,6 +80,50 @@ const HighlightListItem = memo<HighlightListItemProps>(
 
 HighlightListItem.displayName = 'HighlightListItem';
 
+// ─── Expandable list item (only active when USE_INLINE_EXPAND = true) ───
+interface HighlightExpandableListItemProps {
+  highlight: Highlight;
+  index: number;
+  totalItems: number;
+  itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
+  onExpand: (index: number) => void;
+  onCollapse: (index: number) => void;
+  isStaggering: boolean;
+  onStaggerEnd?: () => void;
+}
+
+const HighlightExpandableListItem = memo<HighlightExpandableListItemProps>(
+  ({ highlight, index, totalItems, itemRefs, onExpand, onCollapse, isStaggering, onStaggerEnd }) => {
+    const isLast = index === totalItems - 1;
+
+    return (
+      <React.Fragment>
+        <div ref={(el) => (itemRefs.current[index] = el)}>
+          <HighlightItemExpandable
+            highlight={highlight}
+            index={index}
+            onExpand={onExpand}
+            onCollapse={onCollapse}
+            isStaggering={isStaggering}
+            onStaggerEnd={isLast ? onStaggerEnd : undefined}
+          />
+        </div>
+        {index < totalItems - 1 && (
+          <div
+            className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+            style={{
+              width: '300px',
+              ...(isStaggering ? { animationDelay: `${20 + index * 35 + 17}ms` } : {}),
+            }}
+          />
+        )}
+      </React.Fragment>
+    );
+  }
+);
+
+HighlightExpandableListItem.displayName = 'HighlightExpandableListItem';
+
 export const HighlightsDrawer: React.FC = () => {
   const {
     isOpen,
@@ -108,6 +155,7 @@ export const HighlightsDrawer: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
 
+  // ─── Scroll-center focus system (only active when USE_INLINE_EXPAND = false) ───
   // Scroll intent tracking refs
   const scrollIntentRef = useRef<'programmatic' | 'user' | null>(null);
   const scrollRaf = useRef(0);
@@ -139,6 +187,29 @@ export const HighlightsDrawer: React.FC = () => {
   const handleStaggerEnd = useCallback(() => {
     setIsStaggering(false);
   }, []);
+
+  // ─── Inline expand/collapse scroll helpers (only active when USE_INLINE_EXPAND = true) ───
+  const scrollToItemTop = useCallback((index: number) => {
+    const container = scrollContainerRef.current;
+    const el = itemRefs.current[index];
+    if (!container || !el) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
+    container.scrollTo({ top: Math.max(0, elTopInScroll - 16), behavior: 'smooth' });
+  }, []);
+
+  const expandItem = useCallback((index: number) => {
+    scrollIntentRef.current = 'programmatic';
+    lastScrollIndex.current = index;
+    requestAnimationFrame(() => {
+      scrollToItemTop(index);
+    });
+  }, [scrollToItemTop]);
+
+  const collapseItem = useCallback((index: number) => {
+    scrollToItemTop(index);
+  }, [scrollToItemTop]);
 
   // Calculate drawer position based on logo position
   useEffect(() => {
@@ -477,66 +548,116 @@ export const HighlightsDrawer: React.FC = () => {
         onAnimationEnd={handleDrawerAnimationEnd}
         onKeyDown={handleKeyDown}
       >
-        <div
-          className={detailStyles.slideContainer}
-          data-detail-active={selectedHighlight ? 'true' : 'false'}
-        >
-          {/* List pane */}
-          <div className={detailStyles.listPane}>
+        {USE_INLINE_EXPAND ? (
+          /* Single scroll container with expandable items */
+          <div
+            ref={scrollContainerRef}
+            className={`${styles.scrollContainer} h-full`}
+          >
             <div
-              ref={scrollContainerRef}
-              onScroll={handleScroll}
-              className={`${styles.scrollContainer} h-full`}
+              className="px-[38px] space-y-4"
+              style={{ paddingTop: '20px', paddingBottom: '20px' }}
             >
-              <div
-                className="px-[38px] space-y-4"
-                style={{ paddingTop: '20px', paddingBottom: '20px' }}
-              >
-                {isLoading ? (
-                  <>
-                    <div
-                      className="bg-[#373737] rounded-md animate-pulse"
-                      style={{ height: '64px' }}
-                    />
-                    <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                    <div
-                      className="bg-[#373737] rounded-md animate-pulse"
-                      style={{ height: '48px' }}
-                    />
-                    <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                    <div
-                      className="bg-[#373737] rounded-md animate-pulse"
-                      style={{ height: '56px' }}
-                    />
-                  </>
-                ) : currentPageHighlights.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-text-secondary text-center">No highlights on this page</p>
-                  </div>
-                ) : (
-                  currentPageHighlights.map((highlight, index) => (
-                    <HighlightListItem
-                      key={highlight.id}
-                      highlight={highlight}
-                      index={index}
-                      currentIndex={currentIndex}
-                      totalItems={currentPageHighlights.length}
-                      itemRefs={itemRefs}
-                      onClick={selectIndex}
-                      isStaggering={isStaggering}
-                      onStaggerEnd={handleStaggerEnd}
-                    />
-                  ))
-                )}
-              </div>
+              {isLoading ? (
+                <>
+                  <div
+                    className="bg-[#373737] rounded-md animate-pulse"
+                    style={{ height: '64px' }}
+                  />
+                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                  <div
+                    className="bg-[#373737] rounded-md animate-pulse"
+                    style={{ height: '48px' }}
+                  />
+                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                  <div
+                    className="bg-[#373737] rounded-md animate-pulse"
+                    style={{ height: '56px' }}
+                  />
+                </>
+              ) : currentPageHighlights.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-text-secondary text-center">No highlights on this page</p>
+                </div>
+              ) : (
+                currentPageHighlights.map((highlight, index) => (
+                  <HighlightExpandableListItem
+                    key={highlight.id}
+                    highlight={highlight}
+                    index={index}
+                    totalItems={currentPageHighlights.length}
+                    itemRefs={itemRefs}
+                    onExpand={expandItem}
+                    onCollapse={collapseItem}
+                    isStaggering={isStaggering}
+                    onStaggerEnd={handleStaggerEnd}
+                  />
+                ))
+              )}
             </div>
           </div>
+        ) : (
+          <div
+            className={detailStyles.slideContainer}
+            data-detail-active={selectedHighlight ? 'true' : 'false'}
+          >
+            {/* List pane */}
+            <div className={detailStyles.listPane}>
+              <div
+                ref={scrollContainerRef}
+                onScroll={handleScroll}
+                className={`${styles.scrollContainer} h-full`}
+              >
+                <div
+                  className="px-[38px] space-y-4"
+                  style={{ paddingTop: '20px', paddingBottom: '20px' }}
+                >
+                  {isLoading ? (
+                    <>
+                      <div
+                        className="bg-[#373737] rounded-md animate-pulse"
+                        style={{ height: '64px' }}
+                      />
+                      <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                      <div
+                        className="bg-[#373737] rounded-md animate-pulse"
+                        style={{ height: '48px' }}
+                      />
+                      <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                      <div
+                        className="bg-[#373737] rounded-md animate-pulse"
+                        style={{ height: '56px' }}
+                      />
+                    </>
+                  ) : currentPageHighlights.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-text-secondary text-center">No highlights on this page</p>
+                    </div>
+                  ) : (
+                    currentPageHighlights.map((highlight, index) => (
+                      <HighlightListItem
+                        key={highlight.id}
+                        highlight={highlight}
+                        index={index}
+                        currentIndex={currentIndex}
+                        totalItems={currentPageHighlights.length}
+                        itemRefs={itemRefs}
+                        onClick={selectIndex}
+                        isStaggering={isStaggering}
+                        onStaggerEnd={handleStaggerEnd}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
 
-          {/* Detail pane */}
-          <div className={detailStyles.detailPane}>
-            {selectedHighlight && <HighlightDetailView highlight={selectedHighlight} />}
+            {/* Detail pane */}
+            <div className={detailStyles.detailPane}>
+              {selectedHighlight && <HighlightDetailView highlight={selectedHighlight} />}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
