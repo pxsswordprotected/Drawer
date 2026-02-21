@@ -86,14 +86,13 @@ interface HighlightExpandableListItemProps {
   index: number;
   totalItems: number;
   itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
-  onExpand: (index: number) => void;
-  onCollapse: (index: number) => void;
+  onScrollToItem: (index: number) => void;
   isStaggering: boolean;
   onStaggerEnd?: () => void;
 }
 
 const HighlightExpandableListItem = memo<HighlightExpandableListItemProps>(
-  ({ highlight, index, totalItems, itemRefs, onExpand, onCollapse, isStaggering, onStaggerEnd }) => {
+  ({ highlight, index, totalItems, itemRefs, onScrollToItem, isStaggering, onStaggerEnd }) => {
     const isLast = index === totalItems - 1;
 
     return (
@@ -102,8 +101,7 @@ const HighlightExpandableListItem = memo<HighlightExpandableListItemProps>(
           <HighlightItemExpandable
             highlight={highlight}
             index={index}
-            onExpand={onExpand}
-            onCollapse={onCollapse}
+            onScrollToItem={onScrollToItem}
             isStaggering={isStaggering}
             onStaggerEnd={isLast ? onStaggerEnd : undefined}
           />
@@ -154,6 +152,7 @@ export const HighlightsDrawer: React.FC = () => {
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
+  const [spacerHeight, setSpacerHeight] = useState(0);
 
   // ─── Scroll-center focus system (only active when USE_INLINE_EXPAND = false) ───
   // Scroll intent tracking refs
@@ -162,6 +161,13 @@ export const HighlightsDrawer: React.FC = () => {
   const intentFailsafe = useRef(0);
   const itemCentersRef = useRef<number[]>([]);
   const lastScrollIndex = useRef(0);
+
+  // Measure container height for bottom spacer
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    setSpacerHeight(container.clientHeight);
+  }, []);
 
   // Sync visibility with isOpen for exit animation support
   useEffect(() => {
@@ -196,20 +202,10 @@ export const HighlightsDrawer: React.FC = () => {
     const containerRect = container.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
     const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
-    container.scrollTo({ top: Math.max(0, elTopInScroll - 16), behavior: 'smooth' });
+    setTimeout(() => {
+      container.scrollTo({ top: Math.max(0, elTopInScroll - 16), behavior: 'smooth' });
+    }, 80);
   }, []);
-
-  const expandItem = useCallback((index: number) => {
-    scrollIntentRef.current = 'programmatic';
-    lastScrollIndex.current = index;
-    requestAnimationFrame(() => {
-      scrollToItemTop(index);
-    });
-  }, [scrollToItemTop]);
-
-  const collapseItem = useCallback((index: number) => {
-    scrollToItemTop(index);
-  }, [scrollToItemTop]);
 
   // Calculate drawer position based on logo position
   useEffect(() => {
@@ -587,14 +583,16 @@ export const HighlightsDrawer: React.FC = () => {
                     index={index}
                     totalItems={currentPageHighlights.length}
                     itemRefs={itemRefs}
-                    onExpand={expandItem}
-                    onCollapse={collapseItem}
+                    onScrollToItem={scrollToItemTop}
                     isStaggering={isStaggering}
                     onStaggerEnd={handleStaggerEnd}
                   />
                 ))
               )}
             </div>
+            {currentPageHighlights.length > 0 && (
+              <div style={{ height: spacerHeight, flexShrink: 0 }} aria-hidden="true" />
+            )}
           </div>
         ) : (
           <div

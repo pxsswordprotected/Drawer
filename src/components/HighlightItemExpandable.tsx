@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
 import { NoteInput, NoteItem } from './HighlightDetailView';
@@ -9,8 +9,7 @@ interface HighlightItemExpandableProps {
   index: number;
   isStaggering?: boolean;
   onStaggerEnd?: () => void;
-  onExpand: (index: number) => void;
-  onCollapse: (index: number) => void;
+  onScrollToItem: (index: number) => void;
 }
 
 export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = ({
@@ -18,14 +17,11 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   index,
   isStaggering = false,
   onStaggerEnd,
-  onExpand,
-  onCollapse,
+  onScrollToItem,
 }) => {
   const selectedHighlightId = useDrawerStore((s) => s.selectedHighlightId);
   const selectHighlight = useDrawerStore((s) => s.selectHighlight);
   const clearSelectedHighlight = useDrawerStore((s) => s.clearSelectedHighlight);
-  const notesOuterRef = useRef<HTMLDivElement>(null);
-
   const isExpanded = selectedHighlightId === highlight.id;
 
   const sortedNotes = useMemo(
@@ -36,21 +32,12 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   const handleClick = useCallback(() => {
     if (isExpanded) {
       clearSelectedHighlight();
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reducedMotion || !notesOuterRef.current) {
-        onCollapse(index);
-      } else {
-        notesOuterRef.current.addEventListener(
-          'transitionend',
-          () => onCollapse(index),
-          { once: true }
-        );
-      }
+      requestAnimationFrame(() => onScrollToItem(index));
     } else {
       selectHighlight(highlight.id);
-      onExpand(index);
+      requestAnimationFrame(() => onScrollToItem(index));
     }
-  }, [isExpanded, clearSelectedHighlight, selectHighlight, highlight.id, onExpand, onCollapse, index]);
+  }, [isExpanded, clearSelectedHighlight, selectHighlight, highlight.id, onScrollToItem, index]);
 
   const handleNotesClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -84,7 +71,6 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
       </div>
 
       <div
-        ref={notesOuterRef}
         className={isExpanded ? styles.notesOuterExpanded : styles.notesOuter}
         aria-hidden={!isExpanded}
       >
