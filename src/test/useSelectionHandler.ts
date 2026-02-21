@@ -133,6 +133,7 @@ export function useSelectionHandler() {
 
   // Hide icon on scroll (prevents "ghost" icon floating in wrong position)
   const handleScroll = useCallback(() => {
+    if (isSaved) return; // Don't dismiss checkmark animation on scroll
     if (selectionState.visible) {
       if (hideTimeoutRef.current) {
         clearTimeout(hideTimeoutRef.current);
@@ -143,7 +144,7 @@ export function useSelectionHandler() {
       setIsDismissing(false);
       setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
     }
-  }, [selectionState.visible]);
+  }, [selectionState.visible, isSaved]);
 
   // Save highlight when plus icon is clicked
   const handleSaveHighlight = useCallback(async () => {
