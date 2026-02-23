@@ -30,23 +30,6 @@ export function createShadowRootUI(): ShadowRootUI {
   reactRoot.style.pointerEvents = 'auto'; // Enable clicks on our UI
   shadowRoot.appendChild(reactRoot);
 
-  // Inject styles into Shadow DOM
-  injectStyles(shadowRoot);
-
-  return { shadowRoot, reactRoot, container };
-}
-
-/**
- * Inject CSS styles into the Shadow DOM
- * This includes both Tailwind and custom styles
- */
-function injectStyles(shadowRoot: ShadowRoot): void {
-  // Create style element for Tailwind CSS
-  const tailwindStyle = document.createElement('link');
-  tailwindStyle.rel = 'stylesheet';
-  tailwindStyle.href = chrome.runtime.getURL('src/content/styles.css');
-  shadowRoot.appendChild(tailwindStyle);
-
   // Add base styles to ensure proper rendering
   const baseStyles = document.createElement('style');
   baseStyles.textContent = `
@@ -55,7 +38,7 @@ function injectStyles(shadowRoot: ShadowRoot): void {
     }
 
     #react-root {
-      font-family: Inter, system-ui, -apple-system, sans-serif;
+      font-family: 'Geist', system-ui, -apple-system, sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -66,6 +49,8 @@ function injectStyles(shadowRoot: ShadowRoot): void {
     }
   `;
   shadowRoot.appendChild(baseStyles);
+
+  return { shadowRoot, reactRoot, container };
 }
 
 /**

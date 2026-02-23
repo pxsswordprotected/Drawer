@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --mode test",
-    "dev:extension": "vite",
     "build": "vite build",
+    "build:extension": "vite build --mode extension",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
@@ -34,7 +34,6 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
-    "@crxjs/vite-plugin": "^2.0.0-beta.23",
     "@types/node": "^20.12.7",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",

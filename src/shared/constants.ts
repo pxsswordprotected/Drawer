@@ -8,7 +8,7 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_SETTINGS: Settings = {
-  drawerPosition: { x: window.innerWidth - 420, y: window.innerHeight - 600 },
+  drawerPosition: { x: typeof window !== 'undefined' ? window.innerWidth - 420 : 0, y: typeof window !== 'undefined' ? window.innerHeight - 600 : 0 },
   drawerVisible: true,
   defaultColor: '#FFEB3B', // Yellow highlight
   highlightShortcut: 'Ctrl+Shift+H',
