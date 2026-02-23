@@ -9,7 +9,7 @@ interface DrawerState {
   logoPosition: { x: number; y: number } | null;
   selectedHighlightId: string | null;
   lastAddedHighlightId: string | null;
-  collapsedGroupUrls: Set<string>;
+  expandedGroupUrl: string | null;
 
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -20,7 +20,8 @@ interface DrawerState {
   clearSelectedHighlight: () => void;
   addHighlight: (highlight: Highlight) => void;
   clearLastAdded: () => void;
-  toggleGroupCollapsed: (url: string) => void;
+  toggleGroupExpanded: (url: string) => void;
+  setExpandedGroupUrl: (url: string | null) => void;
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
@@ -36,7 +37,7 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   logoPosition: null,
   selectedHighlightId: null,
   lastAddedHighlightId: null,
-  collapsedGroupUrls: new Set(),
+  expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
 
   openDrawer: () => set({ isOpen: true }),
   closeDrawer: () => set({ isOpen: false }),
@@ -57,12 +58,11 @@ export const useDrawerStore = create<DrawerState>((set) => ({
     })),
   clearLastAdded: () => set({ lastAddedHighlightId: null }),
 
-  toggleGroupCollapsed: (url: string) =>
-    set((state) => {
-      const next = new Set(state.collapsedGroupUrls);
-      next.has(url) ? next.delete(url) : next.add(url);
-      return { collapsedGroupUrls: next };
-    }),
+  toggleGroupExpanded: (url: string) =>
+    set((state) => ({
+      expandedGroupUrl: state.expandedGroupUrl === url ? null : url,
+    })),
+  setExpandedGroupUrl: (url: string | null) => set({ expandedGroupUrl: url }),
 
   addNote: async (highlightId: string, text: string) => {
     const note: Note = {

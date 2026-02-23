@@ -73,8 +73,9 @@ export const HighlightsDrawer: React.FC = () => {
     selectedHighlightId,
     lastAddedHighlightId,
     clearLastAdded,
-    collapsedGroupUrls,
-    toggleGroupCollapsed,
+    expandedGroupUrl,
+    toggleGroupExpanded,
+    setExpandedGroupUrl,
     clearSelectedHighlight,
   } = useDrawerStore();
 
@@ -138,7 +139,6 @@ export const HighlightsDrawer: React.FC = () => {
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
-  const [spacerHeight, setSpacerHeight] = useState(0);
 
   // Scroll intent tracking refs
   const scrollIntentRef = useRef<'programmatic' | 'user' | null>(null);
@@ -147,12 +147,6 @@ export const HighlightsDrawer: React.FC = () => {
   const itemCentersRef = useRef<number[]>([]);
   const lastScrollIndex = useRef(0);
 
-  // Measure container height for bottom spacer
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    setSpacerHeight(container.clientHeight);
-  }, []);
 
   // Sync visibility with isOpen for exit animation support
   useEffect(() => {
@@ -183,6 +177,17 @@ export const HighlightsDrawer: React.FC = () => {
   const scrollToItemTop = useCallback((index: number) => {
     const container = scrollContainerRef.current;
     const el = itemRefs.current[index];
+    if (!container || !el) return;
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
+    setTimeout(() => {
+      container.scrollTo({ top: Math.max(0, elTopInScroll - 16), behavior: 'smooth' });
+    }, 80);
+  }, []);
+
+  const scrollToElement = useCallback((el: HTMLElement) => {
+    const container = scrollContainerRef.current;
     if (!container || !el) return;
     const containerRect = container.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
@@ -244,6 +249,14 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [isOpen, loadAllHighlights]);
 
+  // Auto-expand current page group when drawer opens
+  useEffect(() => {
+    if (isOpen && !isLoading) {
+      const currentGroup = pageGroups.find((g) => g.isCurrentPage);
+      if (currentGroup) setExpandedGroupUrl(currentGroup.url);
+    }
+  }, [isOpen, isLoading]);
+
   // Click outside handler (temporarily disabled)
   // useEffect(() => {
   //   if (!isOpen) return;
@@ -295,10 +308,7 @@ export const HighlightsDrawer: React.FC = () => {
   }, [highlightGlobalIndices.total]);
 
   // Precompute item centers for scroll tracking
-  const highlightIds = useMemo(
-    () => allHighlights.map((h) => h.id).join(','),
-    [allHighlights]
-  );
+  const highlightIds = useMemo(() => allHighlights.map((h) => h.id).join(','), [allHighlights]);
 
   const recomputeCenters = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -483,91 +493,115 @@ export const HighlightsDrawer: React.FC = () => {
       >
         {/* Single scroll container with expandable items */}
         <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
-            <div
-              className={`px-[38px] space-y-6 ${styles.highlightList}`}
-              style={{ paddingTop: '20px', paddingBottom: '20px' }}
-              data-has-expanded={selectedHighlightId ? '' : undefined}
-            >
-              {isLoading ? (
-                <>
-                  <div
-                    className="bg-[#373737] rounded-md animate-pulse"
-                    style={{ height: '64px' }}
-                  />
-                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                  <div
-                    className="bg-[#373737] rounded-md animate-pulse"
-                    style={{ height: '48px' }}
-                  />
-                  <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                  <div
-                    className="bg-[#373737] rounded-md animate-pulse"
-                    style={{ height: '56px' }}
-                  />
-                </>
-              ) : allHighlights.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-text-secondary text-center">No highlights saved</p>
-                </div>
-              ) : (
-                pageGroups.map((group) => {
-                  const isCollapsed = collapsedGroupUrls.has(group.url);
-                  return (
-                  <div
-                    key={group.url}
-                    ref={group.isCurrentPage ? currentPageSectionRef : undefined}
-                  >
-                    {/* Section header — only when multiple page groups exist */}
-                    {(pageGroups.length > 1 || group.isCurrentPage) && (
+          <div
+            className={`px-[38px] ${styles.highlightList}`}
+            style={{ paddingTop: '20px', paddingBottom: '20px' }}
+            data-has-expanded={selectedHighlightId ? '' : undefined}
+          >
+            {isLoading ? (
+              <>
+                <div className="bg-[#373737] rounded-md animate-pulse" style={{ height: '64px' }} />
+                <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                <div className="bg-[#373737] rounded-md animate-pulse" style={{ height: '48px' }} />
+                <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                <div className="bg-[#373737] rounded-md animate-pulse" style={{ height: '56px' }} />
+              </>
+            ) : allHighlights.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-text-secondary text-center">No highlights saved</p>
+              </div>
+            ) : (
+              pageGroups.map((group, groupIndex) => {
+                const isCollapsed = expandedGroupUrl !== group.url;
+                return (
+                  <React.Fragment key={group.url}>
+                    {groupIndex > 0 && (
                       <div
-                        className={`mb-2 cursor-pointer ${isStaggering ? styles.staggerEntry : ''} ${!isCollapsed && !group.isCurrentPage ? styles.pageHeaderDimmed : ''}`}
-                        style={isStaggering ? { animationDelay: `${20 + (highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0) * 35}ms` } : undefined}
-                        onClick={() => {
-                          if (!isCollapsed && selectedHighlightId &&
-                              group.highlights.some(h => h.id === selectedHighlightId)) {
-                            clearSelectedHighlight();
-                          }
-                          toggleGroupCollapsed(group.url);
+                        className={`border-t border-divider mx-auto mt-4 ${isStaggering ? styles.staggerDivider : ''}`}
+                        style={{
+                          width: '300px',
+                          ...(isStaggering
+                            ? {
+                                animationDelay: `${20 + (highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0) * 35}ms`,
+                              }
+                            : {}),
                         }}
-                      >
-                        <p className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : group.isCurrentPage ? 'font-medium text-text-main' : 'text-text-secondary'}`}>
-                          {group.pageTitle || group.url}
-                        </p>
-                      </div>
+                      />
                     )}
-
-                    {/* Highlights within this group */}
-                    {!isCollapsed && group.highlights.map((highlight, i) => {
-                      const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
-                      const isLast = globalIdx === highlightGlobalIndices.total - 1;
-                      const isLastInGroup = i === group.highlights.length - 1;
-                      return (
+                    <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
+                      {/* Section header — only when multiple page groups exist */}
+                      {(pageGroups.length > 1 || group.isCurrentPage) && (
                         <div
-                          key={highlight.id}
-                          ref={(el) => (itemRefs.current[globalIdx] = el)}
-                          data-item-expanded={selectedHighlightId === highlight.id ? '' : undefined}
-                          className={i > 0 ? 'pt-4' : undefined}
+                          data-page-header
+                          className={`${groupIndex > 0 ? 'pt-4' : ''} mb-2 cursor-pointer ${isStaggering ? styles.staggerEntry : ''}`}
+                          style={
+                            isStaggering
+                              ? {
+                                  animationDelay: `${20 + (highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0) * 35}ms`,
+                                }
+                              : undefined
+                          }
+                          onClick={(e) => {
+                            if (
+                              !isCollapsed &&
+                              selectedHighlightId &&
+                              group.highlights.some((h) => h.id === selectedHighlightId)
+                            ) {
+                              clearSelectedHighlight();
+                            }
+                            const isClosing = !isCollapsed;
+                            toggleGroupExpanded(group.url);
+                            if (isClosing) {
+                              handleStaggerEnd();
+                            }
+                            if (isCollapsed) {
+                              const headerEl = e.currentTarget as HTMLElement;
+                              requestAnimationFrame(() => scrollToElement(headerEl));
+                            }
+                          }}
                         >
-                          <HighlightExpandableListItem
-                            highlight={highlight}
-                            index={globalIdx}
-                            isLastInGroup={isLastInGroup}
-                            onScrollToItem={scrollToItemTop}
-                            isStaggering={isStaggering}
-                            onStaggerEnd={isLast ? handleStaggerEnd : undefined}
-                          />
+                          <p
+                            className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
+                          >
+                            {group.pageTitle || group.url}
+                          </p>
                         </div>
-                      );
-                    })}
-                  </div>
-                  );
-                })
-              )}
-            </div>
-            {allHighlights.length > 0 && (
-              <div style={{ height: spacerHeight, flexShrink: 0 }} aria-hidden="true" />
+                      )}
+
+                      {/* Highlights within this group */}
+                      {!isCollapsed &&
+                        group.highlights.map((highlight, i) => {
+                          const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
+                          const isLastInGroup = i === group.highlights.length - 1;
+                          return (
+                            <div
+                              key={highlight.id}
+                              ref={(el) => (itemRefs.current[globalIdx] = el)}
+                              data-item-expanded={
+                                selectedHighlightId === highlight.id ? '' : undefined
+                              }
+                              className={i > 0 ? 'pt-4' : undefined}
+                            >
+                              <HighlightExpandableListItem
+                                highlight={highlight}
+                                index={globalIdx}
+                                isLastInGroup={isLastInGroup}
+                                onScrollToItem={scrollToItemTop}
+                                isStaggering={isStaggering}
+                                onStaggerEnd={
+                                  isLastInGroup && !isCollapsed ? handleStaggerEnd : undefined
+                                }
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </React.Fragment>
+                );
+              })
             )}
           </div>
+        </div>
       </div>
     </div>
   );
