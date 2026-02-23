@@ -8,114 +8,54 @@ import React, {
   memo,
 } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
-import { HighlightItem } from './HighlightItem';
-import { HighlightDetailView } from './HighlightDetailView';
 import { Highlight } from '@/shared/types';
 import { DRAWER_CONFIG } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
-import detailStyles from './HighlightDetailView.module.css';
 import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 import { HighlightItemExpandable } from './HighlightItemExpandable';
 
-const USE_INLINE_EXPAND = true;
-
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
-// Memoized list item to prevent re-renders when other items change
-interface HighlightListItemProps {
-  highlight: Highlight;
-  index: number;
-  currentIndex: number;
-  totalItems: number;
-  itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
-  onClick: (index: number) => void;
-  isStaggering: boolean;
-  onStaggerEnd?: () => void;
+// ─── Page grouping types ───
+interface PageGroup {
+  url: string;
+  pageTitle: string;
+  highlights: Highlight[];
+  isCurrentPage: boolean;
+  mostRecentTimestamp: number;
 }
 
-const HighlightListItem = memo<HighlightListItemProps>(
-  ({
-    highlight,
-    index,
-    currentIndex,
-    totalItems,
-    itemRefs,
-    onClick,
-    isStaggering,
-    onStaggerEnd,
-  }) => {
-    const isFocused = index === currentIndex;
-    const isLast = index === totalItems - 1;
-
-    const handleClick = useCallback(() => {
-      onClick(index);
-    }, [index, onClick]);
-
-    return (
-      <React.Fragment>
-        <div ref={(el) => (itemRefs.current[index] = el)}>
-          <HighlightItem
-            highlight={highlight}
-            isFocused={isFocused}
-            index={index}
-            currentIndex={currentIndex}
-            onClick={handleClick}
-            isStaggering={isStaggering}
-            onStaggerEnd={isLast ? onStaggerEnd : undefined}
-          />
-        </div>
-        {index < totalItems - 1 && (
-          <div
-            className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
-            style={{
-              width: '300px',
-              ...(isStaggering ? { animationDelay: `${20 + index * 35 + 17}ms` } : {}),
-            }}
-          />
-        )}
-      </React.Fragment>
-    );
-  }
-);
-
-HighlightListItem.displayName = 'HighlightListItem';
-
-// ─── Expandable list item (only active when USE_INLINE_EXPAND = true) ───
+// ─── Expandable list item ───
 interface HighlightExpandableListItemProps {
   highlight: Highlight;
   index: number;
-  totalItems: number;
-  itemRefs: React.MutableRefObject<(HTMLDivElement | null)[]>;
+  isLastInGroup: boolean;
   onScrollToItem: (index: number) => void;
   isStaggering: boolean;
   onStaggerEnd?: () => void;
 }
 
 const HighlightExpandableListItem = memo<HighlightExpandableListItemProps>(
-  ({ highlight, index, totalItems, itemRefs, onScrollToItem, isStaggering, onStaggerEnd }) => {
-    const isLast = index === totalItems - 1;
-
+  ({ highlight, index, isLastInGroup, onScrollToItem, isStaggering, onStaggerEnd }) => {
     return (
-      <React.Fragment>
-        <div ref={(el) => (itemRefs.current[index] = el)}>
-          <HighlightItemExpandable
-            highlight={highlight}
-            index={index}
-            onScrollToItem={onScrollToItem}
-            isStaggering={isStaggering}
-            onStaggerEnd={isLast ? onStaggerEnd : undefined}
-          />
-        </div>
-        {index < totalItems - 1 && (
+      <>
+        <HighlightItemExpandable
+          highlight={highlight}
+          index={index}
+          onScrollToItem={onScrollToItem}
+          isStaggering={isStaggering}
+          onStaggerEnd={onStaggerEnd}
+        />
+        {!isLastInGroup && (
           <div
-            className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+            className={`border-t border-divider mx-auto mt-4 ${isStaggering ? styles.staggerDivider : ''}`}
             style={{
               width: '300px',
               ...(isStaggering ? { animationDelay: `${20 + index * 35 + 17}ms` } : {}),
             }}
           />
         )}
-      </React.Fragment>
+      </>
     );
   }
 );
@@ -125,27 +65,73 @@ HighlightExpandableListItem.displayName = 'HighlightExpandableListItem';
 export const HighlightsDrawer: React.FC = () => {
   const {
     isOpen,
-    currentPageHighlights,
+    allHighlights,
     isLoading,
     logoPosition,
     closeDrawer,
-    loadHighlights,
+    loadAllHighlights,
     selectedHighlightId,
     lastAddedHighlightId,
     clearLastAdded,
+    collapsedGroupUrls,
+    toggleGroupCollapsed,
+    clearSelectedHighlight,
   } = useDrawerStore();
 
-  const selectedHighlight = useMemo(
-    () =>
-      selectedHighlightId
-        ? (currentPageHighlights.find((h) => h.id === selectedHighlightId) ?? null)
-        : null,
-    [selectedHighlightId, currentPageHighlights]
-  );
+  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+  // ─── Grouping logic ───
+  const pageGroups = useMemo<PageGroup[]>(() => {
+    if (allHighlights.length === 0) return [];
+
+    const groupMap = new Map<string, PageGroup>();
+    for (const h of allHighlights) {
+      let group = groupMap.get(h.url);
+      if (!group) {
+        group = {
+          url: h.url,
+          pageTitle: h.pageTitle,
+          highlights: [],
+          isCurrentPage: h.url === currentUrl,
+          mostRecentTimestamp: 0,
+        };
+        groupMap.set(h.url, group);
+      }
+      group.highlights.push(h);
+      if (h.timestamp > group.mostRecentTimestamp) {
+        group.mostRecentTimestamp = h.timestamp;
+      }
+    }
+
+    const groups = Array.from(groupMap.values());
+
+    // Current page first, then by most recent highlight descending
+    groups.sort((a, b) => {
+      if (a.isCurrentPage && !b.isCurrentPage) return -1;
+      if (!a.isCurrentPage && b.isCurrentPage) return 1;
+      return b.mostRecentTimestamp - a.mostRecentTimestamp;
+    });
+
+    return groups;
+  }, [allHighlights, currentUrl]);
+
+  // Global highlight index map (headers excluded) for itemRefs and stagger
+  const highlightGlobalIndices = useMemo(() => {
+    const map = new Map<string, number>();
+    let idx = 0;
+    for (const group of pageGroups) {
+      for (const h of group.highlights) {
+        map.set(h.id, idx++);
+      }
+    }
+    return { map, total: idx };
+  }, [pageGroups]);
+
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const currentPageSectionRef = useRef<HTMLDivElement | null>(null);
   const [drawerStyle, setDrawerStyle] = useState<React.CSSProperties>({});
   const [innerStyle, setInnerStyle] = useState<React.CSSProperties>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -154,7 +140,6 @@ export const HighlightsDrawer: React.FC = () => {
   const [isStaggering, setIsStaggering] = useState(false);
   const [spacerHeight, setSpacerHeight] = useState(0);
 
-  // ─── Scroll-center focus system (only active when USE_INLINE_EXPAND = false) ───
   // Scroll intent tracking refs
   const scrollIntentRef = useRef<'programmatic' | 'user' | null>(null);
   const scrollRaf = useRef(0);
@@ -194,7 +179,7 @@ export const HighlightsDrawer: React.FC = () => {
     setIsStaggering(false);
   }, []);
 
-  // ─── Inline expand/collapse scroll helpers (only active when USE_INLINE_EXPAND = true) ───
+  // ─── Inline expand/collapse scroll helpers ───
   const scrollToItemTop = useCallback((index: number) => {
     const container = scrollContainerRef.current;
     const el = itemRefs.current[index];
@@ -252,12 +237,12 @@ export const HighlightsDrawer: React.FC = () => {
     });
   }, [logoPosition]);
 
-  // Load highlights when drawer opens
+  // Load all highlights when drawer opens
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined') {
-      loadHighlights(window.location.href);
+      loadAllHighlights();
     }
-  }, [isOpen, loadHighlights]);
+  }, [isOpen, loadAllHighlights]);
 
   // Click outside handler (temporarily disabled)
   // useEffect(() => {
@@ -304,15 +289,15 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [isOpen, isVisible]);
 
-  // Clamp stale itemRefs when highlights change pages
+  // Clamp stale itemRefs when highlights change
   useEffect(() => {
-    itemRefs.current = itemRefs.current.slice(0, currentPageHighlights.length);
-  }, [currentPageHighlights.length]);
+    itemRefs.current = itemRefs.current.slice(0, highlightGlobalIndices.total);
+  }, [highlightGlobalIndices.total]);
 
   // Precompute item centers for scroll tracking
   const highlightIds = useMemo(
-    () => currentPageHighlights.map((h) => h.id).join(','),
-    [currentPageHighlights]
+    () => allHighlights.map((h) => h.id).join(','),
+    [allHighlights]
   );
 
   const recomputeCenters = useCallback(() => {
@@ -347,14 +332,7 @@ export const HighlightsDrawer: React.FC = () => {
     return () => ro.disconnect();
   }, [isOpen, isVisible, isLoading, recomputeCenters]);
 
-  // Click handler: set index directly with programmatic intent
-  const selectIndex = useCallback((i: number) => {
-    scrollIntentRef.current = 'programmatic';
-    lastScrollIndex.current = i;
-    setCurrentIndex(i);
-  }, []);
-
-  // Keyboard navigation handler
+  // Keyboard navigation handler (cross-page navigation)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
@@ -364,12 +342,12 @@ export const HighlightsDrawer: React.FC = () => {
 
       setCurrentIndex((prev) => {
         const dir = e.key === 'ArrowDown' ? 1 : -1;
-        const next = Math.max(0, Math.min(currentPageHighlights.length - 1, prev + dir));
+        const next = Math.max(0, Math.min(highlightGlobalIndices.total - 1, prev + dir));
         lastScrollIndex.current = next;
         return next;
       });
     },
-    [currentPageHighlights.length]
+    [highlightGlobalIndices.total]
   );
 
   // Programmatic scroll effect + failsafe
@@ -407,87 +385,46 @@ export const HighlightsDrawer: React.FC = () => {
     };
   }, [isOpen]);
 
-  // Scroll handler: detect user scroll vs programmatic scroll
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // Programmatic smooth scroll in progress: clear intent when centered enough
-    if (scrollIntentRef.current === 'programmatic') {
-      const centers = itemCentersRef.current;
-      const i = lastScrollIndex.current;
-      const itemCenter = centers[i];
-
-      if (itemCenter !== undefined) {
-        const containerCenter = container.scrollTop + container.clientHeight / 2;
-        const epsilon = 10;
-        const delta = Math.abs(itemCenter - containerCenter);
-
-        if (delta < epsilon) {
-          scrollIntentRef.current = null;
-          clearTimeout(intentFailsafe.current);
-        }
-      }
-      return;
-    }
-
-    cancelAnimationFrame(scrollRaf.current);
-    scrollRaf.current = requestAnimationFrame(() => {
-      const container = scrollContainerRef.current;
-      const centers = itemCentersRef.current;
-      if (!container) return;
-
-      const targetCenter = container.scrollTop + container.clientHeight / 2;
-
-      const isAtTop = container.scrollTop <= 5;
-      const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 5;
-
-      let closestIndex = 0;
-      let closestDist = Infinity;
-
-      if (isAtTop) {
-        closestIndex = 0;
-      } else if (isAtBottom) {
-        closestIndex = centers.length - 1;
-      } else {
-        // Only run the loop if we aren't at the very top or bottom
-        let closestDist = Infinity;
-        for (let i = 0; i < centers.length; i++) {
-          const c = centers[i];
-          if (c === undefined) continue;
-          const dist = Math.abs(c - targetCenter);
-          if (dist < closestDist) {
-            closestDist = dist;
-            closestIndex = i;
-          }
-        }
-      }
-
-      if (closestIndex !== lastScrollIndex.current) {
-        lastScrollIndex.current = closestIndex;
-        scrollIntentRef.current = 'user';
-        setCurrentIndex(closestIndex);
-      }
-    });
-  }, []);
-
   // Clamp currentIndex when list shrinks
   useEffect(() => {
-    setCurrentIndex((prev) => Math.min(prev, Math.max(0, currentPageHighlights.length - 1)));
-  }, [currentPageHighlights.length]);
+    setCurrentIndex((prev) => Math.min(prev, Math.max(0, highlightGlobalIndices.total - 1)));
+  }, [highlightGlobalIndices.total]);
 
   // Auto-focus newly added highlight
   useEffect(() => {
     if (!lastAddedHighlightId) return;
 
-    const index = currentPageHighlights.findIndex((h) => h.id === lastAddedHighlightId);
-    if (index === -1) return;
+    const globalIndex = highlightGlobalIndices.map.get(lastAddedHighlightId);
+    if (globalIndex === undefined) return;
 
     scrollIntentRef.current = 'programmatic';
-    lastScrollIndex.current = index;
-    setCurrentIndex(index);
+    lastScrollIndex.current = globalIndex;
+    setCurrentIndex(globalIndex);
     clearLastAdded();
-  }, [lastAddedHighlightId, currentPageHighlights, clearLastAdded]);
+  }, [lastAddedHighlightId, highlightGlobalIndices, clearLastAdded]);
+
+  // Auto-scroll to current page section after data loads
+  useEffect(() => {
+    if (!isOpen || isLoading || !scrollContainerRef.current) return;
+
+    const sectionEl = currentPageSectionRef.current;
+    if (!sectionEl) return; // current page has no highlights
+
+    // If the current page group is first, it's already at the top
+    const firstGroup = pageGroups[0];
+    if (firstGroup?.isCurrentPage) return;
+
+    requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      if (!container || !sectionEl) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const sectionRect = sectionEl.getBoundingClientRect();
+      const sectionTopInScroll = sectionRect.top - containerRect.top + container.scrollTop;
+
+      container.scrollTo({ top: Math.max(0, sectionTopInScroll - 16), behavior: 'smooth' });
+    });
+  }, [isOpen, isLoading, pageGroups]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -544,15 +481,12 @@ export const HighlightsDrawer: React.FC = () => {
         onAnimationEnd={handleDrawerAnimationEnd}
         onKeyDown={handleKeyDown}
       >
-        {USE_INLINE_EXPAND ? (
-          /* Single scroll container with expandable items */
-          <div
-            ref={scrollContainerRef}
-            className={`${styles.scrollContainer} h-full`}
-          >
+        {/* Single scroll container with expandable items */}
+        <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
             <div
-              className="px-[38px] space-y-4"
+              className={`px-[38px] space-y-6 ${styles.highlightList}`}
               style={{ paddingTop: '20px', paddingBottom: '20px' }}
+              data-has-expanded={selectedHighlightId ? '' : undefined}
             >
               {isLoading ? (
                 <>
@@ -571,91 +505,69 @@ export const HighlightsDrawer: React.FC = () => {
                     style={{ height: '56px' }}
                   />
                 </>
-              ) : currentPageHighlights.length === 0 ? (
+              ) : allHighlights.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
-                  <p className="text-text-secondary text-center">No highlights on this page</p>
+                  <p className="text-text-secondary text-center">No highlights saved</p>
                 </div>
               ) : (
-                currentPageHighlights.map((highlight, index) => (
-                  <HighlightExpandableListItem
-                    key={highlight.id}
-                    highlight={highlight}
-                    index={index}
-                    totalItems={currentPageHighlights.length}
-                    itemRefs={itemRefs}
-                    onScrollToItem={scrollToItemTop}
-                    isStaggering={isStaggering}
-                    onStaggerEnd={handleStaggerEnd}
-                  />
-                ))
+                pageGroups.map((group) => {
+                  const isCollapsed = collapsedGroupUrls.has(group.url);
+                  return (
+                  <div
+                    key={group.url}
+                    ref={group.isCurrentPage ? currentPageSectionRef : undefined}
+                  >
+                    {/* Section header — only when multiple page groups exist */}
+                    {(pageGroups.length > 1 || group.isCurrentPage) && (
+                      <div
+                        className={`mb-2 cursor-pointer ${isStaggering ? styles.staggerEntry : ''} ${!isCollapsed && !group.isCurrentPage ? styles.pageHeaderDimmed : ''}`}
+                        style={isStaggering ? { animationDelay: `${20 + (highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0) * 35}ms` } : undefined}
+                        onClick={() => {
+                          if (!isCollapsed && selectedHighlightId &&
+                              group.highlights.some(h => h.id === selectedHighlightId)) {
+                            clearSelectedHighlight();
+                          }
+                          toggleGroupCollapsed(group.url);
+                        }}
+                      >
+                        <p className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : group.isCurrentPage ? 'font-medium text-text-main' : 'text-text-secondary'}`}>
+                          {group.pageTitle || group.url}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Highlights within this group */}
+                    {!isCollapsed && group.highlights.map((highlight, i) => {
+                      const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
+                      const isLast = globalIdx === highlightGlobalIndices.total - 1;
+                      const isLastInGroup = i === group.highlights.length - 1;
+                      return (
+                        <div
+                          key={highlight.id}
+                          ref={(el) => (itemRefs.current[globalIdx] = el)}
+                          data-item-expanded={selectedHighlightId === highlight.id ? '' : undefined}
+                          className={i > 0 ? 'pt-4' : undefined}
+                        >
+                          <HighlightExpandableListItem
+                            highlight={highlight}
+                            index={globalIdx}
+                            isLastInGroup={isLastInGroup}
+                            onScrollToItem={scrollToItemTop}
+                            isStaggering={isStaggering}
+                            onStaggerEnd={isLast ? handleStaggerEnd : undefined}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                  );
+                })
               )}
             </div>
-            {currentPageHighlights.length > 0 && (
+            {allHighlights.length > 0 && (
               <div style={{ height: spacerHeight, flexShrink: 0 }} aria-hidden="true" />
             )}
           </div>
-        ) : (
-          <div
-            className={detailStyles.slideContainer}
-            data-detail-active={selectedHighlight ? 'true' : 'false'}
-          >
-            {/* List pane */}
-            <div className={detailStyles.listPane}>
-              <div
-                ref={scrollContainerRef}
-                onScroll={handleScroll}
-                className={`${styles.scrollContainer} h-full`}
-              >
-                <div
-                  className="px-[38px] space-y-4"
-                  style={{ paddingTop: '20px', paddingBottom: '20px' }}
-                >
-                  {isLoading ? (
-                    <>
-                      <div
-                        className="bg-[#373737] rounded-md animate-pulse"
-                        style={{ height: '64px' }}
-                      />
-                      <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                      <div
-                        className="bg-[#373737] rounded-md animate-pulse"
-                        style={{ height: '48px' }}
-                      />
-                      <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                      <div
-                        className="bg-[#373737] rounded-md animate-pulse"
-                        style={{ height: '56px' }}
-                      />
-                    </>
-                  ) : currentPageHighlights.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                      <p className="text-text-secondary text-center">No highlights on this page</p>
-                    </div>
-                  ) : (
-                    currentPageHighlights.map((highlight, index) => (
-                      <HighlightListItem
-                        key={highlight.id}
-                        highlight={highlight}
-                        index={index}
-                        currentIndex={currentIndex}
-                        totalItems={currentPageHighlights.length}
-                        itemRefs={itemRefs}
-                        onClick={selectIndex}
-                        isStaggering={isStaggering}
-                        onStaggerEnd={handleStaggerEnd}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Detail pane */}
-            <div className={detailStyles.detailPane}>
-              {selectedHighlight && <HighlightDetailView highlight={selectedHighlight} />}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

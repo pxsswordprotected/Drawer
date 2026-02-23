@@ -45,6 +45,29 @@
   animation: staggerFadeIn 250ms cubic-bezier(0.19, 1, 0.22, 1) both;
 }
 
+/* Stagger entry for section headers */
+@keyframes itemStaggerEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+}
+
+.staggerEntry {
+  animation: itemStaggerEnter 250ms cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+/* De-emphasized page headers (non-current page) */
+.pageHeaderDimmed {
+  opacity: 0.4;
+}
+
 /* Disable animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   @keyframes drawerEnter {
@@ -68,6 +91,11 @@
     from { opacity: 0; }
     to { opacity: 1; }
   }
+
+  @keyframes itemStaggerEnter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 
 .scrollContainer {
@@ -88,4 +116,21 @@
   outline: none; /* Remove default outline since drawer has visual focus */
 }
 
-/* No gradient masks needed - using progressive blur instead */
+/* Dim non-expanded highlights when one is expanded (nested group structure) */
+.highlightList > * > * {
+  transition: opacity 200ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.highlightList[data-has-expanded] > * > * {
+  opacity: 0.4;
+}
+
+.highlightList[data-has-expanded] [data-item-expanded] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .highlightList > * > * {
+    transition: none;
+  }
+}

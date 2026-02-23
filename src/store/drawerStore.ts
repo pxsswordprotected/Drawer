@@ -4,36 +4,39 @@ import { storageService } from '@/shared/storage';
 
 interface DrawerState {
   isOpen: boolean;
-  currentPageHighlights: Highlight[];
+  allHighlights: Highlight[];
   isLoading: boolean;
   logoPosition: { x: number; y: number } | null;
   selectedHighlightId: string | null;
   lastAddedHighlightId: string | null;
+  collapsedGroupUrls: Set<string>;
 
   openDrawer: () => void;
   closeDrawer: () => void;
   toggleDrawer: () => void;
   setLogoPosition: (position: { x: number; y: number }) => void;
-  loadHighlights: (url: string) => Promise<void>;
+  loadAllHighlights: () => Promise<void>;
   selectHighlight: (id: string) => void;
   clearSelectedHighlight: () => void;
   addHighlight: (highlight: Highlight) => void;
   clearLastAdded: () => void;
+  toggleGroupCollapsed: (url: string) => void;
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
 }
 
-// Request deduplication map - prevents duplicate concurrent requests for the same URL
+// Request deduplication map - prevents duplicate concurrent requests
 const loadingPromises = new Map<string, Promise<void>>();
 
 export const useDrawerStore = create<DrawerState>((set) => ({
   isOpen: false,
-  currentPageHighlights: [],
+  allHighlights: [],
   isLoading: false,
   logoPosition: null,
   selectedHighlightId: null,
   lastAddedHighlightId: null,
+  collapsedGroupUrls: new Set(),
 
   openDrawer: () => set({ isOpen: true }),
   closeDrawer: () => set({ isOpen: false }),
@@ -49,10 +52,17 @@ export const useDrawerStore = create<DrawerState>((set) => ({
 
   addHighlight: (highlight: Highlight) =>
     set((state) => ({
-      currentPageHighlights: [...state.currentPageHighlights, highlight],
+      allHighlights: [...state.allHighlights, highlight],
       lastAddedHighlightId: highlight.id,
     })),
   clearLastAdded: () => set({ lastAddedHighlightId: null }),
+
+  toggleGroupCollapsed: (url: string) =>
+    set((state) => {
+      const next = new Set(state.collapsedGroupUrls);
+      next.has(url) ? next.delete(url) : next.add(url);
+      return { collapsedGroupUrls: next };
+    }),
 
   addNote: async (highlightId: string, text: string) => {
     const note: Note = {
@@ -63,9 +73,8 @@ export const useDrawerStore = create<DrawerState>((set) => ({
 
     await storageService.addNoteToHighlight(highlightId, note);
 
-    // Update local state in place
     set((state) => ({
-      currentPageHighlights: state.currentPageHighlights.map((h) =>
+      allHighlights: state.allHighlights.map((h) =>
         h.id === highlightId ? { ...h, notes: [...h.notes, note] } : h
       ),
     }));
@@ -74,9 +83,8 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   updateNote: async (highlightId: string, noteId: string, text: string) => {
     await storageService.updateNoteInHighlight(highlightId, noteId, text);
 
-    // Update local state in place
     set((state) => ({
-      currentPageHighlights: state.currentPageHighlights.map((h) =>
+      allHighlights: state.allHighlights.map((h) =>
         h.id === highlightId
           ? {
               ...h,
@@ -90,9 +98,8 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   deleteNote: async (highlightId: string, noteId: string) => {
     await storageService.deleteNoteFromHighlight(highlightId, noteId);
 
-    // Update local state in place
     set((state) => ({
-      currentPageHighlights: state.currentPageHighlights.map((h) =>
+      allHighlights: state.allHighlights.map((h) =>
         h.id === highlightId
           ? {
               ...h,
@@ -103,28 +110,26 @@ export const useDrawerStore = create<DrawerState>((set) => ({
     }));
   },
 
-  loadHighlights: async (url: string) => {
-    // Request deduplication: if already loading this URL, return existing promise
-    if (loadingPromises.has(url)) {
-      return loadingPromises.get(url);
+  loadAllHighlights: async () => {
+    if (loadingPromises.has('__all__')) {
+      return loadingPromises.get('__all__');
     }
 
     const promise = (async () => {
       set({ isLoading: true });
 
       try {
-        const highlights = await storageService.getHighlights(url);
-        set({ currentPageHighlights: highlights, isLoading: false });
+        const highlights = await storageService.getHighlights();
+        set({ allHighlights: highlights, isLoading: false });
       } catch (error) {
         console.error('Failed to load highlights:', error);
-        set({ currentPageHighlights: [], isLoading: false });
+        set({ allHighlights: [], isLoading: false });
       } finally {
-        // Clean up promise from map after completion
-        loadingPromises.delete(url);
+        loadingPromises.delete('__all__');
       }
     })();
 
-    loadingPromises.set(url, promise);
+    loadingPromises.set('__all__', promise);
     return promise;
   },
 }));

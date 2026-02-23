@@ -80,7 +80,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
               Notes
             </p>
 
-            <div className="space-y-0">
+            <div className="space-y-0 [&>:last-child]:pb-0">
               <div className="py-3">
                 <NoteInput
                   highlightId={highlight.id}

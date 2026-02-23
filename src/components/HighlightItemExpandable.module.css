@@ -22,6 +22,16 @@
   position: relative;
 }
 
+/* Reset cursor on expanded items — only the highlight text should look clickable */
+.expandableItem[data-expanded='true'] {
+  cursor: default;
+}
+
+/* Highlight text area is always clickable (expand/collapse) */
+.highlightVisual {
+  cursor: pointer;
+}
+
 /* Extended clickable hitbox */
 .expandableItem:not([data-expanded='true'])::before {
   content: '';

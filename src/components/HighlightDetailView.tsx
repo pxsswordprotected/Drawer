@@ -136,6 +136,9 @@ export const NoteItem: React.FC<NoteItemProps> = ({ noteId, highlightId, text })
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSubmit();
+      } else if (e.key === 'Backspace' && !value) {
+        e.preventDefault();
+        handleSubmit();
       } else if (e.key === 'Escape') {
         setValue(text);
         setIsEditing(false);
@@ -153,22 +156,22 @@ export const NoteItem: React.FC<NoteItemProps> = ({ noteId, highlightId, text })
   }, [value]);
 
   return (
-    <div>
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setIsEditing(true)}
-        onBlur={handleSubmit}
-        className="w-full bg-transparent text-text-main text-sm resize-none outline-none"
-        style={{
-          minHeight: '20px',
-          cursor: 'text',
-        }}
-        rows={1}
-      />
-    </div>
+    // <div>
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={handleKeyDown}
+      onFocus={() => setIsEditing(true)}
+      onBlur={handleSubmit}
+      className="w-full bg-transparent text-text-main text-sm resize-none outline-none"
+      style={{
+        minHeight: '20px',
+        cursor: 'text',
+      }}
+      rows={1}
+    />
+    // </div>
   );
 };
 
@@ -228,25 +231,29 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
 
       {/* Notes section */}
       <div className={styles.detailStagger} style={{ animationDelay: '150ms' }}>
-      <p className="text-text-secondary text-xs mb-1">Notes</p>
+        <p className="text-text-secondary text-xs mb-1">Notes</p>
 
-      <div className="space-y-0">
-        {/* Note input */}
-        <div className="py-3">
-          <NoteInput highlightId={highlight.id} hasNotes={sortedNotes.length > 0} onNoteAdded={() => {}} />
+        <div className="space-y-0">
+          {/* Note input */}
+          <div className="py-3">
+            <NoteInput
+              highlightId={highlight.id}
+              hasNotes={sortedNotes.length > 0}
+              onNoteAdded={() => {}}
+            />
+          </div>
+
+          {sortedNotes.length > 0 && <div className="border-t border-divider" />}
+
+          {sortedNotes.map((note, index) => (
+            <React.Fragment key={note.id}>
+              <div className="py-3">
+                <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
+              </div>
+              {index < sortedNotes.length - 1 && <div className="border-t border-divider" />}
+            </React.Fragment>
+          ))}
         </div>
-
-        {sortedNotes.length > 0 && <div className="border-t border-divider" />}
-
-        {sortedNotes.map((note, index) => (
-          <React.Fragment key={note.id}>
-            <div className="py-3">
-              <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
-            </div>
-            {index < sortedNotes.length - 1 && <div className="border-t border-divider" />}
-          </React.Fragment>
-        ))}
-      </div>
       </div>
     </div>
   );
