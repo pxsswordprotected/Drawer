@@ -133,8 +133,15 @@
   opacity: 1;
 }
 
-.highlightList[data-has-expanded] [data-page-header] {
+/* Dim non-expanded page headers when a group is expanded */
+.highlightList[data-group-expanded] [data-page-header] {
+  opacity: 0.4;
+  animation: none;
+}
+
+.highlightList[data-group-expanded] [data-page-header][data-item-expanded] {
   opacity: 1;
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

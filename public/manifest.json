@@ -8,11 +8,7 @@
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
-  "permissions": [
-    "storage",
-    "activeTab",
-    "<all_urls>"
-  ],
+  "permissions": ["storage", "activeTab", "<all_urls>"],
   "background": {
     "scripts": ["background.js"],
     "persistent": false
@@ -39,7 +35,5 @@
       "description": "Highlight selected text"
     }
   },
-  "web_accessible_resources": [
-    "content.css"
-  ]
+  "web_accessible_resources": ["content.css", "fonts/Geist-Variable.woff2"]
 }

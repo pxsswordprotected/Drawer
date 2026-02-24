@@ -17,6 +17,7 @@ export function createShadowRootUI(): ShadowRootUI {
   const container = document.createElement('div');
   container.id = DRAWER_CONFIG.SHADOW_DOM_ID;
   container.style.position = 'fixed';
+  container.style.inset = '0';
   container.style.zIndex = String(DRAWER_CONFIG.Z_INDEX);
   container.style.pointerEvents = 'none'; // Let clicks pass through to page
   document.body.appendChild(container);

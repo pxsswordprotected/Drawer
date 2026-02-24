@@ -15,6 +15,20 @@ link.rel = 'stylesheet';
 link.href = cssUrl;
 shadowRoot.prepend(link);
 
+// Inject self-hosted Geist font into shadow root
+const fontUrl = browser.runtime.getURL('fonts/Geist-Variable.woff2');
+const fontStyle = document.createElement('style');
+fontStyle.textContent = `
+  @font-face {
+    font-family: 'Geist';
+    src: url('${fontUrl}') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+shadowRoot.prepend(fontStyle);
+
 // Render ContentApp
 const root = ReactDOM.createRoot(reactRoot);
 root.render(

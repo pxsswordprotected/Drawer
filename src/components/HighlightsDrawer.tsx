@@ -497,6 +497,7 @@ export const HighlightsDrawer: React.FC = () => {
             className={`px-[38px] ${styles.highlightList}`}
             style={{ paddingTop: '20px', paddingBottom: '20px' }}
             data-has-expanded={selectedHighlightId ? '' : undefined}
+            data-group-expanded={expandedGroupUrl ? '' : undefined}
           >
             {isLoading ? (
               <>
@@ -533,6 +534,7 @@ export const HighlightsDrawer: React.FC = () => {
                       {(pageGroups.length > 1 || group.isCurrentPage) && (
                         <div
                           data-page-header
+                          data-item-expanded={!isCollapsed ? '' : undefined}
                           className={`${groupIndex > 0 ? 'pt-4' : ''} mb-2 cursor-pointer ${isStaggering ? styles.staggerEntry : ''}`}
                           style={
                             isStaggering
