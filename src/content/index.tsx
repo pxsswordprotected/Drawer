@@ -27,7 +27,7 @@ fontStyle.textContent = `
     font-display: swap;
   }
 `;
-shadowRoot.prepend(fontStyle);
+document.head.appendChild(fontStyle);
 
 // Render ContentApp
 const root = ReactDOM.createRoot(reactRoot);
