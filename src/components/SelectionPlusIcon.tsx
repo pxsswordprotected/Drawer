@@ -49,10 +49,11 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
       onClick={onClick}
       disabled={disabled}
       data-selection-plus-icon="true"
-      className="fixed z-[999] bg-bg-main rounded-full p-1.5 shadow-lg hover:bg-[#2a2a2a] cursor-pointer border border-white/20 disabled:cursor-default"
+      className="fixed z-[999] rounded-full p-1.5 shadow-lg cursor-pointer border border-white/20 disabled:cursor-default"
       style={{
         left: `${x}px`,
         top: `${y}px`,
+        backgroundColor: '#1A1A1A',
         transition:
           'opacity 150ms cubic-bezier(.19, 1, .22, 1), transform 150ms cubic-bezier(.19, 1, .22, 1), color 200ms ease',
         opacity: isDismissing ? 0 : 1,
