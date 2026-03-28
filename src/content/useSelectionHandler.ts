@@ -3,6 +3,7 @@ import { Highlight } from '@/shared/types';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
 import { useDrawerStore } from '@/store/drawerStore';
+import { applyHighlightToRange } from './pageHighlighter';
 
 interface SelectionState {
   visible: boolean;
@@ -121,6 +122,15 @@ export function useSelectionHandler() {
     };
 
     try {
+      // Capture the live range before clearing selection
+      const selection = window.getSelection();
+      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+      // Wrap selected text in <mark> elements on the page
+      if (range) {
+        applyHighlightToRange(range, highlight.id, highlight.color);
+      }
+
       await storageService.saveHighlight(highlight);
       console.log('Highlight saved:', selectionState.selectedText.substring(0, 50) + '...');
 

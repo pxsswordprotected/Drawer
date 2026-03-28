@@ -22,6 +22,7 @@ interface DrawerState {
   clearLastAdded: () => void;
   toggleGroupExpanded: (url: string) => void;
   setExpandedGroupUrl: (url: string | null) => void;
+  deleteHighlight: (id: string) => Promise<void>;
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
@@ -63,6 +64,14 @@ export const useDrawerStore = create<DrawerState>((set) => ({
       expandedGroupUrl: state.expandedGroupUrl === url ? null : url,
     })),
   setExpandedGroupUrl: (url: string | null) => set({ expandedGroupUrl: url }),
+
+  deleteHighlight: async (id: string) => {
+    await storageService.deleteHighlight(id);
+    set((state) => ({
+      allHighlights: state.allHighlights.filter((h) => h.id !== id),
+      selectedHighlightId: state.selectedHighlightId === id ? null : state.selectedHighlightId,
+    }));
+  },
 
   addNote: async (highlightId: string, text: string) => {
     const note: Note = {

@@ -6,7 +6,8 @@
       "Bash(npm run dev:*)",
       "WebFetch(domain:www.henrikkarlsson.xyz)",
       "Bash(timeout 15 tail:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(xargs cat:*)"
     ]
   }
 }
