@@ -45,7 +45,7 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
 
   openDrawer: () => set({ isOpen: true }),
-  closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null }),
+  closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null, selectedHighlightId: null }),
   toggleDrawer: () =>
     set((state) => ({
       isOpen: !state.isOpen,

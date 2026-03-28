@@ -26,11 +26,7 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
  * Handles multi-node selections via TreeWalker, processing in reverse
  * document order to avoid offset invalidation when splitting text nodes.
  */
-export function applyHighlightToRange(
-  range: Range,
-  highlightId: string,
-  color: string
-): void {
+export function applyHighlightToRange(range: Range, highlightId: string, color: string): void {
   const treeWalker = document.createTreeWalker(
     range.commonAncestorContainer,
     NodeFilter.SHOW_TEXT,
@@ -41,9 +37,7 @@ export function applyHighlightToRange(
           return NodeFilter.FILTER_REJECT;
         }
         // Only accept nodes that intersect the selection range
-        return range.intersectsNode(node)
-          ? NodeFilter.FILTER_ACCEPT
-          : NodeFilter.FILTER_REJECT;
+        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       },
     }
   );
@@ -100,18 +94,31 @@ export function applyHighlightToRange(
     const mark = document.createElement('mark');
     mark.setAttribute('data-highlight-id', highlightId);
     mark.style.cssText = `
-      background-color: ${color} !important;
+      background-color: transparent !important;
+      background-image: linear-gradient(175deg, transparent 20%, color-mix(in srgb, ${color}, transparent 85%) 50%, transparent 80%), linear-gradient(83.4deg, color-mix(in srgb, ${color}, transparent 30%), color-mix(in srgb, ${color}, transparent 90%) 4%, color-mix(in srgb, ${color}, transparent 70%) 96%, color-mix(in srgb, ${color}, transparent 30%)) !important;
+      border-radius: 0.1em 0.5em 0.15em 0.4em / 0.5em 0.1em 0.4em 0.15em !important;
+      margin: -0.27em -0.16em -0.03em -0.34em !important;
+      padding: 0.27em 0.16em 0.03em 0.34em !important;
+      box-shadow: 1px 1px 3px color-mix(in srgb, ${color}, transparent 85%) !important;
+      -webkit-box-decoration-break: clone !important;
+      box-decoration-break: clone !important;
       color: inherit !important;
       cursor: pointer !important;
-      border-radius: 2px !important;
-      padding: 0 !important;
-      margin: 0 !important;
       display: inline !important;
+      background-position: left center !important;
+      background-repeat: no-repeat !important;
+      background-size: 0% 100% !important;
+      transition: background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1) !important;
     `;
 
     // Wrap: insert mark before the text node, then move text node inside
     targetNode.parentNode!.insertBefore(mark, targetNode);
     mark.appendChild(targetNode);
+
+    // Trigger the animation on the next frame
+    requestAnimationFrame(() => {
+      mark.style.backgroundSize = '100% 100%';
+    });
 
     // Attach click handler directly to this mark
     attachMarkClickHandler(mark, highlightId);
@@ -124,9 +131,7 @@ export function applyHighlightToRange(
  * breaking host page framework state.
  */
 export function removeHighlightMarks(highlightId: string): void {
-  const marks = document.querySelectorAll(
-    `mark[data-highlight-id="${highlightId}"]`
-  );
+  const marks = document.querySelectorAll(`mark[data-highlight-id="${highlightId}"]`);
 
   marks.forEach((mark) => {
     const parent = mark.parentNode;
