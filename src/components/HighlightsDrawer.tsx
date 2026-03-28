@@ -77,6 +77,9 @@ export const HighlightsDrawer: React.FC = () => {
     toggleGroupExpanded,
     setExpandedGroupUrl,
     clearSelectedHighlight,
+    selectHighlight,
+    pendingScrollHighlightId,
+    clearPendingScrollHighlight,
   } = useDrawerStore();
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -412,6 +415,31 @@ export const HighlightsDrawer: React.FC = () => {
     setCurrentIndex(globalIndex);
     clearLastAdded();
   }, [lastAddedHighlightId, highlightGlobalIndices, clearLastAdded]);
+
+  // Scroll to highlight when triggered from page mark click
+  useEffect(() => {
+    if (!pendingScrollHighlightId || isLoading) return;
+
+    const index = highlightGlobalIndices.map.get(pendingScrollHighlightId);
+
+    // If the group just expanded, highlightGlobalIndices may not have
+    // the index yet. Do NOT clear pending — let the next render retry.
+    if (index === undefined) return;
+
+    selectHighlight(pendingScrollHighlightId);
+
+    // Give React a tick to attach refs after drawer open / group expansion
+    const timeoutId = setTimeout(() => {
+      const el = itemRefs.current[index];
+      if (el && scrollContainerRef.current) {
+        scrollToItemTop(index);
+      }
+
+      clearPendingScrollHighlight();
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
+  }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices]);
 
   // Auto-scroll to current page section after data loads
   useEffect(() => {

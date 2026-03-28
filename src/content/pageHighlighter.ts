@@ -8,9 +8,16 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   mark.addEventListener('click', (e) => {
     e.stopPropagation();
     const store = useDrawerStore.getState();
-    store.openDrawer();
-    store.selectHighlight(highlightId);
+
+    // Toggle: if this highlight is already expanded, close the drawer
+    if (store.isOpen && store.selectedHighlightId === highlightId) {
+      store.closeDrawer();
+      return;
+    }
+
     store.setExpandedGroupUrl(window.location.href);
+    store.openDrawer();
+    store.setPendingScrollHighlight(highlightId);
   });
 }
 

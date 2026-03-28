@@ -9,6 +9,7 @@ interface DrawerState {
   logoPosition: { x: number; y: number } | null;
   selectedHighlightId: string | null;
   lastAddedHighlightId: string | null;
+  pendingScrollHighlightId: string | null;
   expandedGroupUrl: string | null;
 
   openDrawer: () => void;
@@ -20,6 +21,8 @@ interface DrawerState {
   clearSelectedHighlight: () => void;
   addHighlight: (highlight: Highlight) => void;
   clearLastAdded: () => void;
+  setPendingScrollHighlight: (id: string) => void;
+  clearPendingScrollHighlight: () => void;
   toggleGroupExpanded: (url: string) => void;
   setExpandedGroupUrl: (url: string | null) => void;
   deleteHighlight: (id: string) => Promise<void>;
@@ -38,10 +41,11 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   logoPosition: null,
   selectedHighlightId: null,
   lastAddedHighlightId: null,
+  pendingScrollHighlightId: null,
   expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
 
   openDrawer: () => set({ isOpen: true }),
-  closeDrawer: () => set({ isOpen: false }),
+  closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null }),
   toggleDrawer: () =>
     set((state) => ({
       isOpen: !state.isOpen,
@@ -58,6 +62,8 @@ export const useDrawerStore = create<DrawerState>((set) => ({
       lastAddedHighlightId: highlight.id,
     })),
   clearLastAdded: () => set({ lastAddedHighlightId: null }),
+  setPendingScrollHighlight: (id: string) => set({ pendingScrollHighlightId: id }),
+  clearPendingScrollHighlight: () => set({ pendingScrollHighlightId: null }),
 
   toggleGroupExpanded: (url: string) =>
     set((state) => ({
