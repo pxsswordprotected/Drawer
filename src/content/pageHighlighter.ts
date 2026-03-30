@@ -16,7 +16,7 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     }
 
     store.setExpandedGroupUrl(window.location.href);
-    store.openDrawer();
+    store.openDrawer('mark');
     store.setPendingScrollHighlight(highlightId);
   });
 }
@@ -131,16 +131,23 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
  * breaking host page framework state.
  */
 export function removeHighlightMarks(highlightId: string): void {
-  const marks = document.querySelectorAll(`mark[data-highlight-id="${highlightId}"]`);
+  const marks = document.querySelectorAll<HTMLElement>(`mark[data-highlight-id="${highlightId}"]`);
 
   marks.forEach((mark) => {
     const parent = mark.parentNode;
     if (!parent) return;
 
-    // Move all children out before the mark, then remove the mark
-    while (mark.firstChild) {
-      parent.insertBefore(mark.firstChild, mark);
-    }
-    parent.removeChild(mark);
+    // Animate out: reverse the enter animation (100% → 0%)
+    const onEnd = () => {
+      mark.removeEventListener('transitionend', onEnd);
+      // Unwrap: move children out, then remove the mark
+      while (mark.firstChild) {
+        parent.insertBefore(mark.firstChild, mark);
+      }
+      parent.removeChild(mark);
+    };
+
+    mark.addEventListener('transitionend', onEnd);
+    mark.style.backgroundSize = '0% 100%';
   });
 }

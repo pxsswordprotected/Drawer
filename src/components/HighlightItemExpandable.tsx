@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
+import { TrashIcon } from '@/shared/TrashIcon';
 import { NoteInput, NoteItem } from './HighlightDetailView';
 import styles from './HighlightItemExpandable.module.css';
 
@@ -22,6 +23,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   const selectedHighlightId = useDrawerStore((s) => s.selectedHighlightId);
   const selectHighlight = useDrawerStore((s) => s.selectHighlight);
   const clearSelectedHighlight = useDrawerStore((s) => s.clearSelectedHighlight);
+  const deleteHighlight = useDrawerStore((s) => s.deleteHighlight);
   const isExpanded = selectedHighlightId === highlight.id;
 
   const sortedNotes = useMemo(
@@ -38,6 +40,14 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
       requestAnimationFrame(() => onScrollToItem(index));
     }
   }, [isExpanded, clearSelectedHighlight, selectHighlight, highlight.id, onScrollToItem, index]);
+
+  const handleDelete = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      deleteHighlight(highlight.id);
+    },
+    [deleteHighlight, highlight.id]
+  );
 
   const handleNotesClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,6 +78,9 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
         >
           {highlight.text}
         </p>
+        <div className={styles.trashIcon}>
+          <TrashIcon size={14} className="text-text-secondary" onClick={handleDelete} />
+        </div>
       </div>
 
       <div

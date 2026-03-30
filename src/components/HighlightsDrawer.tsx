@@ -69,6 +69,7 @@ export const HighlightsDrawer: React.FC = () => {
     isLoading,
     logoPosition,
     closeDrawer,
+    drawerTrigger,
     loadAllHighlights,
     selectedHighlightId,
     lastAddedHighlightId,
@@ -151,16 +152,18 @@ export const HighlightsDrawer: React.FC = () => {
   const lastScrollIndex = useRef(0);
 
 
-  // Sync visibility with isOpen for exit animation support
+  // Sync visibility and stagger with isOpen + trigger intent
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
       setIsClosing(false);
-      setIsStaggering(true);
-    } else if (isVisible) {
+      if (drawerTrigger === 'logo') setIsStaggering(true);
+      if (drawerTrigger === 'mark') setIsStaggering(false);
+    } else {
       setIsClosing(true);
+      setIsStaggering(false);
     }
-  }, [isOpen, isVisible]);
+  }, [isOpen, drawerTrigger]);
 
   const handleDrawerAnimationEnd = useCallback(
     (e: React.AnimationEvent) => {

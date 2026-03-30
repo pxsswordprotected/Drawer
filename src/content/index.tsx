@@ -40,6 +40,6 @@ root.render(
 // Listen for messages from background script
 browser.runtime.onMessage.addListener((message: { type: string }) => {
   if (message.type === 'TOGGLE_DRAWER') {
-    useDrawerStore.getState().toggleDrawer();
+    useDrawerStore.getState().toggleDrawer('keyboard');
   }
 });

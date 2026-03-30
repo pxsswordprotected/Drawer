@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { Highlight, Note } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 
+export type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
+
 interface DrawerState {
   isOpen: boolean;
   allHighlights: Highlight[];
@@ -11,10 +13,11 @@ interface DrawerState {
   lastAddedHighlightId: string | null;
   pendingScrollHighlightId: string | null;
   expandedGroupUrl: string | null;
+  drawerTrigger: DrawerTrigger;
 
-  openDrawer: () => void;
+  openDrawer: (trigger: DrawerTrigger) => void;
   closeDrawer: () => void;
-  toggleDrawer: () => void;
+  toggleDrawer: (trigger?: DrawerTrigger) => void;
   setLogoPosition: (position: { x: number; y: number }) => void;
   loadAllHighlights: () => Promise<void>;
   selectHighlight: (id: string) => void;
@@ -43,13 +46,15 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   lastAddedHighlightId: null,
   pendingScrollHighlightId: null,
   expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
+  drawerTrigger: null,
 
-  openDrawer: () => set({ isOpen: true }),
-  closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null, selectedHighlightId: null }),
-  toggleDrawer: () =>
+  openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger }),
+  closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null, selectedHighlightId: null, drawerTrigger: null }),
+  toggleDrawer: (trigger: DrawerTrigger = 'logo') =>
     set((state) => ({
       isOpen: !state.isOpen,
       selectedHighlightId: !state.isOpen ? state.selectedHighlightId : null,
+      drawerTrigger: !state.isOpen ? trigger : null,
     })),
   setLogoPosition: (position) => set({ logoPosition: position }),
 

@@ -30,6 +30,35 @@
 /* Highlight text area is always clickable (expand/collapse) */
 .highlightVisual {
   cursor: pointer;
+  position: relative;
+}
+
+/* Trash icon — hidden by default, appears on highlight hover */
+.trashIcon {
+  position: absolute;
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+.trashIcon::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  cursor: pointer;
+  pointer-events: none;
+}
+
+.highlightVisual:hover .trashIcon {
+  opacity: 0.5;
+  pointer-events: auto;
+}
+
+.trashIcon:hover {
+  opacity: 1 !important;
 }
 
 /* Extended clickable hitbox */
