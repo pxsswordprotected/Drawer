@@ -415,6 +415,7 @@ export const HighlightsDrawer: React.FC = () => {
 
     // Don't auto-scroll if user is expanded on a highlight — avoid interrupting their flow
     if (!selectedHighlightId) {
+      selectHighlight(lastAddedHighlightId);
       scrollIntentRef.current = 'programmatic';
       lastScrollIndex.current = globalIndex;
       setCurrentIndex(globalIndex);
