@@ -22,25 +22,25 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Trigger morph animation when isSuccess flips to true
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
+  // useEffect(() => {
+  //   const svg = svgRef.current;
+  //   if (!svg) return;
 
-    if (isSuccess) {
-      const animations = svg.querySelectorAll('animate[data-anim="toCheck"]');
-      animations.forEach((anim) => (anim as SVGAnimateElement).beginElement());
-      svg.style.color = '#14C935';
-    }
+  //   if (isSuccess) {
+  //     const animations = svg.querySelectorAll('animate[data-anim="toCheck"]');
+  //     animations.forEach((anim) => (anim as SVGAnimateElement).beginElement());
+  //     svg.style.color = '#14C935';
+  //   }
 
-    // Cleanup: reset to plus state
-    return () => {
-      if (!svg) return;
-      const polylines = svg.querySelectorAll('polyline');
-      if (polylines[0]) polylines[0].setAttribute('points', '3,8 13,8');
-      if (polylines[1]) polylines[1].setAttribute('points', '8,3 8,13');
-      svg.style.color = '';
-    };
-  }, [isSuccess]);
+  //   // Cleanup: reset to plus state
+  //   return () => {
+  //     if (!svg) return;
+  //     const polylines = svg.querySelectorAll('polyline');
+  //     if (polylines[0]) polylines[0].setAttribute('points', '3,8 13,8');
+  //     if (polylines[1]) polylines[1].setAttribute('points', '8,3 8,13');
+  //     svg.style.color = '';
+  //   };
+  // }, [isSuccess]);
 
   if (!visible) return null;
 
@@ -55,9 +55,9 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
         top: `${y}px`,
         backgroundColor: '#1A1A1A',
         transition:
-          'opacity 150ms cubic-bezier(.19, 1, .22, 1), transform 150ms cubic-bezier(.19, 1, .22, 1), color 200ms ease',
+          'opacity 0ms cubic-bezier(.19, 1, .22, 1), transform 0ms cubic-bezier(.19, 1, .22, 1), color 200ms ease',
         opacity: isDismissing ? 0 : 1,
-        transform: isDismissing ? 'scale(0.9)' : 'scale(1)',
+        transform: isDismissing ? 'scale(0.9)' : 'scale(1)', //
       }}
     >
       <svg
@@ -82,7 +82,7 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
             <animate
               data-anim="toCheck"
               attributeName="points"
-              dur="350ms"
+              dur="0ms"
               begin="indefinite"
               fill="freeze"
               calcMode="spline"
@@ -108,7 +108,7 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
             <animate
               data-anim="toCheck"
               attributeName="points"
-              dur="350ms"
+              dur="0ms"
               begin="indefinite"
               fill="freeze"
               calcMode="spline"

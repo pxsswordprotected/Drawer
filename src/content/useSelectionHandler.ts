@@ -53,7 +53,8 @@ export function useSelectionHandler() {
       if (isOpen) {
         const range = selection.getRangeAt(0);
         const container = range.commonAncestorContainer;
-        const element = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+        const element =
+          container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
 
         // Check if selection is inside drawer (look for parent with data-drawer attribute or specific class)
         if (element?.closest('[data-drawer]') || element?.closest('.fixed.bg-bg-main')) {
@@ -141,18 +142,10 @@ export function useSelectionHandler() {
 
       // Clear the selection, trigger morph animation, then hide after 500ms
       window.getSelection()?.removeAllRanges();
-      setIsSaved(true);
-
-      hideTimeoutRef.current = setTimeout(() => {
-        setIsDismissing(true);
-        setTimeout(() => {
-          setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
-          setIsSaving(false);
-          setIsSaved(false);
-          setIsDismissing(false);
-          hideTimeoutRef.current = null;
-        }, 150);
-      }, 500);
+      setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+      setIsSaving(false);
+      setIsSaved(false);
+      setIsDismissing(false);
     } catch (error) {
       console.error('Failed to save highlight:', error);
       setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });

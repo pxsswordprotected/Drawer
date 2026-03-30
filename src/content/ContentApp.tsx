@@ -7,7 +7,8 @@ import { useDrawerStore } from '@/store/drawerStore';
 import { removeHighlightMarks } from './pageHighlighter';
 
 export const ContentApp: React.FC = () => {
-  const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } = useSelectionHandler();
+  const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } =
+    useSelectionHandler();
 
   // React layer for mark cleanup: detect deleted highlights and remove their marks
   const allHighlights = useDrawerStore((s) => s.allHighlights);
