@@ -413,11 +413,14 @@ export const HighlightsDrawer: React.FC = () => {
     const globalIndex = highlightGlobalIndices.map.get(lastAddedHighlightId);
     if (globalIndex === undefined) return;
 
-    scrollIntentRef.current = 'programmatic';
-    lastScrollIndex.current = globalIndex;
-    setCurrentIndex(globalIndex);
+    // Don't auto-scroll if user is expanded on a highlight — avoid interrupting their flow
+    if (!selectedHighlightId) {
+      scrollIntentRef.current = 'programmatic';
+      lastScrollIndex.current = globalIndex;
+      setCurrentIndex(globalIndex);
+    }
     clearLastAdded();
-  }, [lastAddedHighlightId, highlightGlobalIndices, clearLastAdded]);
+  }, [lastAddedHighlightId, highlightGlobalIndices, clearLastAdded, selectedHighlightId]);
 
   // Scroll to highlight when triggered from page mark click
   useEffect(() => {
@@ -489,6 +492,12 @@ export const HighlightsDrawer: React.FC = () => {
       innerRef.current.focus();
     }
   }, [selectedHighlightId, isOpen]);
+
+  // Render-phase state update: instantly cancel stagger if a new item is added.
+  // React will discard the current render and restart with isStaggering = false.
+  if (lastAddedHighlightId && isStaggering) {
+    setIsStaggering(false);
+  }
 
   if (!isVisible) return null;
 
@@ -566,7 +575,7 @@ export const HighlightsDrawer: React.FC = () => {
                         <div
                           data-page-header
                           data-item-expanded={!isCollapsed ? '' : undefined}
-                          className={`${groupIndex > 0 ? 'pt-4' : ''} mb-2 cursor-pointer ${isStaggering ? styles.staggerEntry : ''}`}
+                          className={`${groupIndex > 0 ? 'mt-4' : ''} mb-2 ${styles.pageHeader} ${isStaggering ? styles.staggerEntry : ''}`}
                           style={
                             isStaggering
                               ? {

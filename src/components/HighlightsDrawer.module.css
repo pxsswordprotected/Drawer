@@ -120,6 +120,19 @@
   outline: none; /* Remove default outline since drawer has visual focus */
 }
 
+/* Page group header — extended clickable hitbox matching highlight items */
+.pageHeader {
+  position: relative;
+  cursor: pointer;
+}
+
+.pageHeader::before {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+  cursor: pointer;
+}
+
 /* Dim non-expanded highlights when one is expanded (nested group structure) */
 .highlightList > * > * {
   transition: opacity 200ms cubic-bezier(0.19, 1, 0.22, 1);
