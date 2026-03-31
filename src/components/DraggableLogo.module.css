@@ -36,3 +36,64 @@
   transform: scale(0.95);
   opacity: 1;
 }
+
+/* Icon crossfade stack — both icons occupy the same grid cell */
+.iconStack {
+  display: grid;
+  place-items: center;
+}
+
+.iconStack > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity 150ms cubic-bezier(0.19, 1, 0.22, 1),
+    transform 150ms cubic-bezier(0.19, 1, 0.22, 1),
+    filter 150ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+/* Default: gallery visible, trash hidden */
+.galleryIcon {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0px);
+}
+
+.trashIconOverlay {
+  opacity: 0;
+  transform: scale(0.6);
+  filter: blur(3px);
+  color: #e8e8e8;
+}
+
+/* Drop target mode: logo is a potential drop zone */
+[data-drop-target] .logoInner {
+  transform: scale(1.05);
+  box-shadow:
+    inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65),
+    0 2px 8px -1px rgba(0, 0, 0, 0.5);
+}
+
+/* Swap icons when item is dragged over logo */
+[data-trash-active="true"] .galleryIcon {
+  opacity: 0;
+  transform: scale(0.6);
+  filter: blur(3px);
+}
+
+[data-trash-active="true"] .trashIconOverlay {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0px);
+  color: #ff8a80;
+}
+
+[data-trash-active="true"] .logoInner {
+  background-color: #2a1a1a;
+  transform: scale(1.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconStack > * {
+    transition: opacity 150ms ease;
+  }
+}

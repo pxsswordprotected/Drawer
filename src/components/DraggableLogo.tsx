@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import type { DraggableData, DraggableEvent } from 'react-draggable';
 import { GalleryVerticalEnd } from 'lucide-react';
+import { TrashIcon } from '@/shared/TrashIcon';
 import { useDrawerStore } from '@/store/drawerStore';
 import { DRAWER_CONFIG } from '@/shared/constants';
 import { getDrawerElement, getDrawerLayout } from '@/shared/drawerDom';
@@ -44,6 +45,9 @@ export const DraggableLogo: React.FC = () => {
   const closeDrawer = useDrawerStore((state) => state.closeDrawer);
   const setLogoPosition = useDrawerStore((state) => state.setLogoPosition);
   const isOpen = useDrawerStore((state) => state.isOpen);
+  const draggedItem = useDrawerStore((state) => state.draggedItem);
+  const isTrashActive = useDrawerStore((state) => state.isTrashActive);
+  const isDropTarget = draggedItem !== null;
 
   useEffect(() => {
     const onResize = () => {
@@ -169,15 +173,28 @@ export const DraggableLogo: React.FC = () => {
         onDrag={handleDrag}
         onStop={handleDragStop}
         bounds={bounds}
+        disabled={isDropTarget}
       >
         <div
           ref={logoRef}
           onClick={handleClick}
           className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} ${isOpen ? styles.logoDrawerOpen : ''}`}
           style={{ width: `${LOGO_SIZE}px`, height: `${LOGO_SIZE}px` }}
+          data-drop-target={isDropTarget ? '' : undefined}
+          data-trash-active={isTrashActive ? 'true' : undefined}
         >
           <div className={styles.logoInner}>
-            <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />
+            <div className={styles.iconStack}>
+              <GalleryVerticalEnd
+                size={24}
+                strokeWidth={1.5}
+                className={`text-text-main ${styles.galleryIcon}`}
+              />
+              <TrashIcon
+                size={22}
+                className={`${styles.trashIconOverlay}`}
+              />
+            </div>
           </div>
         </div>
       </Draggable>

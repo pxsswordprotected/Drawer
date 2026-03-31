@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { DraggableLogo } from '../components/DraggableLogo';
 import { HighlightsDrawer } from '../components/HighlightsDrawer';
+import { GhostClone } from '../components/GhostClone';
 import { SelectionPlusIcon } from '../components/SelectionPlusIcon';
 import { useSelectionHandler } from './useSelectionHandler';
 import { useDrawerStore } from '@/store/drawerStore';
@@ -76,6 +77,7 @@ export const TestApp: React.FC = () => {
       <div className="w-1/2 bg-bg-main" />
       <DraggableLogo />
       <HighlightsDrawer />
+      <GhostClone />
       <SelectionPlusIcon
         visible={selectionState.visible}
         x={selectionState.x}

@@ -1,0 +1,32 @@
+.ghostWrapper {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1001;
+  will-change: transform;
+}
+
+/* Force all cloned children inert — prevents child pointer-events: auto from leaking */
+.ghostWrapper * {
+  pointer-events: none !important;
+}
+
+/* Applied when dropPhase transitions to 'deleting' or 'cancelling' */
+.ghostTransition {
+  transition:
+    transform 200ms cubic-bezier(0.19, 1, 0.22, 1),
+    opacity 200ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.ghostDeleting {
+  opacity: 0;
+}
+
+.ghostCancelling {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ghostTransition {
+    transition: opacity 200ms ease;
+  }
+}

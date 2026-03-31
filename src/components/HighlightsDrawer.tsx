@@ -471,6 +471,19 @@ export const HighlightsDrawer: React.FC = () => {
     });
   }, [isOpen, isLoading, pageGroups]);
 
+  // Freeze scrolling while an item is being dragged — prevents scroll wheel
+  // from desynchronizing the ghost clone's fixed coordinates
+  const draggedItem = useDrawerStore((s) => s.draggedItem);
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (draggedItem) {
+      container.style.overflowY = 'hidden';
+    } else {
+      container.style.overflowY = '';
+    }
+  }, [draggedItem]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {

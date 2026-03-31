@@ -3,6 +3,7 @@ import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
 import { TrashIcon } from '@/shared/TrashIcon';
 import { NoteInput, NoteItem } from './HighlightDetailView';
+import { useLongPressDrag } from '@/hooks/useLongPressDrag';
 import styles from './HighlightItemExpandable.module.css';
 
 interface HighlightItemExpandableProps {
@@ -25,6 +26,14 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   const clearSelectedHighlight = useDrawerStore((s) => s.clearSelectedHighlight);
   const deleteHighlight = useDrawerStore((s) => s.deleteHighlight);
   const isExpanded = selectedHighlightId === highlight.id;
+
+  const { dragHandlers } = useLongPressDrag({
+    id: highlight.id,
+    type: 'highlight',
+  });
+
+  const draggedItem = useDrawerStore((s) => s.draggedItem);
+  const isBeingDragged = draggedItem?.id === highlight.id;
 
   const sortedNotes = useMemo(
     () => [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp),
@@ -66,11 +75,12 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
 
   return (
     <div
-      className={`${styles.expandableItem} ${isStaggering ? styles.staggerEntry : ''}`}
+      className={`${styles.expandableItem} ${isStaggering ? styles.staggerEntry : ''} ${isBeingDragged ? styles.dragging : ''}`}
       data-expanded={isExpanded ? 'true' : 'false'}
       onClick={handleClick}
       onAnimationEnd={isStaggering ? handleAnimationEnd : undefined}
       style={isStaggering ? { animationDelay: `${staggerDelay}ms` } : undefined}
+      {...dragHandlers}
     >
       <div className={styles.highlightVisual}>
         <p

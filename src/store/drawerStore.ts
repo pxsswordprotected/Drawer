@@ -3,6 +3,15 @@ import { Highlight, Note } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 
 export type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
+export type DragItemType = 'highlight' | 'note' | 'page';
+export type DropPhase = 'dragging' | 'deleting' | 'cancelling' | null;
+
+export interface DraggedItem {
+  id: string;
+  type: DragItemType;
+  rect: DOMRect;
+  parentHighlightId?: string; // for notes: the highlight that owns this note
+}
 
 interface DrawerState {
   isOpen: boolean;
@@ -14,6 +23,9 @@ interface DrawerState {
   pendingScrollHighlightId: string | null;
   expandedGroupUrl: string | null;
   drawerTrigger: DrawerTrigger;
+  draggedItem: DraggedItem | null;
+  isTrashActive: boolean;
+  dropPhase: DropPhase;
 
   openDrawer: (trigger: DrawerTrigger) => void;
   closeDrawer: () => void;
@@ -32,6 +44,10 @@ interface DrawerState {
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
+  setDraggedItem: (item: DraggedItem) => void;
+  setTrashActive: (active: boolean) => void;
+  setDropPhase: (phase: DropPhase) => void;
+  clearDrag: () => void;
 }
 
 // Request deduplication map - prevents duplicate concurrent requests
@@ -47,6 +63,9 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   pendingScrollHighlightId: null,
   expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
   drawerTrigger: null,
+  draggedItem: null,
+  isTrashActive: false,
+  dropPhase: null,
 
   openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger }),
   closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null, selectedHighlightId: null, drawerTrigger: null }),
@@ -129,6 +148,11 @@ export const useDrawerStore = create<DrawerState>((set) => ({
       ),
     }));
   },
+
+  setDraggedItem: (item: DraggedItem) => set({ draggedItem: item, dropPhase: 'dragging' }),
+  setTrashActive: (active: boolean) => set({ isTrashActive: active }),
+  setDropPhase: (phase: DropPhase) => set({ dropPhase: phase }),
+  clearDrag: () => set({ draggedItem: null, isTrashActive: false, dropPhase: null }),
 
   loadAllHighlights: async () => {
     if (loadingPromises.has('__all__')) {
