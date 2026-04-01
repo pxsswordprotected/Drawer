@@ -67,7 +67,7 @@ export function useSelectionHandler() {
             timestamp: Date.now() - 200000,
           }],
           color: DEFAULT_SETTINGS.defaultColor,
-          timestamp: new Date(2026, 2, 28, 10, 15).getTime(),
+          timestamp: new Date(2030, 0, 1).getTime(),
           position: emptyPos,
         },
         {
@@ -77,7 +77,7 @@ export function useSelectionHandler() {
           pageTitle: 'Interaction Design — Rauno Freiberg',
           notes: [],
           color: '#4CAF50',
-          timestamp: new Date(2026, 2, 28, 10, 22).getTime(),
+          timestamp: new Date(2030, 0, 2).getTime(),
           position: emptyPos,
         },
         {
@@ -95,7 +95,7 @@ export function useSelectionHandler() {
             timestamp: Date.now() - 490000,
           }],
           color: DEFAULT_SETTINGS.defaultColor,
-          timestamp: new Date(2026, 2, 25, 22, 8).getTime(),
+          timestamp: new Date(2029, 0, 1).getTime(),
           position: emptyPos,
         },
         {
@@ -105,7 +105,7 @@ export function useSelectionHandler() {
           pageTitle: 'Putting Ideas Into Words — Paul Graham',
           notes: [],
           color: '#E91E63',
-          timestamp: new Date(2026, 2, 25, 22, 14).getTime(),
+          timestamp: new Date(2029, 0, 2).getTime(),
           position: emptyPos,
         },
         {

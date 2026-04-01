@@ -65,12 +65,8 @@ export const HighlightsDrawer: React.FC = () => {
 
     const groups = Array.from(groupMap.values());
 
-    // Current page first, then by most recent highlight descending
-    groups.sort((a, b) => {
-      if (a.isCurrentPage && !b.isCurrentPage) return -1;
-      if (!a.isCurrentPage && b.isCurrentPage) return 1;
-      return b.mostRecentTimestamp - a.mostRecentTimestamp;
-    });
+    // Sort by most recent highlight descending
+    groups.sort((a, b) => b.mostRecentTimestamp - a.mostRecentTimestamp);
 
     return groups;
   }, [allHighlights, currentUrl]);
