@@ -151,7 +151,6 @@ export const HighlightsDrawer: React.FC = () => {
   const itemCentersRef = useRef<number[]>([]);
   const lastScrollIndex = useRef(0);
 
-
   // Sync visibility and stagger with isOpen + trigger intent
   useEffect(() => {
     if (isOpen) {

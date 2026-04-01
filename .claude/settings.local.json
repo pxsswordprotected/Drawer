@@ -7,7 +7,8 @@
       "WebFetch(domain:www.henrikkarlsson.xyz)",
       "Bash(timeout 15 tail:*)",
       "Bash(tail:*)",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(grep -r border-divider /c/Everything/Programming/Code/Drawer/src --include=*.css --include=*.config.*)"
     ]
   }
 }
