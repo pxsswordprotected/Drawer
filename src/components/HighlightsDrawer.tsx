@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { Highlight } from '@/shared/types';
 import { DRAWER_CONFIG } from '@/shared/constants';
@@ -7,6 +7,11 @@ import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 import { HighlightItemExpandable } from './HighlightItemExpandable';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
+
+// Stagger animation constants (shared between delay calculations and scroll timing)
+const STAGGER_BASE = 20;
+const STAGGER_PER_ITEM = 35;
+const STAGGER_DURATION = 250;
 
 // ─── Page grouping types ───
 interface PageGroup {
@@ -95,12 +100,9 @@ export const HighlightsDrawer: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
 
-  // Scroll intent tracking refs
-  const scrollIntentRef = useRef<'programmatic' | 'user' | null>(null);
-  const scrollRaf = useRef(0);
-  const intentFailsafe = useRef(0);
-  const itemCentersRef = useRef<number[]>([]);
-  const lastScrollIndex = useRef(0);
+  // Scroll intent tracking
+  const scrollIntentRef = useRef<'programmatic' | null>(null);
+  const scrollEndCleanup = useRef<(() => void) | null>(null);
 
   // Sync visibility and stagger with isOpen + trigger intent
   useEffect(() => {
@@ -129,28 +131,36 @@ export const HighlightsDrawer: React.FC = () => {
     setIsStaggering(false);
   }, []);
 
-  // ─── Inline expand/collapse scroll helpers ───
-  const scrollToItemTop = useCallback((index: number) => {
+  // ─── Unified scroll controller ───
+  const scrollTo = useCallback((el: HTMLElement, alignment: 'top' | 'center' = 'top') => {
     const container = scrollContainerRef.current;
-    const el = itemRefs.current[index];
     if (!container || !el) return;
-    const containerRect = container.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
-    setTimeout(() => {
-      container.scrollTo({ top: Math.max(0, elTopInScroll - 16), behavior: 'smooth' });
-    }, 80);
-  }, []);
 
-  const scrollToElement = useCallback((el: HTMLElement) => {
-    const container = scrollContainerRef.current;
-    if (!container || !el) return;
+    // Clean up any previous scroll-end listener
+    scrollEndCleanup.current?.();
+
+    scrollIntentRef.current = 'programmatic';
+
     const containerRect = container.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
     const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
-    setTimeout(() => {
-      container.scrollTo({ top: Math.max(0, elTopInScroll - 16), behavior: 'smooth' });
-    }, 80);
+    const target = alignment === 'center'
+      ? elTopInScroll - containerRect.height / 2 + elRect.height / 2
+      : elTopInScroll - 16;
+
+    container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+
+    // Clear intent when scroll finishes via scrollend event
+    const onScrollEnd = () => {
+      scrollIntentRef.current = null;
+      cleanup();
+    };
+    const cleanup = () => {
+      container.removeEventListener('scrollend', onScrollEnd);
+      scrollEndCleanup.current = null;
+    };
+    container.addEventListener('scrollend', onScrollEnd, { once: true });
+    scrollEndCleanup.current = cleanup;
   }, []);
 
   // Calculate drawer position based on logo position
@@ -245,9 +255,8 @@ export const HighlightsDrawer: React.FC = () => {
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
-      lastScrollIndex.current = 0;
       scrollIntentRef.current = null;
-      clearTimeout(intentFailsafe.current);
+      scrollEndCleanup.current?.();
     }
   }, [isOpen]);
 
@@ -263,40 +272,6 @@ export const HighlightsDrawer: React.FC = () => {
     itemRefs.current = itemRefs.current.slice(0, highlightGlobalIndices.total);
   }, [highlightGlobalIndices.total]);
 
-  // Precompute item centers for scroll tracking
-  const highlightIds = useMemo(() => allHighlights.map((h) => h.id).join(','), [allHighlights]);
-
-  const recomputeCenters = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const containerRect = container.getBoundingClientRect();
-    const centers: number[] = [];
-    itemRefs.current.forEach((el, i) => {
-      if (!el) return;
-      const elRect = el.getBoundingClientRect();
-      // Convert viewport-relative rect to container-scroll-relative coordinate
-      const topInContainer = elRect.top - containerRect.top + container.scrollTop;
-      centers[i] = topInContainer + elRect.height / 2;
-    });
-    itemCentersRef.current = centers;
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!isOpen || !isVisible || isLoading) return;
-
-    recomputeCenters();
-    requestAnimationFrame(recomputeCenters);
-  }, [isOpen, isVisible, isLoading, highlightIds, recomputeCenters]);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!isOpen || !isVisible || isLoading || !container) return;
-
-    const ro = new ResizeObserver(() => recomputeCenters());
-    ro.observe(container);
-    return () => ro.disconnect();
-  }, [isOpen, isVisible, isLoading, recomputeCenters]);
 
   // Keyboard navigation handler (cross-page navigation)
   const handleKeyDown = useCallback(
@@ -304,32 +279,20 @@ export const HighlightsDrawer: React.FC = () => {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       e.preventDefault();
 
-      scrollIntentRef.current = 'programmatic';
-
       setCurrentIndex((prev) => {
         const dir = e.key === 'ArrowDown' ? 1 : -1;
-        const next = Math.max(0, Math.min(highlightGlobalIndices.total - 1, prev + dir));
-        lastScrollIndex.current = next;
-        return next;
+        return Math.max(0, Math.min(highlightGlobalIndices.total - 1, prev + dir));
       });
     },
     [highlightGlobalIndices.total]
   );
 
-  // Programmatic scroll effect + failsafe
+  // Programmatic scroll on keyboard navigation
   useEffect(() => {
-    if (scrollIntentRef.current !== 'programmatic') return;
-
     const el = itemRefs.current[currentIndex];
     if (!el) return;
-
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    clearTimeout(intentFailsafe.current);
-    intentFailsafe.current = window.setTimeout(() => {
-      scrollIntentRef.current = null;
-    }, 800);
-  }, [currentIndex]);
+    scrollTo(el, 'center');
+  }, [currentIndex, scrollTo]);
 
   // Wheel + pointerdown: immediately override programmatic intent
   useEffect(() => {
@@ -339,7 +302,7 @@ export const HighlightsDrawer: React.FC = () => {
     const clearProgrammatic = () => {
       if (scrollIntentRef.current === 'programmatic') {
         scrollIntentRef.current = null;
-        clearTimeout(intentFailsafe.current);
+        scrollEndCleanup.current?.();
       }
     };
 
@@ -366,12 +329,14 @@ export const HighlightsDrawer: React.FC = () => {
     // Don't auto-scroll if user is expanded on a highlight — avoid interrupting their flow
     if (!selectedHighlightId) {
       selectHighlight(lastAddedHighlightId);
-      scrollIntentRef.current = 'programmatic';
-      lastScrollIndex.current = globalIndex;
       setCurrentIndex(globalIndex);
+      requestAnimationFrame(() => {
+        const el = itemRefs.current[globalIndex];
+        if (el) scrollTo(el, 'center');
+      });
     }
     clearLastAdded();
-  }, [lastAddedHighlightId, highlightGlobalIndices, clearLastAdded, selectedHighlightId]);
+  }, [lastAddedHighlightId, highlightGlobalIndices, clearLastAdded, selectedHighlightId, scrollTo]);
 
   // Scroll to highlight when triggered from page mark click
   useEffect(() => {
@@ -385,18 +350,13 @@ export const HighlightsDrawer: React.FC = () => {
 
     selectHighlight(pendingScrollHighlightId);
 
-    // Give React a tick to attach refs after drawer open / group expansion
-    const timeoutId = setTimeout(() => {
+    // mark click sets drawerTrigger='mark' which disables stagger, so rAF is sufficient
+    requestAnimationFrame(() => {
       const el = itemRefs.current[index];
-      if (el && scrollContainerRef.current) {
-        scrollToItemTop(index);
-      }
-
+      if (el) scrollTo(el);
       clearPendingScrollHighlight();
-    }, 50);
-
-    return () => clearTimeout(timeoutId);
-  }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices]);
+    });
+  }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, scrollTo]);
 
   // Auto-scroll to current page section after data loads
   useEffect(() => {
@@ -409,23 +369,32 @@ export const HighlightsDrawer: React.FC = () => {
     const firstGroup = pageGroups[0];
     if (firstGroup?.isCurrentPage) return;
 
-    requestAnimationFrame(() => {
-      const container = scrollContainerRef.current;
-      if (!container || !sectionEl) return;
+    // Calculate how many visible items stagger before the current page section
+    // so we wait for stagger animations to complete before measuring layout
+    let visibleItemsBeforeSection = 0;
+    for (const group of pageGroups) {
+      if (group.isCurrentPage) break;
+      visibleItemsBeforeSection++; // page header
+      if (expandedGroupUrl === group.url) {
+        visibleItemsBeforeSection += group.highlights.length; // expanded highlights
+      }
+    }
 
-      const containerRect = container.getBoundingClientRect();
-      const sectionRect = sectionEl.getBoundingClientRect();
-      const sectionTopInScroll = sectionRect.top - containerRect.top + container.scrollTop;
+    const staggerWait = isStaggering
+      ? STAGGER_BASE + visibleItemsBeforeSection * STAGGER_PER_ITEM + STAGGER_DURATION + 50
+      : 0;
 
-      container.scrollTo({ top: Math.max(0, sectionTopInScroll - 16), behavior: 'smooth' });
-    });
-  }, [isOpen, isLoading, pageGroups]);
+    const timeoutId = setTimeout(() => {
+      if (sectionEl) scrollTo(sectionEl);
+    }, staggerWait);
+
+    return () => clearTimeout(timeoutId);
+  }, [isOpen, isLoading, pageGroups, isStaggering, expandedGroupUrl, scrollTo]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      cancelAnimationFrame(scrollRaf.current);
-      clearTimeout(intentFailsafe.current);
+      scrollEndCleanup.current?.();
     };
   }, []);
 
@@ -508,7 +477,7 @@ export const HighlightsDrawer: React.FC = () => {
                 const isCollapsed = expandedGroupUrl !== group.url;
                 const rawGlobalIndex = highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0;
                 const effectiveIndex = Math.max(0, rawGlobalIndex - hiddenHighlightsBefore);
-                const correctedDelay = 20 + effectiveIndex * 35;
+                const correctedDelay = STAGGER_BASE + effectiveIndex * STAGGER_PER_ITEM;
                 if (isCollapsed) {
                   hiddenHighlightsBefore += group.highlights.length;
                 }
@@ -559,7 +528,7 @@ export const HighlightsDrawer: React.FC = () => {
                               }
                               if (isCollapsed) {
                                 const headerEl = e.currentTarget as HTMLElement;
-                                requestAnimationFrame(() => scrollToElement(headerEl));
+                                requestAnimationFrame(() => scrollTo(headerEl));
                               }
                             }}
                           >
@@ -589,7 +558,10 @@ export const HighlightsDrawer: React.FC = () => {
                                 <HighlightItemExpandable
                                   highlight={highlight}
                                   index={globalIdx}
-                                  onScrollToItem={scrollToItemTop}
+                                  onScrollToItem={(idx: number) => {
+                                    const el = itemRefs.current[idx];
+                                    if (el) scrollTo(el);
+                                  }}
                                   isStaggering={isStaggering}
                                   onStaggerEnd={
                                     isLastInGroup && !isCollapsed ? handleStaggerEnd : undefined
@@ -605,7 +577,7 @@ export const HighlightsDrawer: React.FC = () => {
                                   style={{
                                     width: '300px',
                                     ...(isStaggering
-                                      ? { animationDelay: `${20 + globalIdx * 35 + 17}ms` }
+                                      ? { animationDelay: `${STAGGER_BASE + globalIdx * STAGGER_PER_ITEM + 17}ms` }
                                       : {}),
                                   }}
                                 />
