@@ -34,23 +34,12 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   const handleClick = useCallback(() => {
     if (isExpanded) {
       clearSelectedHighlight();
-      // Collapse doesn't change this item's top position, rAF is sufficient
-      requestAnimationFrame(() => onScrollToItem(index));
     } else {
       selectHighlight(highlight.id);
-      // Expand scroll deferred to onTransitionEnd below
     }
+    // Top edge stays in place for both expand and collapse — scroll immediately
+    requestAnimationFrame(() => onScrollToItem(index));
   }, [isExpanded, clearSelectedHighlight, selectHighlight, highlight.id, onScrollToItem, index]);
-
-  // Fire scroll after the grid expand transition completes (0fr → 1fr)
-  const handleTransitionEnd = useCallback(
-    (e: React.TransitionEvent) => {
-      if (e.target === e.currentTarget && e.propertyName === 'grid-template-rows') {
-        onScrollToItem(index);
-      }
-    },
-    [onScrollToItem, index]
-  );
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
@@ -97,7 +86,6 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
       <div
         className={isExpanded ? styles.notesOuterExpanded : styles.notesOuter}
         aria-hidden={!isExpanded}
-        onTransitionEnd={handleTransitionEnd}
       >
         <div className={styles.notesInner} onClick={handleNotesClick}>
           <div className={`${isExpanded ? styles.notesFadeInActive : styles.notesFadeIn}`}>

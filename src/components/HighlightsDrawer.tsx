@@ -358,38 +358,28 @@ export const HighlightsDrawer: React.FC = () => {
     });
   }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, scrollTo]);
 
-  // Auto-scroll to current page section after data loads
+  // Auto-scroll to current page section (once per drawer open)
+  const hasScrolledOnOpen = useRef(false);
+
   useEffect(() => {
-    if (!isOpen || isLoading || !scrollContainerRef.current) return;
+    if (!isOpen) {
+      hasScrolledOnOpen.current = false;
+      return;
+    }
+    if (isLoading || hasScrolledOnOpen.current || !scrollContainerRef.current) return;
+    if (pageGroups.length === 0) return;
+    hasScrolledOnOpen.current = true;
 
     const sectionEl = currentPageSectionRef.current;
-    if (!sectionEl) return; // current page has no highlights
+    if (!sectionEl) return;
 
-    // If the current page group is first, it's already at the top
     const firstGroup = pageGroups[0];
     if (firstGroup?.isCurrentPage) return;
 
-    // Calculate how many visible items stagger before the current page section
-    // so we wait for stagger animations to complete before measuring layout
-    let visibleItemsBeforeSection = 0;
-    for (const group of pageGroups) {
-      if (group.isCurrentPage) break;
-      visibleItemsBeforeSection++; // page header
-      if (expandedGroupUrl === group.url) {
-        visibleItemsBeforeSection += group.highlights.length; // expanded highlights
-      }
-    }
-
-    const staggerWait = isStaggering
-      ? STAGGER_BASE + visibleItemsBeforeSection * STAGGER_PER_ITEM + STAGGER_DURATION + 50
-      : 0;
-
-    const timeoutId = setTimeout(() => {
+    requestAnimationFrame(() => {
       if (sectionEl) scrollTo(sectionEl);
-    }, staggerWait);
-
-    return () => clearTimeout(timeoutId);
-  }, [isOpen, isLoading, pageGroups, isStaggering, expandedGroupUrl, scrollTo]);
+    });
+  }, [isOpen, isLoading, pageGroups.length, scrollTo]);
 
   // Cleanup on unmount
   useEffect(() => {
