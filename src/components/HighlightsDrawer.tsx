@@ -506,8 +506,16 @@ export const HighlightsDrawer: React.FC = () => {
                 <p className="text-text-secondary text-center">No highlights saved</p>
               </div>
             ) : (
-              pageGroups.map((group, groupIndex) => {
+              (() => {
+                let hiddenHighlightsBefore = 0;
+                return pageGroups.map((group, groupIndex) => {
                 const isCollapsed = expandedGroupUrl !== group.url;
+                const rawGlobalIndex = highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0;
+                const effectiveIndex = Math.max(0, rawGlobalIndex - hiddenHighlightsBefore);
+                const correctedDelay = 20 + effectiveIndex * 35;
+                if (isCollapsed) {
+                  hiddenHighlightsBefore += group.highlights.length;
+                }
                 return (
                   <React.Fragment key={group.url}>
                     {groupIndex > 0 && (
@@ -517,7 +525,7 @@ export const HighlightsDrawer: React.FC = () => {
                           width: '300px',
                           ...(isStaggering
                             ? {
-                                animationDelay: `${20 + (highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0) * 35}ms`,
+                                animationDelay: `${correctedDelay}ms`,
                               }
                             : {}),
                         }}
@@ -531,7 +539,7 @@ export const HighlightsDrawer: React.FC = () => {
                           style={
                             isStaggering
                               ? {
-                                  animationDelay: `${20 + (highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0) * 35}ms`,
+                                  animationDelay: `${correctedDelay}ms`,
                                 }
                               : undefined
                           }
@@ -612,7 +620,8 @@ export const HighlightsDrawer: React.FC = () => {
                     </div>
                   </React.Fragment>
                 );
-              })
+              });
+              })()
             )}
           </div>
         </div>
