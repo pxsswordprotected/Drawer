@@ -595,6 +595,9 @@ export const HighlightsDrawer: React.FC = () => {
                               {!isLastInGroup && (
                                 <div
                                   className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+                                  data-item-expanded={
+                                    selectedHighlightId === highlight.id ? '' : undefined
+                                  }
                                   style={{
                                     width: '300px',
                                     ...(isStaggering

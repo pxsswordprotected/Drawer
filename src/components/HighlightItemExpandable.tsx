@@ -94,7 +94,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
             </p>
 
             <div className="space-y-0">
-              <div className="py-3">
+              <div className="py-3 flex items-center">
                 <NoteInput
                   highlightId={highlight.id}
                   hasNotes={sortedNotes.length > 0}
@@ -105,7 +105,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
               {sortedNotes.length > 0 && <div className="border-t border-divider" />}
 
               {sortedNotes.map((note, i) => (
-                <div key={note.id} className={`py-3 ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}>
+                <div key={note.id} className={`py-3 flex items-center ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}>
                   <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
                 </div>
               ))}
