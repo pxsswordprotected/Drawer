@@ -514,11 +514,8 @@ export const HighlightsDrawer: React.FC = () => {
                             data-item-expanded={!isCollapsed ? '' : undefined}
                             className={styles.pageHeader}
                             onClick={(e) => {
-                              if (
-                                !isCollapsed &&
-                                selectedHighlightId &&
-                                group.highlights.some((h) => h.id === selectedHighlightId)
-                              ) {
+                              // Always clear selected highlight when switching pages
+                              if (selectedHighlightId) {
                                 clearSelectedHighlight();
                               }
                               const isClosing = !isCollapsed;
