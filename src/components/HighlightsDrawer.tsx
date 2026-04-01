@@ -350,12 +350,14 @@ export const HighlightsDrawer: React.FC = () => {
 
     selectHighlight(pendingScrollHighlightId);
 
-    // mark click sets drawerTrigger='mark' which disables stagger, so rAF is sufficient
-    requestAnimationFrame(() => {
+    // Wait for React to mount refs and CSS to apply after group expansion
+    const timeoutId = setTimeout(() => {
       const el = itemRefs.current[index];
       if (el) scrollTo(el);
       clearPendingScrollHighlight();
-    });
+    }, 50);
+
+    return () => clearTimeout(timeoutId);
   }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, scrollTo]);
 
   // Auto-scroll to current page section (once per drawer open)
@@ -490,6 +492,7 @@ export const HighlightsDrawer: React.FC = () => {
                       {/* Section header — only when multiple page groups exist */}
                       {(pageGroups.length > 1 || group.isCurrentPage) && (
                         <div
+                          data-item-expanded={!isCollapsed ? '' : undefined}
                           className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
                           style={
                             isStaggering
@@ -501,7 +504,6 @@ export const HighlightsDrawer: React.FC = () => {
                         >
                           <div
                             data-page-header
-                            data-item-expanded={!isCollapsed ? '' : undefined}
                             className={styles.pageHeader}
                             onClick={(e) => {
                               // Always clear selected highlight when switching pages

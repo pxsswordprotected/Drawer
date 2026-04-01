@@ -152,7 +152,7 @@
   animation: none;
 }
 
-.highlightList[data-group-expanded] [data-page-header][data-item-expanded] {
+.highlightList[data-group-expanded] [data-item-expanded] [data-page-header] {
   opacity: 1;
   animation: none;
 }
