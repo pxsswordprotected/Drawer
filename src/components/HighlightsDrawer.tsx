@@ -497,8 +497,7 @@ export const HighlightsDrawer: React.FC = () => {
         {/* Single scroll container with expandable items */}
         <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
           <div
-            className={`px-[38px] pb-8 ${styles.highlightList}`}
-            style={{ paddingTop: '20px' }}
+            className={`px-[38px] pb-4 ${styles.highlightList}`}
             data-has-expanded={selectedHighlightId ? '' : undefined}
             data-group-expanded={expandedGroupUrl ? '' : undefined}
           >
@@ -535,10 +534,7 @@ export const HighlightsDrawer: React.FC = () => {
                     <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
                       {/* Section header — only when multiple page groups exist */}
                       {(pageGroups.length > 1 || group.isCurrentPage) && (
-                        <div
-                          data-page-header
-                          data-item-expanded={!isCollapsed ? '' : undefined}
-                          className={`pt-4 pb-3 ${styles.pageHeader} ${isStaggering ? styles.staggerEntry : ''}`}
+                        <div className={`py-4 ${isStaggering ? styles.staggerEntry : ''}`}
                           style={
                             isStaggering
                               ? {
@@ -546,30 +542,36 @@ export const HighlightsDrawer: React.FC = () => {
                                 }
                               : undefined
                           }
-                          onClick={(e) => {
-                            if (
-                              !isCollapsed &&
-                              selectedHighlightId &&
-                              group.highlights.some((h) => h.id === selectedHighlightId)
-                            ) {
-                              clearSelectedHighlight();
-                            }
-                            const isClosing = !isCollapsed;
-                            toggleGroupExpanded(group.url);
-                            if (isClosing) {
-                              handleStaggerEnd();
-                            }
-                            if (isCollapsed) {
-                              const headerEl = e.currentTarget as HTMLElement;
-                              requestAnimationFrame(() => scrollToElement(headerEl));
-                            }
-                          }}
                         >
-                          <p
-                            className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
+                          <div
+                            data-page-header
+                            data-item-expanded={!isCollapsed ? '' : undefined}
+                            className={styles.pageHeader}
+                            onClick={(e) => {
+                              if (
+                                !isCollapsed &&
+                                selectedHighlightId &&
+                                group.highlights.some((h) => h.id === selectedHighlightId)
+                              ) {
+                                clearSelectedHighlight();
+                              }
+                              const isClosing = !isCollapsed;
+                              toggleGroupExpanded(group.url);
+                              if (isClosing) {
+                                handleStaggerEnd();
+                              }
+                              if (isCollapsed) {
+                                const headerEl = e.currentTarget as HTMLElement;
+                                requestAnimationFrame(() => scrollToElement(headerEl));
+                              }
+                            }}
                           >
-                            {group.pageTitle || group.url}
-                          </p>
+                            <p
+                              className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
+                            >
+                              {group.pageTitle || group.url}
+                            </p>
+                          </div>
                         </div>
                       )}
 
