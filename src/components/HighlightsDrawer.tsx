@@ -1,11 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useMemo,
-} from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { Highlight } from '@/shared/types';
 import { DRAWER_CONFIG } from '@/shared/constants';
@@ -23,7 +16,6 @@ interface PageGroup {
   isCurrentPage: boolean;
   mostRecentTimestamp: number;
 }
-
 
 export const HighlightsDrawer: React.FC = () => {
   const {
@@ -497,7 +489,7 @@ export const HighlightsDrawer: React.FC = () => {
         {/* Single scroll container with expandable items */}
         <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
           <div
-            className={`px-[38px] pb-4 ${styles.highlightList}`}
+            className={`px-[38px] py-2 ${styles.highlightList}`}
             data-has-expanded={selectedHighlightId ? '' : undefined}
             data-group-expanded={expandedGroupUrl ? '' : undefined}
           >
@@ -534,7 +526,8 @@ export const HighlightsDrawer: React.FC = () => {
                     <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
                       {/* Section header — only when multiple page groups exist */}
                       {(pageGroups.length > 1 || group.isCurrentPage) && (
-                        <div className={`py-4 ${isStaggering ? styles.staggerEntry : ''}`}
+                        <div
+                          className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
                           style={
                             isStaggering
                               ? {
@@ -604,7 +597,9 @@ export const HighlightsDrawer: React.FC = () => {
                                   className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
                                   style={{
                                     width: '300px',
-                                    ...(isStaggering ? { animationDelay: `${20 + globalIdx * 35 + 17}ms` } : {}),
+                                    ...(isStaggering
+                                      ? { animationDelay: `${20 + globalIdx * 35 + 17}ms` }
+                                      : {}),
                                   }}
                                 />
                               )}
