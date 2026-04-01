@@ -48,7 +48,7 @@ const HighlightExpandableListItem = memo<HighlightExpandableListItemProps>(
         />
         {!isLastInGroup && (
           <div
-            className={`border-t border-divider mx-auto mt-4 ${isStaggering ? styles.staggerDivider : ''}`}
+            className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
             style={{
               width: '300px',
               ...(isStaggering ? { animationDelay: `${20 + index * 35 + 17}ms` } : {}),
@@ -558,7 +558,7 @@ export const HighlightsDrawer: React.FC = () => {
                   <React.Fragment key={group.url}>
                     {groupIndex > 0 && (
                       <div
-                        className={`border-t border-divider mx-auto mt-4 ${isStaggering ? styles.staggerDivider : ''}`}
+                        className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
                         style={{
                           width: '300px',
                           ...(isStaggering
@@ -569,13 +569,13 @@ export const HighlightsDrawer: React.FC = () => {
                         }}
                       />
                     )}
-                    <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
+                    <div ref={group.isCurrentPage ? currentPageSectionRef : undefined} className="pb-6">
                       {/* Section header — only when multiple page groups exist */}
                       {(pageGroups.length > 1 || group.isCurrentPage) && (
                         <div
                           data-page-header
                           data-item-expanded={!isCollapsed ? '' : undefined}
-                          className={`${groupIndex > 0 ? 'mt-4' : ''} mb-2 ${styles.pageHeader} ${isStaggering ? styles.staggerEntry : ''}`}
+                          className={`${groupIndex > 0 ? 'pt-6' : ''} pb-2 ${styles.pageHeader} ${isStaggering ? styles.staggerEntry : ''}`}
                           style={
                             isStaggering
                               ? {
@@ -622,7 +622,7 @@ export const HighlightsDrawer: React.FC = () => {
                               data-item-expanded={
                                 selectedHighlightId === highlight.id ? '' : undefined
                               }
-                              className={i > 0 ? 'pt-4' : undefined}
+                              className="pt-4 pb-4"
                             >
                               <HighlightExpandableListItem
                                 highlight={highlight}

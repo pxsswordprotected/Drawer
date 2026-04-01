@@ -88,12 +88,12 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
         aria-hidden={!isExpanded}
       >
         <div className={styles.notesInner} onClick={handleNotesClick}>
-          <div className={isExpanded ? styles.notesFadeInActive : styles.notesFadeIn}>
+          <div className={`${isExpanded ? styles.notesFadeInActive : styles.notesFadeIn} pb-4`}>
             <p className="text-text-secondary text-xs mb-1" style={{ marginTop: '12px' }}>
               Notes
             </p>
 
-            <div className="space-y-0 [&>:last-child]:pb-0">
+            <div className="space-y-0">
               <div className="py-3">
                 <NoteInput
                   highlightId={highlight.id}
@@ -105,12 +105,9 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
               {sortedNotes.length > 0 && <div className="border-t border-divider" />}
 
               {sortedNotes.map((note, i) => (
-                <React.Fragment key={note.id}>
-                  <div className="py-3">
-                    <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
-                  </div>
-                  {i < sortedNotes.length - 1 && <div className="border-t border-divider" />}
-                </React.Fragment>
+                <div key={note.id} className={`py-3 ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}>
+                  <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
+                </div>
               ))}
             </div>
           </div>

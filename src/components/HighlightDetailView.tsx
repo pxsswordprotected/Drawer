@@ -246,12 +246,9 @@ export const HighlightDetailView: React.FC<HighlightDetailViewProps> = ({ highli
           {sortedNotes.length > 0 && <div className="border-t border-divider" />}
 
           {sortedNotes.map((note, index) => (
-            <React.Fragment key={note.id}>
-              <div className="py-3">
-                <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
-              </div>
-              {index < sortedNotes.length - 1 && <div className="border-t border-divider" />}
-            </React.Fragment>
+            <div key={note.id} className={`py-3 ${index < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}>
+              <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
+            </div>
           ))}
         </div>
       </div>
