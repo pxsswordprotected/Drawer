@@ -88,7 +88,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
         aria-hidden={!isExpanded}
       >
         <div className={styles.notesInner} onClick={handleNotesClick}>
-          <div className={`${isExpanded ? styles.notesFadeInActive : styles.notesFadeIn} pb-4`}>
+          <div className={`${isExpanded ? styles.notesFadeInActive : styles.notesFadeIn}`}>
             <p className="text-text-secondary text-xs mb-1" style={{ marginTop: '12px' }}>
               Notes
             </p>

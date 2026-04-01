@@ -5,7 +5,6 @@ import React, {
   useRef,
   useState,
   useMemo,
-  memo,
 } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { Highlight } from '@/shared/types';
@@ -25,42 +24,6 @@ interface PageGroup {
   mostRecentTimestamp: number;
 }
 
-// ─── Expandable list item ───
-interface HighlightExpandableListItemProps {
-  highlight: Highlight;
-  index: number;
-  isLastInGroup: boolean;
-  onScrollToItem: (index: number) => void;
-  isStaggering: boolean;
-  onStaggerEnd?: () => void;
-}
-
-const HighlightExpandableListItem = memo<HighlightExpandableListItemProps>(
-  ({ highlight, index, isLastInGroup, onScrollToItem, isStaggering, onStaggerEnd }) => {
-    return (
-      <>
-        <HighlightItemExpandable
-          highlight={highlight}
-          index={index}
-          onScrollToItem={onScrollToItem}
-          isStaggering={isStaggering}
-          onStaggerEnd={onStaggerEnd}
-        />
-        {!isLastInGroup && (
-          <div
-            className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
-            style={{
-              width: '300px',
-              ...(isStaggering ? { animationDelay: `${20 + index * 35 + 17}ms` } : {}),
-            }}
-          />
-        )}
-      </>
-    );
-  }
-);
-
-HighlightExpandableListItem.displayName = 'HighlightExpandableListItem';
 
 export const HighlightsDrawer: React.FC = () => {
   const {
@@ -534,8 +497,8 @@ export const HighlightsDrawer: React.FC = () => {
         {/* Single scroll container with expandable items */}
         <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
           <div
-            className={`px-[38px] ${styles.highlightList}`}
-            style={{ paddingTop: '20px', paddingBottom: '20px' }}
+            className={`px-[38px] pb-8 ${styles.highlightList}`}
+            style={{ paddingTop: '20px' }}
             data-has-expanded={selectedHighlightId ? '' : undefined}
             data-group-expanded={expandedGroupUrl ? '' : undefined}
           >
@@ -569,13 +532,13 @@ export const HighlightsDrawer: React.FC = () => {
                         }}
                       />
                     )}
-                    <div ref={group.isCurrentPage ? currentPageSectionRef : undefined} className="pb-6">
+                    <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
                       {/* Section header — only when multiple page groups exist */}
                       {(pageGroups.length > 1 || group.isCurrentPage) && (
                         <div
                           data-page-header
                           data-item-expanded={!isCollapsed ? '' : undefined}
-                          className={`${groupIndex > 0 ? 'pt-6' : ''} pb-2 ${styles.pageHeader} ${isStaggering ? styles.staggerEntry : ''}`}
+                          className={`pt-4 pb-3 ${styles.pageHeader} ${isStaggering ? styles.staggerEntry : ''}`}
                           style={
                             isStaggering
                               ? {
@@ -616,25 +579,34 @@ export const HighlightsDrawer: React.FC = () => {
                           const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
                           const isLastInGroup = i === group.highlights.length - 1;
                           return (
-                            <div
-                              key={highlight.id}
-                              ref={(el) => (itemRefs.current[globalIdx] = el)}
-                              data-item-expanded={
-                                selectedHighlightId === highlight.id ? '' : undefined
-                              }
-                              className="pt-4 pb-4"
-                            >
-                              <HighlightExpandableListItem
-                                highlight={highlight}
-                                index={globalIdx}
-                                isLastInGroup={isLastInGroup}
-                                onScrollToItem={scrollToItemTop}
-                                isStaggering={isStaggering}
-                                onStaggerEnd={
-                                  isLastInGroup && !isCollapsed ? handleStaggerEnd : undefined
+                            <React.Fragment key={highlight.id}>
+                              <div
+                                ref={(el) => (itemRefs.current[globalIdx] = el)}
+                                data-item-expanded={
+                                  selectedHighlightId === highlight.id ? '' : undefined
                                 }
-                              />
-                            </div>
+                                className={selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'}
+                              >
+                                <HighlightItemExpandable
+                                  highlight={highlight}
+                                  index={globalIdx}
+                                  onScrollToItem={scrollToItemTop}
+                                  isStaggering={isStaggering}
+                                  onStaggerEnd={
+                                    isLastInGroup && !isCollapsed ? handleStaggerEnd : undefined
+                                  }
+                                />
+                              </div>
+                              {!isLastInGroup && (
+                                <div
+                                  className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+                                  style={{
+                                    width: '300px',
+                                    ...(isStaggering ? { animationDelay: `${20 + globalIdx * 35 + 17}ms` } : {}),
+                                  }}
+                                />
+                              )}
+                            </React.Fragment>
                           );
                         })}
                     </div>
