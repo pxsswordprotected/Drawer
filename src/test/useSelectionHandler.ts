@@ -119,7 +119,7 @@ export function useSelectionHandler() {
             timestamp: Date.now() - 300000,
           }],
           color: '#9C27B0',
-          timestamp: new Date(2026, 1, 10, 16, 45).getTime(),
+          timestamp: new Date(2028, 0, 1).getTime(),
           position: emptyPos,
         },
         {

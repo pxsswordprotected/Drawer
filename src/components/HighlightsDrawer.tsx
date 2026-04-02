@@ -274,11 +274,14 @@ export const HighlightsDrawer: React.FC = () => {
 
 
   // Keyboard navigation handler (cross-page navigation)
+  const keyNavActive = useRef(false);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       e.preventDefault();
 
+      keyNavActive.current = true;
       setCurrentIndex((prev) => {
         const dir = e.key === 'ArrowDown' ? 1 : -1;
         return Math.max(0, Math.min(highlightGlobalIndices.total - 1, prev + dir));
@@ -287,8 +290,11 @@ export const HighlightsDrawer: React.FC = () => {
     [highlightGlobalIndices.total]
   );
 
-  // Programmatic scroll on keyboard navigation
+  // Programmatic scroll on keyboard navigation only
   useEffect(() => {
+    if (!keyNavActive.current) return;
+    keyNavActive.current = false;
+
     const el = itemRefs.current[currentIndex];
     if (!el) return;
     scrollTo(el, 'center');
@@ -368,9 +374,8 @@ export const HighlightsDrawer: React.FC = () => {
       hasScrolledOnOpen.current = false;
       return;
     }
-    if (isLoading || hasScrolledOnOpen.current || !scrollContainerRef.current) return;
+    if (!isVisible || isLoading || hasScrolledOnOpen.current || !scrollContainerRef.current) return;
     if (pageGroups.length === 0) return;
-    hasScrolledOnOpen.current = true;
 
     const sectionEl = currentPageSectionRef.current;
     if (!sectionEl) return;
@@ -378,10 +383,12 @@ export const HighlightsDrawer: React.FC = () => {
     const firstGroup = pageGroups[0];
     if (firstGroup?.isCurrentPage) return;
 
+    hasScrolledOnOpen.current = true;
+
     requestAnimationFrame(() => {
       if (sectionEl) scrollTo(sectionEl);
     });
-  }, [isOpen, isLoading, pageGroups.length, scrollTo]);
+  }, [isOpen, isVisible, isLoading, pageGroups.length, scrollTo]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -475,7 +482,7 @@ export const HighlightsDrawer: React.FC = () => {
                 }
                 return (
                   <React.Fragment key={group.url}>
-                    {groupIndex > 0 && (
+                    {groupIndex > 0 && expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
                       <div
                         className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
                         style={{
@@ -557,12 +564,9 @@ export const HighlightsDrawer: React.FC = () => {
                                   }
                                 />
                               </div>
-                              {!isLastInGroup && (
+                              {!isLastInGroup && selectedHighlightId !== highlight.id && (
                                 <div
                                   className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
-                                  data-item-expanded={
-                                    selectedHighlightId === highlight.id ? '' : undefined
-                                  }
                                   style={{
                                     width: '300px',
                                     ...(isStaggering
