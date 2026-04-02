@@ -5,6 +5,7 @@ import { DRAWER_CONFIG } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
 import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 import { HighlightItemExpandable } from './HighlightItemExpandable';
+import { TrashIcon } from '@/shared/TrashIcon';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -41,6 +42,7 @@ export const HighlightsDrawer: React.FC = () => {
     selectHighlight,
     pendingScrollHighlightId,
     clearPendingScrollHighlight,
+    deletePageGroup,
   } = useDrawerStore();
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -549,6 +551,15 @@ export const HighlightsDrawer: React.FC = () => {
                               >
                                 {group.pageTitle || group.url}
                               </p>
+                              <div
+                                className={styles.pageTrashIcon}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deletePageGroup(group.url);
+                                }}
+                              >
+                                <TrashIcon size={14} className="text-text-secondary" />
+                              </div>
                             </div>
                           </div>
                         )}
