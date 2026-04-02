@@ -85,6 +85,12 @@
   transition: grid-template-rows 250ms cubic-bezier(0.19, 1, 0.22, 1);
 }
 
+.notesOuterInstant {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: none;
+}
+
 .notesInner {
   overflow: hidden;
   min-height: 0;
@@ -133,7 +139,8 @@
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .notesOuter,
-  .notesOuterExpanded {
+  .notesOuterExpanded,
+  .notesOuterInstant {
     transition: none;
   }
 

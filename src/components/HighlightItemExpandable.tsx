@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
 import { TrashIcon } from '@/shared/TrashIcon';
@@ -25,6 +25,11 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   const clearSelectedHighlight = useDrawerStore((s) => s.clearSelectedHighlight);
   const deleteHighlight = useDrawerStore((s) => s.deleteHighlight);
   const isExpanded = selectedHighlightId === highlight.id;
+
+  // Track previous expanded state to detect switch-collapse (another highlight selected)
+  const prevExpandedRef = useRef(isExpanded);
+  useEffect(() => { prevExpandedRef.current = isExpanded; });
+  const isSwitchCollapse = prevExpandedRef.current && !isExpanded && selectedHighlightId != null;
 
   const sortedNotes = useMemo(
     () => [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp),
@@ -84,7 +89,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
       </div>
 
       <div
-        className={isExpanded ? styles.notesOuterExpanded : styles.notesOuter}
+        className={isExpanded ? styles.notesOuterExpanded : isSwitchCollapse ? styles.notesOuterInstant : styles.notesOuter}
         aria-hidden={!isExpanded}
       >
         <div className={styles.notesInner} onClick={handleNotesClick}>
