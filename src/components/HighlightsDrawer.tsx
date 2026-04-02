@@ -545,7 +545,7 @@ export const HighlightsDrawer: React.FC = () => {
                               }}
                             >
                               <p
-                                className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
+                                className={`text-base ${styles.pageTitle} ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
                               >
                                 {group.pageTitle || group.url}
                               </p>

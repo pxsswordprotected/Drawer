@@ -126,6 +126,13 @@
   cursor: pointer;
 }
 
+.pageTitle {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .pageHeader::before {
   content: '';
   position: absolute;
