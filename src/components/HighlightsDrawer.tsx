@@ -144,9 +144,10 @@ export const HighlightsDrawer: React.FC = () => {
     const containerRect = container.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
     const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
-    const target = alignment === 'center'
-      ? elTopInScroll - containerRect.height / 2 + elRect.height / 2
-      : elTopInScroll - 16;
+    const target =
+      alignment === 'center'
+        ? elTopInScroll - containerRect.height / 2 + elRect.height / 2
+        : elTopInScroll - 16;
 
     container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
 
@@ -272,7 +273,6 @@ export const HighlightsDrawer: React.FC = () => {
     itemRefs.current = itemRefs.current.slice(0, highlightGlobalIndices.total);
   }, [highlightGlobalIndices.total]);
 
-
   // Keyboard navigation handler (cross-page navigation)
   const keyNavActive = useRef(false);
 
@@ -334,15 +334,30 @@ export const HighlightsDrawer: React.FC = () => {
 
     // Don't auto-scroll if user is expanded on a highlight — avoid interrupting their flow
     if (!selectedHighlightId) {
+      // Ensure the group containing the new highlight is expanded
+      const newHighlight = allHighlights.find((h) => h.id === lastAddedHighlightId);
+      if (newHighlight && expandedGroupUrl !== newHighlight.url) {
+        setExpandedGroupUrl(newHighlight.url);
+      }
       selectHighlight(lastAddedHighlightId);
       setCurrentIndex(globalIndex);
-      requestAnimationFrame(() => {
+      // Wait for React to mount refs after group expansion
+      setTimeout(() => {
         const el = itemRefs.current[globalIndex];
         if (el) scrollTo(el, 'center');
-      });
+      }, 0);
     }
     clearLastAdded();
-  }, [lastAddedHighlightId, highlightGlobalIndices, clearLastAdded, selectedHighlightId, scrollTo]);
+  }, [
+    lastAddedHighlightId,
+    highlightGlobalIndices,
+    clearLastAdded,
+    selectedHighlightId,
+    scrollTo,
+    allHighlights,
+    expandedGroupUrl,
+    setExpandedGroupUrl,
+  ]);
 
   // Scroll to highlight when triggered from page mark click
   useEffect(() => {
@@ -473,115 +488,118 @@ export const HighlightsDrawer: React.FC = () => {
               (() => {
                 let hiddenHighlightsBefore = 0;
                 return pageGroups.map((group, groupIndex) => {
-                const isCollapsed = expandedGroupUrl !== group.url;
-                const rawGlobalIndex = highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0;
-                const effectiveIndex = Math.max(0, rawGlobalIndex - hiddenHighlightsBefore);
-                const correctedDelay = STAGGER_BASE + effectiveIndex * STAGGER_PER_ITEM;
-                if (isCollapsed) {
-                  hiddenHighlightsBefore += group.highlights.length;
-                }
-                return (
-                  <React.Fragment key={group.url}>
-                    {groupIndex > 0 && expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
-                      <div
-                        className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
-                        style={{
-                          width: '300px',
-                          ...(isStaggering
-                            ? {
-                                animationDelay: `${correctedDelay}ms`,
-                              }
-                            : {}),
-                        }}
-                      />
-                    )}
-                    <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
-                      {/* Section header — only when multiple page groups exist */}
-                      {(pageGroups.length > 1 || group.isCurrentPage) && (
+                  const isCollapsed = expandedGroupUrl !== group.url;
+                  const rawGlobalIndex =
+                    highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0;
+                  const effectiveIndex = Math.max(0, rawGlobalIndex - hiddenHighlightsBefore);
+                  const correctedDelay = STAGGER_BASE + effectiveIndex * STAGGER_PER_ITEM;
+                  if (isCollapsed) {
+                    hiddenHighlightsBefore += group.highlights.length;
+                  }
+                  return (
+                    <React.Fragment key={group.url}>
+                      {groupIndex > 0 && expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
                         <div
-                          data-item-expanded={!isCollapsed ? '' : undefined}
-                          className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
-                          style={
-                            isStaggering
+                          className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+                          style={{
+                            width: '300px',
+                            ...(isStaggering
                               ? {
                                   animationDelay: `${correctedDelay}ms`,
                                 }
-                              : undefined
-                          }
-                        >
-                          <div
-                            data-page-header
-                            className={styles.pageHeader}
-                            onClick={(e) => {
-                              // Always clear selected highlight when switching pages
-                              if (selectedHighlightId) {
-                                clearSelectedHighlight();
-                              }
-                              const isClosing = !isCollapsed;
-                              toggleGroupExpanded(group.url);
-                              if (isClosing) {
-                                handleStaggerEnd();
-                              }
-                              if (isCollapsed) {
-                                const headerEl = e.currentTarget as HTMLElement;
-                                requestAnimationFrame(() => scrollTo(headerEl));
-                              }
-                            }}
-                          >
-                            <p
-                              className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
-                            >
-                              {group.pageTitle || group.url}
-                            </p>
-                          </div>
-                        </div>
+                              : {}),
+                          }}
+                        />
                       )}
-
-                      {/* Highlights within this group */}
-                      {!isCollapsed &&
-                        group.highlights.map((highlight, i) => {
-                          const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
-                          const isLastInGroup = i === group.highlights.length - 1;
-                          return (
-                            <React.Fragment key={highlight.id}>
-                              <div
-                                ref={(el) => (itemRefs.current[globalIdx] = el)}
-                                data-item-expanded={
-                                  selectedHighlightId === highlight.id ? '' : undefined
-                                }
-                                className={selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'}
-                              >
-                                <HighlightItemExpandable
-                                  highlight={highlight}
-                                  index={globalIdx}
-                                  onScrollToItem={(idx: number) => {
-                                    const el = itemRefs.current[idx];
-                                    if (el) scrollTo(el);
-                                  }}
-                                  isStaggering={isStaggering}
-                                  onStaggerEnd={
-                                    isLastInGroup && !isCollapsed ? handleStaggerEnd : undefined
+                      <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
+                        {/* Section header — only when multiple page groups exist */}
+                        {(pageGroups.length > 1 || group.isCurrentPage) && (
+                          <div
+                            data-item-expanded={!isCollapsed ? '' : undefined}
+                            className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
+                            style={
+                              isStaggering
+                                ? {
+                                    animationDelay: `${correctedDelay}ms`,
                                   }
-                                />
-                              </div>
-                              {!isLastInGroup && selectedHighlightId !== highlight.id && (
+                                : undefined
+                            }
+                          >
+                            <div
+                              data-page-header
+                              className={styles.pageHeader}
+                              onClick={(e) => {
+                                // Always clear selected highlight when switching pages
+                                if (selectedHighlightId) {
+                                  clearSelectedHighlight();
+                                }
+                                const isClosing = !isCollapsed;
+                                toggleGroupExpanded(group.url);
+                                if (isClosing) {
+                                  handleStaggerEnd();
+                                }
+                                if (isCollapsed) {
+                                  const headerEl = e.currentTarget as HTMLElement;
+                                  requestAnimationFrame(() => scrollTo(headerEl));
+                                }
+                              }}
+                            >
+                              <p
+                                className={`text-base truncate ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
+                              >
+                                {group.pageTitle || group.url}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Highlights within this group */}
+                        {!isCollapsed &&
+                          group.highlights.map((highlight, i) => {
+                            const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
+                            const isLastInGroup = i === group.highlights.length - 1;
+                            return (
+                              <React.Fragment key={highlight.id}>
                                 <div
-                                  className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
-                                  style={{
-                                    width: '300px',
-                                    ...(isStaggering
-                                      ? { animationDelay: `${STAGGER_BASE + globalIdx * STAGGER_PER_ITEM + 17}ms` }
-                                      : {}),
-                                  }}
-                                />
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                    </div>
-                  </React.Fragment>
-                );
-              });
+                                  ref={(el) => (itemRefs.current[globalIdx] = el)}
+                                  data-item-expanded={
+                                    selectedHighlightId === highlight.id ? '' : undefined
+                                  }
+                                  className={selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'}
+                                >
+                                  <HighlightItemExpandable
+                                    highlight={highlight}
+                                    index={globalIdx}
+                                    onScrollToItem={(idx: number) => {
+                                      const el = itemRefs.current[idx];
+                                      if (el) scrollTo(el);
+                                    }}
+                                    isStaggering={isStaggering}
+                                    onStaggerEnd={
+                                      isLastInGroup && !isCollapsed ? handleStaggerEnd : undefined
+                                    }
+                                  />
+                                </div>
+                                {!isLastInGroup && selectedHighlightId !== highlight.id && (
+                                  <div
+                                    className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+                                    style={{
+                                      width: '300px',
+                                      ...(isStaggering
+                                        ? {
+                                            animationDelay: `${STAGGER_BASE + globalIdx * STAGGER_PER_ITEM + 17}ms`,
+                                          }
+                                        : {}),
+                                    }}
+                                  />
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                      </div>
+                    </React.Fragment>
+                  );
+                });
               })()
             )}
           </div>
