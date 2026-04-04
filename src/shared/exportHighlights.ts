@@ -1,9 +1,14 @@
 import { Highlight } from './types';
 
+export interface ExportOptions {
+  includeNotes: boolean;
+  includeTimestamps: boolean;
+}
+
 const escapeMd = (s: string) => s.replace(/([#>*_`\-\[\]\\|~])/g, '\\$1');
 
-export function exportHighlightsAsMarkdown(highlights: Highlight[]): void {
-  if (highlights.length === 0) return;
+export function generateMarkdown(highlights: Highlight[], options: ExportOptions): string {
+  if (highlights.length === 0) return '';
 
   const groups = new Map<string, Highlight[]>();
   for (const h of highlights) {
@@ -30,17 +35,23 @@ export function exportHighlightsAsMarkdown(highlights: Highlight[]): void {
 
     for (let hi = 0; hi < group.highlights.length; hi++) {
       const h = group.highlights[hi];
-      const date = new Date(h.timestamp).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      md += `### ${hi + 1}. ${date}\n\n`;
+
+      if (options.includeTimestamps) {
+        const date = new Date(h.timestamp).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        md += `### ${hi + 1}. ${date}\n\n`;
+      } else {
+        md += `### ${hi + 1}.\n\n`;
+      }
+
       md += escapeMd(h.text).split('\n').map((line) => `> ${line}`).join('\n') + '\n\n';
 
-      if (h.notes.length > 0) {
+      if (options.includeNotes && h.notes.length > 0) {
         md += `**Notes**\n`;
         for (const note of h.notes) {
           md += `- ${escapeMd(note.text)}\n`;
@@ -54,6 +65,10 @@ export function exportHighlightsAsMarkdown(highlights: Highlight[]): void {
     }
   }
 
+  return md;
+}
+
+export function downloadMarkdown(md: string): void {
   const blob = new Blob([md], { type: 'text/markdown' });
   const objUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -66,4 +81,8 @@ export function exportHighlightsAsMarkdown(highlights: Highlight[]): void {
     URL.revokeObjectURL(objUrl);
     a.remove();
   }, 100);
+}
+
+export function copyMarkdown(md: string): Promise<void> {
+  return navigator.clipboard.writeText(md);
 }

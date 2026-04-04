@@ -6,7 +6,7 @@ import styles from './HighlightsDrawer.module.css';
 import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 import { HighlightItemExpandable } from './HighlightItemExpandable';
 import { TrashIcon } from '@/shared/TrashIcon';
-import { exportHighlightsAsMarkdown } from '@/shared/exportHighlights';
+import { ExportPanel, ExportScope } from './ExportPanel';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -102,6 +102,15 @@ export const HighlightsDrawer: React.FC = () => {
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
+  const [exportMode, setExportMode] = useState(false);
+  const [exportScope, setExportScope] = useState<ExportScope>('current');
+  const [exportIncludeNotes, setExportIncludeNotes] = useState(true);
+  const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(true);
+
+  const currentPageHighlights = useMemo(
+    () => allHighlights.filter((h) => h.url === currentUrl),
+    [allHighlights, currentUrl]
+  );
 
   // Scroll intent tracking
   const scrollIntentRef = useRef<'programmatic' | null>(null);
@@ -125,6 +134,10 @@ export const HighlightsDrawer: React.FC = () => {
       if (e.target === e.currentTarget && isClosing) {
         setIsVisible(false);
         setIsClosing(false);
+        setExportMode(false);
+        setExportScope('current');
+        setExportIncludeNotes(true);
+        setExportIncludeTimestamps(true);
       }
     },
     [isClosing]
@@ -430,10 +443,6 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [selectedHighlightId, isOpen]);
 
-  const handleExport = useCallback(() => {
-    exportHighlightsAsMarkdown(allHighlights);
-  }, [allHighlights]);
-
   // Render-phase state update: instantly cancel stagger if a new item is added.
   // React will discard the current render and restart with isStaggering = false.
   if (lastAddedHighlightId && isStaggering) {
@@ -458,6 +467,16 @@ export const HighlightsDrawer: React.FC = () => {
         ...drawerStyle,
       }}
     >
+      {/* Export button — outside main container */}
+      {allHighlights.length > 0 && (
+        <button
+          onClick={() => setExportMode(!exportMode)}
+          className="absolute text-text-secondary text-xs font-light hover:text-text-main transition-colors cursor-pointer"
+          style={{ top: -28, right: 0, background: 'none', border: 'none', padding: 0 }}
+        >
+          Export
+        </button>
+      )}
       {/* Inner div — visuals + animation */}
       <div
         ref={innerRef}
@@ -472,18 +491,20 @@ export const HighlightsDrawer: React.FC = () => {
         onAnimationEnd={handleDrawerAnimationEnd}
         onKeyDown={handleKeyDown}
       >
-        {/* Export header */}
-        {allHighlights.length > 0 && (
-          <div className="flex justify-end px-[38px] pt-2">
-            <button
-              onClick={handleExport}
-              className="text-text-secondary text-xs font-light hover:text-text-main transition-colors cursor-pointer"
-              style={{ background: 'none', border: 'none', padding: 0 }}
-            >
-              Export
-            </button>
-          </div>
-        )}
+        {exportMode ? (
+          <ExportPanel
+            allHighlights={allHighlights}
+            currentPageHighlights={currentPageHighlights}
+            scope={exportScope}
+            setScope={setExportScope}
+            includeNotes={exportIncludeNotes}
+            setIncludeNotes={setExportIncludeNotes}
+            includeTimestamps={exportIncludeTimestamps}
+            setIncludeTimestamps={setExportIncludeTimestamps}
+            onClose={() => setExportMode(false)}
+          />
+        ) : (
+        <>
         {/* Single scroll container with expandable items */}
         <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
           <div
@@ -632,6 +653,8 @@ export const HighlightsDrawer: React.FC = () => {
             )}
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );
