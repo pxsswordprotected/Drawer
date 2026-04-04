@@ -452,7 +452,28 @@ export const HighlightsDrawer: React.FC = () => {
   if (!isVisible) return null;
 
   return (
-    /* Outer div — positioning only, translate updated by FAB rAF */
+    <>
+    {/* Export icon — fixed above draggable logo */}
+    {allHighlights.length > 0 && logoPosition && !isClosing && (
+      <button
+        onClick={() => setExportMode(!exportMode)}
+        className="fixed cursor-pointer"
+        style={{
+          left: logoPosition.x - 10,
+          top: logoPosition.y - 22 - 8 - 20,
+          zIndex: 1001,
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          lineHeight: 0,
+        }}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#8C8C8C" viewBox="0 0 256 256">
+          <path d="M224,104a8,8,0,0,1-16,0V59.32l-66.33,66.34a8,8,0,0,1-11.32-11.32L196.68,48H152a8,8,0,0,1,0-16h64a8,8,0,0,1,8,8Zm-40,24a8,8,0,0,0-8,8v72H48V80h72a8,8,0,0,0,0-16H48A16,16,0,0,0,32,80V208a16,16,0,0,0,16,16H176a16,16,0,0,0,16-16V136A8,8,0,0,0,184,128Z" />
+        </svg>
+      </button>
+    )}
+    {/* Outer div — positioning only, translate updated by FAB rAF */}
     <div
       ref={(el) => {
         drawerRef.current = el;
@@ -467,16 +488,6 @@ export const HighlightsDrawer: React.FC = () => {
         ...drawerStyle,
       }}
     >
-      {/* Export button — outside main container */}
-      {allHighlights.length > 0 && (
-        <button
-          onClick={() => setExportMode(!exportMode)}
-          className="absolute text-text-secondary text-xs font-light hover:text-text-main transition-colors cursor-pointer"
-          style={{ top: -28, right: 0, background: 'none', border: 'none', padding: 0 }}
-        >
-          Export
-        </button>
-      )}
       {/* Inner div — visuals + animation */}
       <div
         ref={innerRef}
@@ -657,5 +668,6 @@ export const HighlightsDrawer: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
