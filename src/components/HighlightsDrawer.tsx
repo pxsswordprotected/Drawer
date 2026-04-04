@@ -6,6 +6,7 @@ import styles from './HighlightsDrawer.module.css';
 import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 import { HighlightItemExpandable } from './HighlightItemExpandable';
 import { TrashIcon } from '@/shared/TrashIcon';
+import { exportHighlightsAsMarkdown } from '@/shared/exportHighlights';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -429,6 +430,10 @@ export const HighlightsDrawer: React.FC = () => {
     }
   }, [selectedHighlightId, isOpen]);
 
+  const handleExport = useCallback(() => {
+    exportHighlightsAsMarkdown(allHighlights);
+  }, [allHighlights]);
+
   // Render-phase state update: instantly cancel stagger if a new item is added.
   // React will discard the current render and restart with isStaggering = false.
   if (lastAddedHighlightId && isStaggering) {
@@ -467,6 +472,18 @@ export const HighlightsDrawer: React.FC = () => {
         onAnimationEnd={handleDrawerAnimationEnd}
         onKeyDown={handleKeyDown}
       >
+        {/* Export header */}
+        {allHighlights.length > 0 && (
+          <div className="flex justify-end px-[38px] pt-2">
+            <button
+              onClick={handleExport}
+              className="text-text-secondary text-xs font-light hover:text-text-main transition-colors cursor-pointer"
+              style={{ background: 'none', border: 'none', padding: 0 }}
+            >
+              Export
+            </button>
+          </div>
+        )}
         {/* Single scroll container with expandable items */}
         <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
           <div
