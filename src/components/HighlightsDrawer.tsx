@@ -103,13 +103,60 @@ export const HighlightsDrawer: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
   const [exportMode, setExportMode] = useState(false);
+  const [exportScreen, setExportScreen] = useState<'select' | 'options'>('select');
   const [exportScope, setExportScope] = useState<ExportScope>('current');
+  const [exportSelectedIds, setExportSelectedIds] = useState<Set<string>>(new Set());
+  const [exportScopeError, setExportScopeError] = useState<string | null>(null);
   const [exportIncludeNotes, setExportIncludeNotes] = useState(true);
   const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(true);
 
   const currentPageHighlights = useMemo(
     () => allHighlights.filter((h) => h.url === currentUrl),
     [allHighlights, currentUrl]
+  );
+
+  // Export selection helpers
+  const toggleExportHighlight = useCallback((id: string) => {
+    setExportScope('selected');
+    setExportSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleExportPage = useCallback((highlights: Highlight[]) => {
+    setExportScope('selected');
+    setExportSelectedIds((prev) => {
+      const next = new Set(prev);
+      const anySelected = highlights.some((h) => prev.has(h.id));
+      for (const h of highlights) {
+        if (anySelected) next.delete(h.id);
+        else next.add(h.id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleExportScopeChange = useCallback((newScope: ExportScope) => {
+    setExportScopeError(null);
+    if (newScope === 'current') {
+      if (currentPageHighlights.length === 0) {
+        setExportScopeError('No highlights on this page');
+        return;
+      }
+      setExportSelectedIds(new Set(currentPageHighlights.map((h) => h.id)));
+    } else if (newScope === 'all') {
+      setExportSelectedIds(new Set(allHighlights.map((h) => h.id)));
+    }
+    // 'selected' — don't change selectedIds
+    setExportScope(newScope);
+  }, [currentPageHighlights, allHighlights]);
+
+  const highlightsToExport = useMemo(
+    () => allHighlights.filter((h) => exportSelectedIds.has(h.id)),
+    [allHighlights, exportSelectedIds]
   );
 
   // Scroll intent tracking
@@ -135,7 +182,10 @@ export const HighlightsDrawer: React.FC = () => {
         setIsVisible(false);
         setIsClosing(false);
         setExportMode(false);
+        setExportScreen('select');
         setExportScope('current');
+        setExportSelectedIds(new Set());
+        setExportScopeError(null);
         setExportIncludeNotes(true);
         setExportIncludeTimestamps(true);
       }
@@ -456,7 +506,24 @@ export const HighlightsDrawer: React.FC = () => {
     {/* Export icon — fixed above draggable logo */}
     {allHighlights.length > 0 && logoPosition && !isClosing && (
       <button
-        onClick={() => setExportMode(!exportMode)}
+        onClick={() => {
+          if (exportMode) {
+            setExportMode(false);
+            setExportScreen('select');
+            setExportScope('current');
+            setExportSelectedIds(new Set());
+            setExportScopeError(null);
+          } else {
+            setExportMode(true);
+            if (currentPageHighlights.length > 0) {
+              setExportScope('current');
+              setExportSelectedIds(new Set(currentPageHighlights.map((h) => h.id)));
+            } else {
+              setExportScope('selected');
+              setExportSelectedIds(new Set());
+            }
+          }
+        }}
         className="fixed cursor-pointer"
         style={{
           left: logoPosition.x - 10,
@@ -502,17 +569,21 @@ export const HighlightsDrawer: React.FC = () => {
         onAnimationEnd={handleDrawerAnimationEnd}
         onKeyDown={handleKeyDown}
       >
-        {exportMode ? (
+        {exportMode && exportScreen === 'options' ? (
           <ExportPanel
-            allHighlights={allHighlights}
-            currentPageHighlights={currentPageHighlights}
-            scope={exportScope}
-            setScope={setExportScope}
+            highlightsToExport={highlightsToExport}
             includeNotes={exportIncludeNotes}
             setIncludeNotes={setExportIncludeNotes}
             includeTimestamps={exportIncludeTimestamps}
             setIncludeTimestamps={setExportIncludeTimestamps}
-            onClose={() => setExportMode(false)}
+            onClose={() => {
+              setExportMode(false);
+              setExportScreen('select');
+              setExportScope('current');
+              setExportSelectedIds(new Set());
+              setExportScopeError(null);
+            }}
+            onBack={() => setExportScreen('select')}
           />
         ) : (
         <>
@@ -523,6 +594,58 @@ export const HighlightsDrawer: React.FC = () => {
             data-has-expanded={selectedHighlightId ? '' : undefined}
             data-group-expanded={expandedGroupUrl ? '' : undefined}
           >
+            {/* Export scope bar */}
+            {exportMode && !isLoading && allHighlights.length > 0 && (
+              <>
+                <div className="flex flex-col gap-2 py-3">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="export-scope"
+                        checked={exportScope === 'current'}
+                        onChange={() => handleExportScopeChange('current')}
+                        className="accent-text-main"
+                      />
+                      <span className="text-text-main text-xs font-light">
+                        Current page
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="export-scope"
+                        checked={exportScope === 'all'}
+                        onChange={() => handleExportScopeChange('all')}
+                        className="accent-text-main"
+                      />
+                      <span className="text-text-main text-xs font-light">
+                        All highlights
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="export-scope"
+                        checked={exportScope === 'selected'}
+                        onChange={() => handleExportScopeChange('selected')}
+                        className="accent-text-main"
+                      />
+                      <span className="text-text-main text-xs font-light">
+                        Selected
+                      </span>
+                    </label>
+                  </div>
+                  {exportScopeError && (
+                    <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
+                  )}
+                </div>
+                <div
+                  className="border-t border-divider mx-auto"
+                  style={{ width: '300px' }}
+                />
+              </>
+            )}
             {isLoading ? (
               <>
                 <div className="bg-[#373737] rounded-md animate-pulse" style={{ height: '64px' }} />
@@ -549,7 +672,7 @@ export const HighlightsDrawer: React.FC = () => {
                   }
                   return (
                     <React.Fragment key={group.url}>
-                      {groupIndex > 0 && expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
+                      {groupIndex > 0 && (exportMode || expandedGroupUrl !== pageGroups[groupIndex - 1]?.url) && (
                         <div
                           className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
                           style={{
@@ -595,20 +718,42 @@ export const HighlightsDrawer: React.FC = () => {
                                 }
                               }}
                             >
+                              {exportMode && (() => {
+                                const allInGroup = group.highlights.every((h) => exportSelectedIds.has(h.id));
+                                const someInGroup = group.highlights.some((h) => exportSelectedIds.has(h.id));
+                                return (
+                                  <input
+                                    type="checkbox"
+                                    checked={allInGroup}
+                                    ref={(el) => {
+                                      if (el) el.indeterminate = someInGroup && !allInGroup;
+                                    }}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      toggleExportPage(group.highlights);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="accent-text-main cursor-pointer"
+                                    style={{ position: 'absolute', left: -24, top: '50%', transform: 'translateY(-50%)' }}
+                                  />
+                                );
+                              })()}
                               <p
                                 className={`text-base ${styles.pageTitle} ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
                               >
                                 {group.pageTitle || group.url}
                               </p>
-                              <div
-                                className={styles.pageTrashIcon}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deletePageGroup(group.url);
-                                }}
-                              >
-                                <TrashIcon size={14} className="text-text-secondary" />
-                              </div>
+                              {!exportMode && (
+                                <div
+                                  className={styles.pageTrashIcon}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deletePageGroup(group.url);
+                                  }}
+                                >
+                                  <TrashIcon size={14} className="text-text-secondary" />
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -626,7 +771,17 @@ export const HighlightsDrawer: React.FC = () => {
                                     selectedHighlightId === highlight.id ? '' : undefined
                                   }
                                   className={selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'}
+                                  style={{ position: 'relative' }}
                                 >
+                                  {exportMode && (
+                                    <input
+                                      type="checkbox"
+                                      checked={exportSelectedIds.has(highlight.id)}
+                                      onChange={() => toggleExportHighlight(highlight.id)}
+                                      className="accent-text-main cursor-pointer"
+                                      style={{ position: 'absolute', left: -24, top: '50%', transform: 'translateY(-50%)' }}
+                                    />
+                                  )}
                                   <HighlightItemExpandable
                                     highlight={highlight}
                                     index={globalIdx}
@@ -638,6 +793,7 @@ export const HighlightsDrawer: React.FC = () => {
                                     onStaggerEnd={
                                       isLastInGroup && !isCollapsed ? handleStaggerEnd : undefined
                                     }
+                                    hideActions={exportMode}
                                   />
                                 </div>
                                 {!isLastInGroup && selectedHighlightId !== highlight.id && (
@@ -661,6 +817,18 @@ export const HighlightsDrawer: React.FC = () => {
                   );
                 });
               })()
+            )}
+            {/* Export "Next" button */}
+            {exportMode && !isLoading && allHighlights.length > 0 && (
+              <div className="py-4">
+                <button
+                  onClick={() => setExportScreen('options')}
+                  disabled={exportSelectedIds.size === 0}
+                  className="w-full py-2 rounded text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  Next ({exportSelectedIds.size})
+                </button>
+              </div>
             )}
           </div>
         </div>

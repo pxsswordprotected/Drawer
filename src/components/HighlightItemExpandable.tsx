@@ -11,6 +11,7 @@ interface HighlightItemExpandableProps {
   isStaggering?: boolean;
   onStaggerEnd?: () => void;
   onScrollToItem: (index: number) => void;
+  hideActions?: boolean;
 }
 
 export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = ({
@@ -19,6 +20,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   isStaggering = false,
   onStaggerEnd,
   onScrollToItem,
+  hideActions = false,
 }) => {
   const selectedHighlightId = useDrawerStore((s) => s.selectedHighlightId);
   const selectHighlight = useDrawerStore((s) => s.selectHighlight);
@@ -83,9 +85,11 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
         >
           {highlight.text}
         </p>
-        <div className={styles.trashIcon}>
-          <TrashIcon size={14} className="text-text-secondary" onClick={handleDelete} />
-        </div>
+        {!hideActions && (
+          <div className={styles.trashIcon}>
+            <TrashIcon size={14} className="text-text-secondary" onClick={handleDelete} />
+          </div>
+        )}
       </div>
 
       <div
