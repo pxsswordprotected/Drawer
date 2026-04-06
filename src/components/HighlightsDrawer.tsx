@@ -695,7 +695,10 @@ export const HighlightsDrawer: React.FC = () => {
                               <div
                                 data-item-expanded={!isCollapsed ? '' : undefined}
                                 data-export-selected={
-                                  exportMode && group.highlights.some((h) => exportSelectedIds.has(h.id)) ? '' : undefined
+                                  exportMode &&
+                                  group.highlights.some((h) => exportSelectedIds.has(h.id))
+                                    ? ''
+                                    : undefined
                                 }
                                 className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
                                 style={
@@ -789,7 +792,9 @@ export const HighlightsDrawer: React.FC = () => {
                                         selectedHighlightId === highlight.id ? '' : undefined
                                       }
                                       data-export-selected={
-                                        exportMode && exportSelectedIds.has(highlight.id) ? '' : undefined
+                                        exportMode && exportSelectedIds.has(highlight.id)
+                                          ? ''
+                                          : undefined
                                       }
                                       className={
                                         selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'
@@ -852,144 +857,161 @@ export const HighlightsDrawer: React.FC = () => {
               </div>
             </div>
             {/* Floating export bar */}
-            {exportMode && !isLoading && allHighlights.length > 0 && !(exportExiting && !exportSuccess) && (
-              <div
-                className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg px-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
-                style={{
-                  zIndex: 10,
-                  boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
-                  width: '236px',
-                }}
-              >
-                {exportScreen === 'select' ? (
-                  <div className="flex items-center justify-between">
-                    {/* Scope cycle button: vertical dots + active label */}
-                    <button
-                      onClick={cycleExportScope}
-                      className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5"
-                      style={{ background: 'none', border: 'none' }}
-                      aria-label={`Export scope: ${exportScope === 'current' ? 'Current page' : exportScope === 'all' ? 'All highlights' : 'Selected'}. Click to change.`}
-                    >
-                      <span className="flex flex-col items-center gap-1" aria-hidden="true">
-                        {(['current', 'all', 'selected'] as const).map((scope) => (
-                          <span
-                            key={scope}
-                            className={`block rounded-full transition-opacity ${
-                              exportScope === scope
-                                ? 'w-1.5 h-1.5 bg-text-main'
-                                : 'w-1 h-1 bg-text-secondary opacity-40'
-                            }`}
-                          />
-                        ))}
-                      </span>
-                      <span
-                        className="text-sm font-light text-text-main"
-                        style={{ marginLeft: '6px' }}
+            {exportMode &&
+              !isLoading &&
+              allHighlights.length > 0 &&
+              !(exportExiting && !exportSuccess) && (
+                <div
+                  className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg px-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
+                  style={{
+                    zIndex: 10,
+                    boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
+                    width: '236px',
+                  }}
+                >
+                  {exportScreen === 'select' ? (
+                    <div className="flex items-center justify-between">
+                      {/* Scope cycle button: vertical dots + active label */}
+                      <button
+                        onClick={cycleExportScope}
+                        className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5"
+                        style={{ background: 'none', border: 'none' }}
+                        aria-label={`Export scope: ${exportScope === 'current' ? 'Current page' : exportScope === 'all' ? 'All highlights' : 'Selected'}. Click to change.`}
                       >
-                        {exportScope === 'current'
-                          ? 'Current page'
-                          : exportScope === 'all'
-                            ? 'All highlights'
-                            : 'Selected'}
-                      </span>
-                    </button>
-                    {exportScopeError && (
-                      <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
-                    )}
-                    {/* Next button */}
-                    <button
-                      onClick={() => setExportScreen('options')}
-                      disabled={exportSelectedIds.size === 0}
-                      className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                      style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
-                    >
-                      Next ({exportSelectedIds.size})
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-2 pt-1" style={{ marginBottom: '-1px' }}>
-                    {/* Back arrow */}
-                    <button
-                      onClick={() => setExportScreen('select')}
-                      className="text-text-secondary hover:text-text-main text-sm cursor-pointer self-start flex items-center justify-center"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        width: '22px',
-                        height: '22px',
-                      }}
-                    >
-                      &larr;
-                    </button>
-                    {/* Options */}
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span className="text-text-main text-sm font-light">Include notes</span>
-                      <input
-                        type="checkbox"
-                        checked={exportIncludeNotes}
-                        onChange={(e) => setExportIncludeNotes(e.target.checked)}
-                        className={styles.toggle}
-                      />
-                    </label>
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span className="text-text-main text-sm font-light">Include timestamps</span>
-                      <input
-                        type="checkbox"
-                        checked={exportIncludeTimestamps}
-                        onChange={(e) => setExportIncludeTimestamps(e.target.checked)}
-                        className={styles.toggle}
-                      />
-                    </label>
-                    {/* Export action buttons */}
-                    <div className="flex gap-2 pt-1">
-                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                        {exportSuccess === 'copy' ? (
-                          <div
-                            className="w-full flex items-center justify-center"
-                            style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
-                          >
-                            <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
-                              <path d="M1 5.5L5 9.5L13 1.5" stroke="#4CAF50" strokeWidth="1.5" strokeLinejoin="miter" strokeLinecap="square" />
-                            </svg>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={handleExportCopy}
-                            disabled={exportSuccess !== null}
-                            className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-                            style={{ borderRadius: '8px', height: '32px' }}
-                          >
-                            Copy
-                          </button>
-                        )}
-                      </div>
-                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                        {exportSuccess === 'download' ? (
-                          <div
-                            className="w-full flex items-center justify-center"
-                            style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
-                          >
-                            <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
-                              <path d="M1 5.5L5 9.5L13 1.5" stroke="#4CAF50" strokeWidth="1.5" strokeLinejoin="miter" strokeLinecap="square" />
-                            </svg>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={handleExportDownload}
-                            disabled={exportSuccess !== null}
-                            className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-                            style={{ borderRadius: '8px', height: '32px' }}
-                          >
-                            Download
-                          </button>
-                        )}
+                        <span className="flex flex-col items-center gap-1" aria-hidden="true">
+                          {(['current', 'all', 'selected'] as const).map((scope) => (
+                            <span
+                              key={scope}
+                              className={`block rounded-full transition-opacity ${
+                                exportScope === scope
+                                  ? 'w-1.5 h-1.5 bg-text-main'
+                                  : 'w-1 h-1 bg-text-secondary opacity-40'
+                              }`}
+                            />
+                          ))}
+                        </span>
+                        <span
+                          className="text-sm font-light text-text-main"
+                          style={{ marginLeft: '6px' }}
+                        >
+                          {exportScope === 'current'
+                            ? 'Current page'
+                            : exportScope === 'all'
+                              ? 'All highlights'
+                              : 'Selected'}
+                        </span>
+                      </button>
+                      {exportScopeError && (
+                        <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
+                      )}
+                      {/* Next button */}
+                      <button
+                        onClick={() => setExportScreen('options')}
+                        disabled={exportSelectedIds.size === 0}
+                        className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                        style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
+                      >
+                        Next ({exportSelectedIds.size})
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 pt-1" style={{ marginBottom: '1px' }}>
+                      {/* Back arrow */}
+                      <button
+                        onClick={() => setExportScreen('select')}
+                        className="text-text-secondary hover:text-text-main text-sm cursor-pointer self-start flex items-center justify-center"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          width: '22px',
+                          height: '22px',
+                        }}
+                      >
+                        &larr;
+                      </button>
+                      {/* Options */}
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-text-main text-sm font-light">Include notes</span>
+                        <input
+                          type="checkbox"
+                          checked={exportIncludeNotes}
+                          onChange={(e) => setExportIncludeNotes(e.target.checked)}
+                          className={styles.toggle}
+                        />
+                      </label>
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-text-main text-sm font-light">
+                          Include timestamps
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={exportIncludeTimestamps}
+                          onChange={(e) => setExportIncludeTimestamps(e.target.checked)}
+                          className={styles.toggle}
+                        />
+                      </label>
+                      {/* Export action buttons */}
+                      <div className="flex gap-2 pt-1">
+                        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                          {exportSuccess === 'copy' ? (
+                            <div
+                              className="w-full flex items-center justify-center"
+                              style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
+                            >
+                              <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                                <path
+                                  d="M1 5.5L5 9.5L13 1.5"
+                                  stroke="#4CAF50"
+                                  strokeWidth="1.5"
+                                  strokeLinejoin="miter"
+                                  strokeLinecap="square"
+                                />
+                              </svg>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={handleExportCopy}
+                              disabled={exportSuccess !== null}
+                              className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                              style={{ borderRadius: '8px', height: '32px' }}
+                            >
+                              Copy
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                          {exportSuccess === 'download' ? (
+                            <div
+                              className="w-full flex items-center justify-center"
+                              style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
+                            >
+                              <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                                <path
+                                  d="M1 5.5L5 9.5L13 1.5"
+                                  stroke="#4CAF50"
+                                  strokeWidth="1.5"
+                                  strokeLinejoin="miter"
+                                  strokeLinecap="square"
+                                />
+                              </svg>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={handleExportDownload}
+                              disabled={exportSuccess !== null}
+                              className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                              style={{ borderRadius: '8px', height: '32px' }}
+                            >
+                              Download
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
           </>
         </div>
       </div>
