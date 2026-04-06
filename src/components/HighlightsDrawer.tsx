@@ -637,7 +637,7 @@ export const HighlightsDrawer: React.FC = () => {
                 className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${styles.highlightList}`}
                 data-has-expanded={selectedHighlightId ? '' : undefined}
                 data-group-expanded={expandedGroupUrl ? '' : undefined}
-                data-export-mode={exportMode ? '' : undefined}
+                data-export-mode={exportMode && !exportExiting ? '' : undefined}
               >
                 {isLoading ? (
                   <>
@@ -907,7 +907,7 @@ export const HighlightsDrawer: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2 py-1">
+                  <div className="flex flex-col gap-2 pt-1" style={{ marginBottom: '-1px' }}>
                     {/* Back arrow */}
                     <button
                       onClick={() => setExportScreen('select')}
