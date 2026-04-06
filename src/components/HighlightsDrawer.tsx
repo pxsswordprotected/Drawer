@@ -842,7 +842,7 @@ export const HighlightsDrawer: React.FC = () => {
                 style={{
                   zIndex: 10,
                   boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
-                  width: '224px',
+                  width: '236px',
                   transform: 'translateX(-50%)',
                 }}
               >
@@ -868,7 +868,7 @@ export const HighlightsDrawer: React.FC = () => {
                         ))}
                       </span>
                       <span
-                        className="text-xs font-light text-text-main"
+                        className="text-sm font-light text-text-main"
                         style={{ marginLeft: '6px' }}
                       >
                         {exportScope === 'current'
@@ -885,7 +885,7 @@ export const HighlightsDrawer: React.FC = () => {
                     <button
                       onClick={() => setExportScreen('options')}
                       disabled={exportSelectedIds.size === 0}
-                      className="px-3 text-xs font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                      className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
                       style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
                     >
                       Next ({exportSelectedIds.size})
@@ -909,7 +909,7 @@ export const HighlightsDrawer: React.FC = () => {
                     </button>
                     {/* Options */}
                     <label className="flex items-center justify-between cursor-pointer">
-                      <span className="text-text-main text-xs font-light">Include notes</span>
+                      <span className="text-text-main text-sm font-light">Include notes</span>
                       <input
                         type="checkbox"
                         checked={exportIncludeNotes}
@@ -918,7 +918,7 @@ export const HighlightsDrawer: React.FC = () => {
                       />
                     </label>
                     <label className="flex items-center justify-between cursor-pointer">
-                      <span className="text-text-main text-xs font-light">Include timestamps</span>
+                      <span className="text-text-main text-sm font-light">Include timestamps</span>
                       <input
                         type="checkbox"
                         checked={exportIncludeTimestamps}
@@ -930,14 +930,14 @@ export const HighlightsDrawer: React.FC = () => {
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={handleExportCopy}
-                        className="flex-1 px-3 text-xs font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer"
+                        className="flex-1 px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer"
                         style={{ borderRadius: '8px', height: '32x' }}
                       >
                         Copy
                       </button>
                       <button
                         onClick={handleExportDownload}
-                        className="flex-1 px-3 text-xs font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer"
+                        className="flex-1 px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer"
                         style={{ borderRadius: '8px', height: '32px' }}
                       >
                         Download
