@@ -12,6 +12,7 @@ interface HighlightItemExpandableProps {
   onStaggerEnd?: () => void;
   onScrollToItem: (index: number) => void;
   hideActions?: boolean;
+  checkboxSlot?: React.ReactNode;
 }
 
 export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = ({
@@ -21,6 +22,7 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   onStaggerEnd,
   onScrollToItem,
   hideActions = false,
+  checkboxSlot,
 }) => {
   const selectedHighlightId = useDrawerStore((s) => s.selectedHighlightId);
   const selectHighlight = useDrawerStore((s) => s.selectHighlight);
@@ -79,7 +81,8 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
       onAnimationEnd={isStaggering ? handleAnimationEnd : undefined}
       style={isStaggering ? { animationDelay: `${staggerDelay}ms` } : undefined}
     >
-      <div className={styles.highlightVisual}>
+      <div className={styles.highlightVisual} style={{ position: 'relative' }}>
+        {checkboxSlot}
         <p
           className={`${isExpanded ? styles.highlightTextExpanded : styles.highlightText} text-text-main`}
         >

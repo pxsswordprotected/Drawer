@@ -753,8 +753,7 @@ export const HighlightsDrawer: React.FC = () => {
                                           style={{
                                             position: 'absolute',
                                             left: -24,
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
+                                            top: '5px',
                                           }}
                                         />
                                       );
@@ -799,24 +798,25 @@ export const HighlightsDrawer: React.FC = () => {
                                       className={
                                         selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'
                                       }
-                                      style={{ position: 'relative' }}
                                     >
-                                      {exportMode && (
-                                        <input
-                                          type="checkbox"
-                                          checked={exportSelectedIds.has(highlight.id)}
-                                          onChange={() => toggleExportHighlight(highlight.id)}
-                                          disabled={exportScreen === 'options'}
-                                          className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
-                                          style={{
-                                            position: 'absolute',
-                                            left: -24,
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
-                                          }}
-                                        />
-                                      )}
                                       <HighlightItemExpandable
+                                        checkboxSlot={
+                                          exportMode ? (
+                                            <input
+                                              type="checkbox"
+                                              checked={exportSelectedIds.has(highlight.id)}
+                                              onChange={() => toggleExportHighlight(highlight.id)}
+                                              onClick={(e) => e.stopPropagation()}
+                                              disabled={exportScreen === 'options'}
+                                              className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
+                                              style={{
+                                                position: 'absolute',
+                                                left: -24,
+                                                top: '5px',
+                                              }}
+                                            />
+                                          ) : undefined
+                                        }
                                         highlight={highlight}
                                         index={globalIdx}
                                         onScrollToItem={(idx: number) => {
@@ -915,21 +915,7 @@ export const HighlightsDrawer: React.FC = () => {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2 pt-1" style={{ marginBottom: '1px' }}>
-                      {/* Back arrow */}
-                      <button
-                        onClick={() => setExportScreen('select')}
-                        className="text-text-secondary hover:text-text-main text-sm cursor-pointer self-start flex items-center justify-center"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: 0,
-                          width: '22px',
-                          height: '22px',
-                        }}
-                      >
-                        &larr;
-                      </button>
+                    <div className="flex flex-col gap-2 pt-1" style={{ marginBottom: '-1px' }}>
                       {/* Options */}
                       <label className="flex items-center justify-between cursor-pointer">
                         <span className="text-text-main text-sm font-light">Include notes</span>
@@ -951,9 +937,23 @@ export const HighlightsDrawer: React.FC = () => {
                           className={styles.toggle}
                         />
                       </label>
-                      {/* Export action buttons */}
+                      {/* Back + Export action buttons */}
                       <div className="flex gap-2 pt-1">
-                        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                        {/* Back arrow button */}
+                        <button
+                          onClick={() => setExportScreen('select')}
+                          disabled={exportSuccess !== null}
+                          className="flex items-center justify-center bg-[#373737] text-text-secondary hover:text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                          style={{
+                            borderRadius: '8px',
+                            height: '32px',
+                            width: '32px',
+                            flexShrink: 0,
+                          }}
+                        >
+                          &larr;
+                        </button>
+                        <div style={{ flex: '3 1 0', minWidth: 0 }}>
                           {exportSuccess === 'copy' ? (
                             <div
                               className="w-full flex items-center justify-center"
@@ -973,14 +973,14 @@ export const HighlightsDrawer: React.FC = () => {
                             <button
                               onClick={handleExportCopy}
                               disabled={exportSuccess !== null}
-                              className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                              className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
                               style={{ borderRadius: '8px', height: '32px' }}
                             >
                               Copy
                             </button>
                           )}
                         </div>
-                        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                        <div style={{ flex: '5 1 0', minWidth: 0 }}>
                           {exportSuccess === 'download' ? (
                             <div
                               className="w-full flex items-center justify-center"
@@ -1000,7 +1000,7 @@ export const HighlightsDrawer: React.FC = () => {
                             <button
                               onClick={handleExportDownload}
                               disabled={exportSuccess !== null}
-                              className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                              className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
                               style={{ borderRadius: '8px', height: '32px' }}
                             >
                               Download
