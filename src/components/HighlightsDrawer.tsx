@@ -105,6 +105,8 @@ export const HighlightsDrawer: React.FC = () => {
   const [isStaggering, setIsStaggering] = useState(false);
   const [exportMode, setExportMode] = useState(false);
   const [exportScreen, setExportScreen] = useState<'select' | 'options'>('select');
+  const [exportSuccess, setExportSuccess] = useState<'copy' | 'download' | null>(null);
+  const [exportExiting, setExportExiting] = useState(false);
   const [exportScope, setExportScope] = useState<ExportScope>('current');
   const [exportSelectedIds, setExportSelectedIds] = useState<Set<string>>(new Set());
   const [exportScopeError, setExportScopeError] = useState<string | null>(null);
@@ -181,6 +183,8 @@ export const HighlightsDrawer: React.FC = () => {
     setExportScope('current');
     setExportSelectedIds(new Set());
     setExportScopeError(null);
+    setExportSuccess(null);
+    setExportExiting(false);
   }, []);
 
   const handleExportCopy = useCallback(async () => {
@@ -190,7 +194,11 @@ export const HighlightsDrawer: React.FC = () => {
     });
     try {
       await copyMarkdown(md);
-      resetExportState();
+      setExportSuccess('copy');
+      setTimeout(() => {
+        setExportExiting(true);
+        setTimeout(() => resetExportState(), 200);
+      }, 1000);
     } catch {
       /* silently fail */
     }
@@ -202,7 +210,11 @@ export const HighlightsDrawer: React.FC = () => {
       includeTimestamps: exportIncludeTimestamps,
     });
     downloadMarkdown(md);
-    resetExportState();
+    setExportSuccess('download');
+    setTimeout(() => {
+      setExportExiting(true);
+      setTimeout(() => resetExportState(), 200);
+    }, 1000);
   }, [highlightsToExport, exportIncludeNotes, exportIncludeTimestamps, resetExportState]);
 
   // Scroll intent tracking
@@ -554,11 +566,8 @@ export const HighlightsDrawer: React.FC = () => {
         <button
           onClick={() => {
             if (exportMode) {
-              setExportMode(false);
-              setExportScreen('select');
-              setExportScope('current');
-              setExportSelectedIds(new Set());
-              setExportScopeError(null);
+              setExportExiting(true);
+              setTimeout(() => resetExportState(), 200);
             } else {
               setExportMode(true);
               if (currentPageHighlights.length > 0) {
@@ -625,9 +634,10 @@ export const HighlightsDrawer: React.FC = () => {
             {/* Single scroll container with expandable items */}
             <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
               <div
-                className={`px-[38px] py-2 ${exportMode ? 'pb-14' : ''} ${styles.highlightList}`}
+                className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${styles.highlightList}`}
                 data-has-expanded={selectedHighlightId ? '' : undefined}
                 data-group-expanded={expandedGroupUrl ? '' : undefined}
+                data-export-mode={exportMode ? '' : undefined}
               >
                 {isLoading ? (
                   <>
@@ -684,6 +694,9 @@ export const HighlightsDrawer: React.FC = () => {
                             {(pageGroups.length > 1 || group.isCurrentPage) && (
                               <div
                                 data-item-expanded={!isCollapsed ? '' : undefined}
+                                data-export-selected={
+                                  exportMode && group.highlights.some((h) => exportSelectedIds.has(h.id)) ? '' : undefined
+                                }
                                 className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
                                 style={
                                   isStaggering
@@ -733,7 +746,7 @@ export const HighlightsDrawer: React.FC = () => {
                                           }}
                                           onClick={(e) => e.stopPropagation()}
                                           disabled={exportScreen === 'options'}
-                                          className={styles.checkbox}
+                                          className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
                                           style={{
                                             position: 'absolute',
                                             left: -24,
@@ -775,6 +788,9 @@ export const HighlightsDrawer: React.FC = () => {
                                       data-item-expanded={
                                         selectedHighlightId === highlight.id ? '' : undefined
                                       }
+                                      data-export-selected={
+                                        exportMode && exportSelectedIds.has(highlight.id) ? '' : undefined
+                                      }
                                       className={
                                         selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'
                                       }
@@ -786,7 +802,7 @@ export const HighlightsDrawer: React.FC = () => {
                                           checked={exportSelectedIds.has(highlight.id)}
                                           onChange={() => toggleExportHighlight(highlight.id)}
                                           disabled={exportScreen === 'options'}
-                                          className={styles.checkbox}
+                                          className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
                                           style={{
                                             position: 'absolute',
                                             left: -24,
@@ -836,14 +852,13 @@ export const HighlightsDrawer: React.FC = () => {
               </div>
             </div>
             {/* Floating export bar */}
-            {exportMode && !isLoading && allHighlights.length > 0 && (
+            {exportMode && !isLoading && allHighlights.length > 0 && !(exportExiting && !exportSuccess) && (
               <div
-                className="absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg px-3.5 py-2.5"
+                className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg px-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
                 style={{
                   zIndex: 10,
                   boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
                   width: '236px',
-                  transform: 'translateX(-50%)',
                 }}
               >
                 {exportScreen === 'select' ? (
@@ -928,20 +943,48 @@ export const HighlightsDrawer: React.FC = () => {
                     </label>
                     {/* Export action buttons */}
                     <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={handleExportCopy}
-                        className="flex-1 px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer"
-                        style={{ borderRadius: '8px', height: '32x' }}
-                      >
-                        Copy
-                      </button>
-                      <button
-                        onClick={handleExportDownload}
-                        className="flex-1 px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer"
-                        style={{ borderRadius: '8px', height: '32px' }}
-                      >
-                        Download
-                      </button>
+                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                        {exportSuccess === 'copy' ? (
+                          <div
+                            className="w-full flex items-center justify-center"
+                            style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
+                          >
+                            <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                              <path d="M1 5.5L5 9.5L13 1.5" stroke="#4CAF50" strokeWidth="1.5" strokeLinejoin="miter" strokeLinecap="square" />
+                            </svg>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleExportCopy}
+                            disabled={exportSuccess !== null}
+                            className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                            style={{ borderRadius: '8px', height: '32px' }}
+                          >
+                            Copy
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ flex: '1 1 0', minWidth: 0 }}>
+                        {exportSuccess === 'download' ? (
+                          <div
+                            className="w-full flex items-center justify-center"
+                            style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
+                          >
+                            <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                              <path d="M1 5.5L5 9.5L13 1.5" stroke="#4CAF50" strokeWidth="1.5" strokeLinejoin="miter" strokeLinecap="square" />
+                            </svg>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleExportDownload}
+                            disabled={exportSuccess !== null}
+                            className="w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                            style={{ borderRadius: '8px', height: '32px' }}
+                          >
+                            Download
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
