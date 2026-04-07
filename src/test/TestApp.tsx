@@ -73,7 +73,37 @@ export const TestApp: React.FC = () => {
           </p>
         </article>
       </div>
-      <div className="w-1/2 bg-bg-main" />
+      <div className="w-1/2 bg-bg-main overflow-auto scrollbar-hide">
+        <article className="max-w-2xl mx-auto px-8 py-12 space-y-6 text-text-main">
+          <h1 className="text-4xl font-bold mb-8">
+            Being Open to Your Own Body
+          </h1>
+
+          <p className="text-lg leading-relaxed">
+            Being open to your own body, being embodied, is a precondition for vibing. Which is why
+            nerds can't vibe. The deepest limitation: all of these are still me generating the
+            "other perspective" from my own weights.
+          </p>
+
+          <p className="text-lg leading-relaxed">
+            There's something about physical awareness, proprioception, and the felt sense of being
+            in a body that goes beyond intellectual understanding. The disconnect between thinking
+            and feeling prevents the kind of open, responsive engagement that presence requires.
+          </p>
+
+          <p className="text-lg leading-relaxed">
+            You can't unfold if you're not in touch with what your body is telling you about the
+            current moment. The information is there — in tension, in breath, in the subtle
+            orientation of attention — but it requires a different kind of listening.
+          </p>
+
+          <p className="text-lg leading-relaxed">
+            Software should be warm to the touch. It should feel like it was made by a person who
+            cared, not a committee that compromised. The best interface is one that disappears
+            entirely, letting the user interact directly with the content they care about.
+          </p>
+        </article>
+      </div>
       <DraggableLogo />
       <HighlightsDrawer />
       <SelectionPlusIcon

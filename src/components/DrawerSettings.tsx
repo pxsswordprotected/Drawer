@@ -10,6 +10,21 @@ const COLOR_OPTIONS = [
   { name: 'Orange', value: HIGHLIGHT_COLORS.orange },
 ] as const;
 
+const highlighterStyle = (color: string, isSelected: boolean) => ({
+  width: '20px',
+  height: '20px',
+  backgroundColor: 'transparent',
+  backgroundImage: `linear-gradient(175deg, ${color} 20%, color-mix(in srgb, ${color}, white 30%) 50%, ${color} 80%), linear-gradient(83.4deg, ${color}, color-mix(in srgb, ${color}, white 20%) 4%, color-mix(in srgb, ${color}, white 10%) 96%, ${color})`,
+  backgroundSize: '100% 100%',
+  borderRadius: '0.1em 0.5em 0.15em 0.4em / 0.5em 0.1em 0.4em 0.15em',
+  boxShadow: `1px 1px 3px color-mix(in srgb, ${color}, transparent 85%)`,
+  outline: isSelected ? '2px solid #F5F5F5' : 'none',
+  outlineOffset: '2px',
+  opacity: 1,
+  border: 'none',
+  padding: 0,
+});
+
 const buttonClass =
   'px-4 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer flex items-center justify-center';
 
@@ -94,21 +109,13 @@ export const DrawerSettings: React.FC = () => {
         <span className="text-text-secondary text-xs font-light">Highlights</span>
         <div className="flex items-center justify-between">
           <span className="text-text-main text-sm font-light">Color</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             {COLOR_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setDefaultColor(opt.value)}
-                className="cursor-pointer rounded-full"
-                style={{
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: opt.value,
-                  outline: defaultColor === opt.value ? '2px solid #F5F5F5' : 'none',
-                  outlineOffset: '2px',
-                  border: 'none',
-                  padding: 0,
-                }}
+                className="cursor-pointer"
+                style={highlighterStyle(opt.value, defaultColor === opt.value)}
                 aria-label={`${opt.name} highlight color`}
               />
             ))}
