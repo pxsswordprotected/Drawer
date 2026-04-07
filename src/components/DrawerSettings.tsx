@@ -56,9 +56,9 @@ export const DrawerSettings: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-5 px-[38px] py-3 h-full">
+    <div className="flex flex-col gap-5 px-[38px] py-3 h-full justify-center">
       {/* Highlights */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         <span className="text-text-secondary text-xs font-light">Highlights</span>
         <div className="flex items-center justify-between">
           <span className="text-text-main text-sm font-light">Color</span>

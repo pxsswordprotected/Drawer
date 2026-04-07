@@ -683,7 +683,7 @@ export const HighlightsDrawer: React.FC = () => {
               {/* Single scroll container with expandable items */}
               <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
                 <div
-                  className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${styles.highlightList}`}
+                  className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${allHighlights.length === 0 && !isLoading ? 'h-full' : ''} ${styles.highlightList}`}
                   data-has-expanded={selectedHighlightId ? '' : undefined}
                   data-group-expanded={expandedGroupUrl ? '' : undefined}
                   data-export-mode={exportMode && !exportExiting ? '' : undefined}
@@ -707,8 +707,10 @@ export const HighlightsDrawer: React.FC = () => {
                     </>
                   ) : allHighlights.length === 0 ? (
                     <div className="flex flex-col gap-2 items-center justify-center h-full">
-                      <p className="text-text-secondary text-center">
-                        No highlights saved. Select text on the page to start highlighting.
+                      <p className="text-text-main text-center text-md font-light">
+                        No highlights saved.
+                        <br />
+                        Select text on the page to start highlighting.
                       </p>
                       {exportEmptyMessage && (
                         <p className="text-text-secondary text-xs text-center font-light">
