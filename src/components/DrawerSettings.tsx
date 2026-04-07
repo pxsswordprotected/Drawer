@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { HIGHLIGHT_COLORS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
@@ -21,6 +21,7 @@ export const DrawerSettings: React.FC = () => {
   const setDefaultColor = useDrawerStore((state) => state.setDefaultColor);
   const importBackup = useDrawerStore((state) => state.importBackup);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   const handleBackup = async () => {
     const json = await storageService.exportHighlights();
@@ -31,9 +32,18 @@ export const DrawerSettings: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setRestoreError(null);
     const reader = new FileReader();
     reader.onload = async () => {
-      await importBackup(reader.result as string);
+      try {
+        await importBackup(reader.result as string);
+        console.log('[restore] success');
+      } catch (err) {
+        console.log('[restore] error caught:', err);
+        setRestoreError(
+          'Data could not be restored as the file format is not recognized. Please select a backup file that was exported from this extension.'
+        );
+      }
     };
     reader.readAsText(file);
 
@@ -93,6 +103,7 @@ export const DrawerSettings: React.FC = () => {
             className="hidden"
           />
         </div>
+        {restoreError && <p className="text-red-400 text-xs font-light">{restoreError}</p>}
       </div>
     </div>
   );
