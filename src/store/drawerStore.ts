@@ -14,6 +14,7 @@ interface DrawerState {
   pendingScrollHighlightId: string | null;
   expandedGroupUrl: string | null;
   drawerTrigger: DrawerTrigger;
+  logoResetCount: number;
 
   openDrawer: (trigger: DrawerTrigger) => void;
   closeDrawer: () => void;
@@ -33,6 +34,7 @@ interface DrawerState {
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
+  resetLogoPosition: () => void;
 }
 
 // Request deduplication map - prevents duplicate concurrent requests
@@ -48,6 +50,7 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   pendingScrollHighlightId: null,
   expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
   drawerTrigger: null,
+  logoResetCount: 0,
 
   openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger }),
   closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null, selectedHighlightId: null, drawerTrigger: null }),
@@ -142,6 +145,8 @@ export const useDrawerStore = create<DrawerState>((set) => ({
       ),
     }));
   },
+
+  resetLogoPosition: () => set((state) => ({ logoResetCount: state.logoResetCount + 1 })),
 
   loadAllHighlights: async () => {
     if (loadingPromises.has('__all__')) {

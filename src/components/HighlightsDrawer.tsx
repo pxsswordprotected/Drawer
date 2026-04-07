@@ -288,6 +288,7 @@ export const HighlightsDrawer: React.FC = () => {
         setExportIncludeTimestamps(true);
         setExportIncludePageTitles(true);
         setExportBarHeight(undefined);
+        setSettingsMode(false);
       }
     },
     [isClosing]

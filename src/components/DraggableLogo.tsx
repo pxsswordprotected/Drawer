@@ -44,6 +44,16 @@ export const DraggableLogo: React.FC = () => {
   const closeDrawer = useDrawerStore((state) => state.closeDrawer);
   const setLogoPosition = useDrawerStore((state) => state.setLogoPosition);
   const isOpen = useDrawerStore((state) => state.isOpen);
+  const logoResetCount = useDrawerStore((state) => state.logoResetCount);
+
+  useEffect(() => {
+    if (logoResetCount === 0) return;
+    const pos = getInitialPosition();
+    setPosition(pos);
+    const center = { x: pos.x + LOGO_SIZE / 2, y: pos.y + LOGO_SIZE / 2 };
+    latestCenterRef.current = center;
+    setLogoPosition(center);
+  }, [logoResetCount, setLogoPosition]);
 
   useEffect(() => {
     const onResize = () => {
