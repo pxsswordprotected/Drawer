@@ -603,6 +603,7 @@ export const HighlightsDrawer: React.FC = () => {
       {allHighlights.length > 0 && logoPosition && !isClosing && (
         <DrawerToolbar
           logoPosition={logoPosition}
+          isExportActive={exportMode}
           onExportToggle={() => {
             if (exportMode) {
               setExportExiting(true);
@@ -922,10 +923,10 @@ export const HighlightsDrawer: React.FC = () => {
                             style={{ marginLeft: '6px' }}
                           >
                             {exportScope === 'current'
-                              ? 'Current page'
+                              ? `Current page (${currentPageHighlights.length})`
                               : exportScope === 'all'
-                                ? 'All highlights'
-                                : 'Selected'}
+                                ? `All highlights (${allHighlights.length})`
+                                : `Selected (${exportSelectedIds.size})`}
                           </span>
                         </button>
                         {exportScopeError && (
@@ -938,7 +939,7 @@ export const HighlightsDrawer: React.FC = () => {
                           className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
                           style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
                         >
-                          Next ({exportSelectedIds.size})
+                          Next
                         </button>
                       </div>
                     </div>
