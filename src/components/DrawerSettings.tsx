@@ -11,7 +11,7 @@ const COLOR_OPTIONS = [
 ] as const;
 
 const buttonClass =
-  'w-full px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer flex items-center justify-center';
+  'px-4 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer flex items-center justify-center';
 
 const buttonStyle = {
   borderRadius: '8px',
@@ -87,7 +87,11 @@ export const DrawerSettings: React.FC = () => {
       {/* General */}
       <div className="flex flex-col gap-2">
         <span className="text-text-secondary text-xs font-light">General</span>
-        <button onClick={resetLogoPosition} className={buttonClass} style={buttonStyle}>
+        <button
+          onClick={resetLogoPosition}
+          className={`${buttonClass} self-start`}
+          style={buttonStyle}
+        >
           Reset position
         </button>
       </div>
@@ -106,6 +110,13 @@ export const DrawerSettings: React.FC = () => {
           >
             Restore
           </button>
+          <button
+            onClick={deleteAllHighlights}
+            className="px-4 text-sm font-light bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer flex items-center justify-center"
+            style={{ borderRadius: '8px', height: '32px' }}
+          >
+            Delete all
+          </button>
           <input
             ref={fileInputRef}
             type="file"
@@ -115,13 +126,6 @@ export const DrawerSettings: React.FC = () => {
           />
         </div>
         {restoreError && <p className="text-red-400 text-xs font-light">{restoreError}</p>}
-        <button
-          onClick={deleteAllHighlights}
-          className="w-full px-3 text-sm font-light bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer flex items-center justify-center"
-          style={{ borderRadius: '8px', height: '32px' }}
-        >
-          Delete all highlights
-        </button>
       </div>
     </div>
   );
