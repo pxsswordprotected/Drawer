@@ -43,6 +43,7 @@ export const DrawerSettings: React.FC = () => {
   const deleteAllHighlights = useDrawerStore((state) => state.deleteAllHighlights);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreSuccess, setRestoreSuccess] = useState(false);
 
   const [isHolding, setIsHolding] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
@@ -89,9 +90,9 @@ export const DrawerSettings: React.FC = () => {
     reader.onload = async () => {
       try {
         await importBackup(reader.result as string);
-        console.log('[restore] success');
-      } catch (err) {
-        console.log('[restore] error caught:', err);
+        setRestoreSuccess(true);
+        setTimeout(() => setRestoreSuccess(false), 2000);
+      } catch {
         setRestoreError(
           'Data could not be restored as the file format is not recognized. Please select a backup file that was exported from this extension.'
         );
@@ -142,13 +143,36 @@ export const DrawerSettings: React.FC = () => {
           <button onClick={handleBackup} className={buttonClass} style={buttonStyle}>
             Backup
           </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className={buttonClass}
-            style={buttonStyle}
-          >
-            Restore
-          </button>
+          {restoreSuccess ? (
+            <div
+              className="flex items-center justify-center"
+              style={{
+                borderRadius: '8px',
+                height: '32px',
+                width: '72px',
+                background: '#2a3a2a',
+                boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
+              }}
+            >
+              <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                <path
+                  d="M1 5.5L5 9.5L13 1.5"
+                  stroke="#4CAF50"
+                  strokeWidth="1.5"
+                  strokeLinejoin="miter"
+                  strokeLinecap="square"
+                />
+              </svg>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className={buttonClass}
+              style={buttonStyle}
+            >
+              Restore
+            </button>
+          )}
           <button
             onPointerDown={allHighlights.length > 0 ? startDelete : undefined}
             onPointerUp={allHighlights.length > 0 ? stopDelete : undefined}

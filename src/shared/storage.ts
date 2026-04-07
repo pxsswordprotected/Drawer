@@ -250,15 +250,16 @@ export class StorageService {
   async importHighlights(jsonString: string): Promise<void> {
     try {
       const data = JSON.parse(jsonString);
-      if (data.highlights && Array.isArray(data.highlights)) {
-        const existingHighlights = await this.getHighlights();
-        const merged = [...existingHighlights, ...data.highlights];
-        // Remove duplicates by ID
-        const unique = merged.filter(
-          (highlight, index, self) => index === self.findIndex((h) => h.id === highlight.id)
-        );
-        await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, unique);
+      if (!data.highlights || !Array.isArray(data.highlights)) {
+        throw new Error('Invalid backup format: missing highlights array');
       }
+      const existingHighlights = await this.getHighlights();
+      const merged = [...existingHighlights, ...data.highlights];
+      // Remove duplicates by ID
+      const unique = merged.filter(
+        (highlight, index, self) => index === self.findIndex((h) => h.id === highlight.id)
+      );
+      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, unique);
     } catch (error) {
       console.error('Failed to import highlights:', error);
       throw new Error('Invalid JSON format');
