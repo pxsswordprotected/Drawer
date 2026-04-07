@@ -607,6 +607,7 @@ export const HighlightsDrawer: React.FC = () => {
         <DrawerToolbar
           logoPosition={logoPosition}
           isExportActive={exportMode}
+          isSettingsActive={settingsMode}
           onExportToggle={() => {
             if (exportMode) {
               setExportExiting(true);

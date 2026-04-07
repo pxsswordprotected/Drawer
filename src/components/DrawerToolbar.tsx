@@ -6,6 +6,7 @@ import { DRAWER_CONFIG } from '../shared/constants';
 interface DrawerToolbarProps {
   logoPosition: { x: number; y: number };
   isExportActive: boolean;
+  isSettingsActive: boolean;
   onExportToggle: () => void;
   onSettingsClick: () => void;
 }
@@ -40,6 +41,7 @@ const iconButtonStyle = {
 export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
   logoPosition,
   isExportActive,
+  isSettingsActive,
   onExportToggle,
   onSettingsClick,
 }) => {
@@ -73,7 +75,7 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
     {/* Settings */}
     <button
       onClick={onSettingsClick}
-      className={`flex items-center justify-center cursor-pointer text-text-secondary hover:text-text-main transition-colors ${styles.iconButton}`}
+      className={`flex items-center justify-center cursor-pointer ${isSettingsActive ? 'text-text-main' : 'text-text-secondary'} hover:text-text-main transition-colors ${styles.iconButton}`}
       style={iconButtonStyle}
       aria-label="Settings"
     >
