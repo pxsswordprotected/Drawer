@@ -140,21 +140,21 @@ export const DrawerSettings: React.FC = () => {
       <div className="flex flex-col gap-2">
         <span className="text-text-secondary text-xs font-light">Data</span>
         <div className="flex items-center gap-2">
-          <button onClick={handleBackup} className={buttonClass} style={buttonStyle}>
+          <button
+            onClick={handleBackup}
+            className={`${buttonClass} ${allHighlights.length === 0 ? 'opacity-40 pointer-events-none' : ''}`}
+            style={buttonStyle}
+          >
             Backup
           </button>
-          {restoreSuccess ? (
-            <div
-              className="flex items-center justify-center"
-              style={{
-                borderRadius: '8px',
-                height: '32px',
-                width: '72px',
-                background: '#2a3a2a',
-                boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
-              }}
-            >
-              <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+          <button
+            onClick={() => !restoreSuccess && fileInputRef.current?.click()}
+            className={`${buttonClass} relative overflow-hidden`}
+            style={{ ...buttonStyle, background: restoreSuccess ? '#2a3a2a' : undefined }}
+          >
+            <span className={restoreSuccess ? 'invisible' : ''}>Restore</span>
+            {restoreSuccess && (
+              <svg className="absolute" width="14" height="11" viewBox="0 0 14 11" fill="none">
                 <path
                   d="M1 5.5L5 9.5L13 1.5"
                   stroke="#4CAF50"
@@ -163,16 +163,8 @@ export const DrawerSettings: React.FC = () => {
                   strokeLinecap="square"
                 />
               </svg>
-            </div>
-          ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className={buttonClass}
-              style={buttonStyle}
-            >
-              Restore
-            </button>
-          )}
+            )}
+          </button>
           <button
             onPointerDown={allHighlights.length > 0 ? startDelete : undefined}
             onPointerUp={allHighlights.length > 0 ? stopDelete : undefined}
