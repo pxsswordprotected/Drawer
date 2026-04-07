@@ -35,7 +35,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
   const handleCopy = useCallback(async () => {
     setCopyError(null);
-    const md = generateMarkdown(highlightsToExport, { includeNotes, includeTimestamps });
+    const md = generateMarkdown(highlightsToExport, { includeNotes, includeTimestamps, includePageTitles: true });
     try {
       await copyMarkdown(md);
       setDone(true);
@@ -47,7 +47,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
   const handleDownload = useCallback(() => {
     setCopyError(null);
-    const md = generateMarkdown(highlightsToExport, { includeNotes, includeTimestamps });
+    const md = generateMarkdown(highlightsToExport, { includeNotes, includeTimestamps, includePageTitles: true });
     downloadMarkdown(md);
     setDone(true);
     dismissTimer.current = setTimeout(() => onClose(), 1500);

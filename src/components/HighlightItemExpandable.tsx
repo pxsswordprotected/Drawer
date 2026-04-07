@@ -32,7 +32,9 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
 
   // Track previous expanded state to detect switch-collapse (another highlight selected)
   const prevExpandedRef = useRef(isExpanded);
-  useEffect(() => { prevExpandedRef.current = isExpanded; });
+  useEffect(() => {
+    prevExpandedRef.current = isExpanded;
+  });
   const isSwitchCollapse = prevExpandedRef.current && !isExpanded && selectedHighlightId != null;
 
   const sortedNotes = useMemo(
@@ -96,7 +98,13 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
       </div>
 
       <div
-        className={isExpanded ? styles.notesOuterExpanded : isSwitchCollapse ? styles.notesOuterInstant : styles.notesOuter}
+        className={
+          isExpanded
+            ? styles.notesOuterExpanded
+            : isSwitchCollapse
+              ? styles.notesOuterInstant
+              : styles.notesOuter
+        }
         aria-hidden={!isExpanded}
       >
         <div className={styles.notesInner} onClick={handleNotesClick}>
@@ -117,7 +125,10 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
               {sortedNotes.length > 0 && <div className="border-t border-divider" />}
 
               {sortedNotes.map((note, i) => (
-                <div key={note.id} className={`py-3 flex items-center ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}>
+                <div
+                  key={note.id}
+                  className={`py-3 flex items-center ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}
+                >
                   <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
                 </div>
               ))}

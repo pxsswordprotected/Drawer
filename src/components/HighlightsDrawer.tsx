@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { Highlight } from '@/shared/types';
 import { DRAWER_CONFIG } from '@/shared/constants';
@@ -97,6 +97,9 @@ export const HighlightsDrawer: React.FC = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const currentPageSectionRef = useRef<HTMLDivElement | null>(null);
+  const exportSelectRef = useRef<HTMLDivElement>(null);
+  const exportOptionsRef = useRef<HTMLDivElement>(null);
+  const [exportBarHeight, setExportBarHeight] = useState<number | undefined>(undefined);
   const [drawerStyle, setDrawerStyle] = useState<React.CSSProperties>({});
   const [innerStyle, setInnerStyle] = useState<React.CSSProperties>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -178,6 +181,20 @@ export const HighlightsDrawer: React.FC = () => {
     [allHighlights, exportSelectedIds]
   );
 
+  // Measure active export screen height for smooth container morph
+  useLayoutEffect(() => {
+    const activeRef = exportScreen === 'select' ? exportSelectRef : exportOptionsRef;
+    if (activeRef.current) {
+      setExportBarHeight(activeRef.current.scrollHeight);
+    }
+  }, [
+    exportMode,
+    exportScreen,
+    exportIncludeNotes,
+    exportIncludeTimestamps,
+    exportIncludePageTitles,
+  ]);
+
   const resetExportState = useCallback(() => {
     setExportMode(false);
     setExportScreen('select');
@@ -189,6 +206,7 @@ export const HighlightsDrawer: React.FC = () => {
     setExportIncludeNotes(true);
     setExportIncludeTimestamps(true);
     setExportIncludePageTitles(true);
+    setExportBarHeight(undefined);
   }, []);
 
   const handleExportCopy = useCallback(async () => {
@@ -207,7 +225,13 @@ export const HighlightsDrawer: React.FC = () => {
     } catch {
       /* silently fail */
     }
-  }, [highlightsToExport, exportIncludeNotes, exportIncludeTimestamps, exportIncludePageTitles, resetExportState]);
+  }, [
+    highlightsToExport,
+    exportIncludeNotes,
+    exportIncludeTimestamps,
+    exportIncludePageTitles,
+    resetExportState,
+  ]);
 
   const handleExportDownload = useCallback(() => {
     const md = generateMarkdown(highlightsToExport, {
@@ -221,7 +245,13 @@ export const HighlightsDrawer: React.FC = () => {
       setExportExiting(true);
       setTimeout(() => resetExportState(), 200);
     }, 1000);
-  }, [highlightsToExport, exportIncludeNotes, exportIncludeTimestamps, exportIncludePageTitles, resetExportState]);
+  }, [
+    highlightsToExport,
+    exportIncludeNotes,
+    exportIncludeTimestamps,
+    exportIncludePageTitles,
+    resetExportState,
+  ]);
 
   // Scroll intent tracking
   const scrollIntentRef = useRef<'programmatic' | null>(null);
@@ -253,6 +283,7 @@ export const HighlightsDrawer: React.FC = () => {
         setExportIncludeNotes(true);
         setExportIncludeTimestamps(true);
         setExportIncludePageTitles(true);
+        setExportBarHeight(undefined);
       }
     },
     [isClosing]
@@ -874,161 +905,183 @@ export const HighlightsDrawer: React.FC = () => {
                     width: '236px',
                   }}
                 >
-                  {exportScreen === 'select' ? (
-                    <div className="flex items-center justify-between">
-                      {/* Scope cycle button: vertical dots + active label */}
-                      <button
-                        onClick={cycleExportScope}
-                        className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5"
-                        style={{ background: 'none', border: 'none' }}
-                        aria-label={`Export scope: ${exportScope === 'current' ? 'Current page' : exportScope === 'all' ? 'All highlights' : 'Selected'}. Click to change.`}
-                      >
-                        <span className="flex flex-col items-center gap-1" aria-hidden="true">
-                          {(['current', 'all', 'selected'] as const).map((scope) => (
-                            <span
-                              key={scope}
-                              className={`block rounded-full transition-opacity ${
-                                exportScope === scope
-                                  ? 'w-1.5 h-1.5 bg-text-main'
-                                  : 'w-1 h-1 bg-text-secondary opacity-40'
-                              }`}
-                            />
-                          ))}
-                        </span>
-                        <span
-                          className="text-sm font-light text-text-main"
-                          style={{ marginLeft: '6px' }}
-                        >
-                          {exportScope === 'current'
-                            ? 'Current page'
-                            : exportScope === 'all'
-                              ? 'All highlights'
-                              : 'Selected'}
-                        </span>
-                      </button>
-                      {exportScopeError && (
-                        <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
-                      )}
-                      {/* Next button */}
-                      <button
-                        onClick={() => setExportScreen('options')}
-                        disabled={exportSelectedIds.size === 0}
-                        className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
-                        style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
-                      >
-                        Next ({exportSelectedIds.size})
-                      </button>
-                    </div>
-                  ) : (
+                  <div
+                    className={styles.exportScreenContainer}
+                    style={exportBarHeight ? { height: exportBarHeight } : undefined}
+                  >
+                    {/* Select screen */}
                     <div
-                      className="flex flex-col gap-2 pt-[7px] pl-[10px] pr-[2px]"
-                      style={{ marginBottom: '1px' }}
+                      ref={exportSelectRef}
+                      className={`${styles.exportScreen} ${exportScreen === 'select' ? styles.exportScreenActive : styles.exportScreenInactive}`}
                     >
-                      {/* Options */}
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-text-main text-sm font-light">Include notes</span>
-                        <input
-                          type="checkbox"
-                          checked={exportIncludeNotes}
-                          onChange={(e) => setExportIncludeNotes(e.target.checked)}
-                          className={styles.toggle}
-                        />
-                      </label>
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-text-main text-sm font-light">
-                          Include timestamps
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={exportIncludeTimestamps}
-                          onChange={(e) => setExportIncludeTimestamps(e.target.checked)}
-                          className={styles.toggle}
-                        />
-                      </label>
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-text-main text-sm font-light">
-                          Include page titles
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={exportIncludePageTitles}
-                          onChange={(e) => setExportIncludePageTitles(e.target.checked)}
-                          className={styles.toggle}
-                        />
-                      </label>
-                      {/* Back + Export action buttons */}
-                      <div className="flex gap-2">
-                        {/* Back arrow button */}
+                      <div className="flex items-center justify-between">
+                        {/* Scope cycle button: vertical dots + active label */}
                         <button
-                          onClick={() => setExportScreen('select')}
-                          disabled={exportSuccess !== null}
-                          className="flex items-center justify-center bg-[#373737] text-text-secondary hover:text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-                          style={{
-                            borderRadius: '8px',
-                            height: '32px',
-                            width: '32px',
-                            flexShrink: 0,
-                          }}
+                          onClick={cycleExportScope}
+                          className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5"
+                          style={{ background: 'none', border: 'none' }}
+                          aria-label={`Export scope: ${exportScope === 'current' ? 'Current page' : exportScope === 'all' ? 'All highlights' : 'Selected'}. Click to change.`}
                         >
-                          &larr;
+                          <span className="flex flex-col items-center gap-1" aria-hidden="true">
+                            {(['current', 'all', 'selected'] as const).map((scope) => (
+                              <span
+                                key={scope}
+                                className={`block rounded-full transition-opacity ${
+                                  exportScope === scope
+                                    ? 'w-1.5 h-1.5 bg-text-main'
+                                    : 'w-1 h-1 bg-text-secondary opacity-40'
+                                }`}
+                              />
+                            ))}
+                          </span>
+                          <span
+                            className="text-sm font-light text-text-main"
+                            style={{ marginLeft: '6px' }}
+                          >
+                            {exportScope === 'current'
+                              ? 'Current page'
+                              : exportScope === 'all'
+                                ? 'All highlights'
+                                : 'Selected'}
+                          </span>
                         </button>
-                        <div style={{ flex: '3 1 0', minWidth: 0 }}>
-                          {exportSuccess === 'copy' ? (
-                            <div
-                              className="w-full flex items-center justify-center"
-                              style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
-                            >
-                              <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
-                                <path
-                                  d="M1 5.5L5 9.5L13 1.5"
-                                  stroke="#4CAF50"
-                                  strokeWidth="1.5"
-                                  strokeLinejoin="miter"
-                                  strokeLinecap="square"
-                                />
-                              </svg>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={handleExportCopy}
-                              disabled={exportSuccess !== null}
-                              className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                              style={{ borderRadius: '8px', height: '32px' }}
-                            >
-                              Copy
-                            </button>
-                          )}
-                        </div>
-                        <div style={{ flex: '5 1 0', minWidth: 0 }}>
-                          {exportSuccess === 'download' ? (
-                            <div
-                              className="w-full flex items-center justify-center"
-                              style={{ borderRadius: '8px', height: '32px', background: '#2a3a2a' }}
-                            >
-                              <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
-                                <path
-                                  d="M1 5.5L5 9.5L13 1.5"
-                                  stroke="#4CAF50"
-                                  strokeWidth="1.5"
-                                  strokeLinejoin="miter"
-                                  strokeLinecap="square"
-                                />
-                              </svg>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={handleExportDownload}
-                              disabled={exportSuccess !== null}
-                              className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                              style={{ borderRadius: '8px', height: '32px' }}
-                            >
-                              Download
-                            </button>
-                          )}
+                        {exportScopeError && (
+                          <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
+                        )}
+                        {/* Next button */}
+                        <button
+                          onClick={() => setExportScreen('options')}
+                          disabled={exportSelectedIds.size === 0}
+                          className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
+                          style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
+                        >
+                          Next ({exportSelectedIds.size})
+                        </button>
+                      </div>
+                    </div>
+                    {/* Options screen */}
+                    <div
+                      ref={exportOptionsRef}
+                      className={`${styles.exportScreen} ${exportScreen === 'options' ? styles.exportScreenActive : styles.exportScreenInactive}`}
+                    >
+                      <div
+                        className="flex flex-col gap-2 pt-[7px] pl-[10px] pr-[2px]"
+                        style={{ marginBottom: '1px' }}
+                      >
+                        {/* Options */}
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-text-main text-sm font-light">Include notes</span>
+                          <input
+                            type="checkbox"
+                            checked={exportIncludeNotes}
+                            onChange={(e) => setExportIncludeNotes(e.target.checked)}
+                            className={styles.toggle}
+                          />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-text-main text-sm font-light">
+                            Include timestamps
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={exportIncludeTimestamps}
+                            onChange={(e) => setExportIncludeTimestamps(e.target.checked)}
+                            className={styles.toggle}
+                          />
+                        </label>
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-text-main text-sm font-light">
+                            Include page titles
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={exportIncludePageTitles}
+                            onChange={(e) => setExportIncludePageTitles(e.target.checked)}
+                            className={styles.toggle}
+                          />
+                        </label>
+                        {/* Back + Export action buttons */}
+                        <div className="flex gap-2">
+                          {/* Back arrow button */}
+                          <button
+                            onClick={() => setExportScreen('select')}
+                            disabled={exportSuccess !== null}
+                            className="flex items-center justify-center bg-[#373737] text-text-secondary hover:text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                            style={{
+                              borderRadius: '8px',
+                              height: '32px',
+                              width: '32px',
+                              flexShrink: 0,
+                            }}
+                          >
+                            &larr;
+                          </button>
+                          <div style={{ flex: '2 1 0', minWidth: 0 }}>
+                            {exportSuccess === 'copy' ? (
+                              <div
+                                className="w-full flex items-center justify-center"
+                                style={{
+                                  borderRadius: '8px',
+                                  height: '32px',
+                                  background: '#2a3a2a',
+                                }}
+                              >
+                                <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                                  <path
+                                    d="M1 5.5L5 9.5L13 1.5"
+                                    stroke="#4CAF50"
+                                    strokeWidth="1.5"
+                                    strokeLinejoin="miter"
+                                    strokeLinecap="square"
+                                  />
+                                </svg>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={handleExportCopy}
+                                disabled={exportSuccess !== null}
+                                className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                                style={{ borderRadius: '8px', height: '32px' }}
+                              >
+                                Copy
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ flex: '3 1 0', minWidth: 0 }}>
+                            {exportSuccess === 'download' ? (
+                              <div
+                                className="w-full flex items-center justify-center"
+                                style={{
+                                  borderRadius: '8px',
+                                  height: '32px',
+                                  background: '#2a3a2a',
+                                }}
+                              >
+                                <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                                  <path
+                                    d="M1 5.5L5 9.5L13 1.5"
+                                    stroke="#4CAF50"
+                                    strokeWidth="1.5"
+                                    strokeLinejoin="miter"
+                                    strokeLinecap="square"
+                                  />
+                                </svg>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={handleExportDownload}
+                                disabled={exportSuccess !== null}
+                                className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                                style={{ borderRadius: '8px', height: '32px' }}
+                              >
+                                Download
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
           </>
