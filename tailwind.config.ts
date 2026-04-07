@@ -8,7 +8,7 @@ export default {
         // Dark mode colors (default theme)
         bg: {
           main: '#1A1A1A', // Main background
-          elevated: '#242424', // Slightly lighter for cards/drawer
+          elevated: '#1A1A1A', // Matches toolbar background
         },
         text: {
           main: '#F5F5F5', // Main text
