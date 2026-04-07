@@ -1,5 +1,6 @@
 import React from 'react';
 import { Settings } from 'lucide-react';
+import styles from './DrawerToolbar.module.css';
 
 interface DrawerToolbarProps {
   logoPosition: { x: number; y: number };
@@ -51,7 +52,7 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
     {/* Export */}
     <button
       onClick={onExportToggle}
-      className="flex items-center justify-center cursor-pointer text-text-secondary hover:text-text-main transition-colors"
+      className={`flex items-center justify-center cursor-pointer text-text-secondary hover:text-text-main transition-colors ${styles.iconButton}`}
       style={iconButtonStyle}
       aria-label="Toggle export mode"
     >
@@ -62,7 +63,7 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
     {/* Settings */}
     <button
       onClick={onSettingsClick}
-      className="flex items-center justify-center cursor-pointer text-text-secondary hover:text-text-main transition-colors"
+      className={`flex items-center justify-center cursor-pointer text-text-secondary hover:text-text-main transition-colors ${styles.iconButton}`}
       style={iconButtonStyle}
       aria-label="Settings"
     >
