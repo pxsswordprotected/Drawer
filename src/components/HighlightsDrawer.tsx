@@ -676,10 +676,8 @@ export const HighlightsDrawer: React.FC = () => {
           onAnimationEnd={handleDrawerAnimationEnd}
           onKeyDown={handleKeyDown}
         >
-          {settingsMode ? (
-            <DrawerSettings />
-          ) : (
-            <>
+          {settingsMode && <DrawerSettings />}
+            <div style={{ display: settingsMode ? 'none' : undefined }} className="h-full">
               {/* Single scroll container with expandable items */}
               <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
                 <div
@@ -969,7 +967,7 @@ export const HighlightsDrawer: React.FC = () => {
                             onClick={() => setExportScreen('options')}
                             disabled={exportSelectedIds.size === 0}
                             className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
-                            style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
+                            style={{ borderRadius: '8px', height: '32px', paddingTop: '1px', boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)' }}
                           >
                             Next
                           </button>
@@ -1028,6 +1026,7 @@ export const HighlightsDrawer: React.FC = () => {
                                 height: '32px',
                                 width: '32px',
                                 flexShrink: 0,
+                                boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
                               }}
                             >
                               &larr;
@@ -1040,6 +1039,7 @@ export const HighlightsDrawer: React.FC = () => {
                                     borderRadius: '8px',
                                     height: '32px',
                                     background: '#2a3a2a',
+                                    boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
                                   }}
                                 >
                                   <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
@@ -1057,7 +1057,7 @@ export const HighlightsDrawer: React.FC = () => {
                                   onClick={handleExportCopy}
                                   disabled={exportSuccess !== null}
                                   className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                                  style={{ borderRadius: '8px', height: '32px' }}
+                                  style={{ borderRadius: '8px', height: '32px', boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)' }}
                                 >
                                   Copy
                                 </button>
@@ -1071,6 +1071,7 @@ export const HighlightsDrawer: React.FC = () => {
                                     borderRadius: '8px',
                                     height: '32px',
                                     background: '#2a3a2a',
+                                    boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
                                   }}
                                 >
                                   <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
@@ -1088,7 +1089,7 @@ export const HighlightsDrawer: React.FC = () => {
                                   onClick={handleExportDownload}
                                   disabled={exportSuccess !== null}
                                   className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                                  style={{ borderRadius: '8px', height: '32px' }}
+                                  style={{ borderRadius: '8px', height: '32px', boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)' }}
                                 >
                                   Download
                                 </button>
@@ -1100,8 +1101,7 @@ export const HighlightsDrawer: React.FC = () => {
                     </div>
                   </div>
                 )}
-            </>
-          )}
+            </div>
         </div>
       </div>
     </>
