@@ -19,6 +19,7 @@ export function useSelectionHandler() {
     y: 0,
     selectedText: '',
   });
+  const defaultColor = useDrawerStore((state) => state.defaultColor);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isDismissing, setIsDismissing] = useState(false);
@@ -110,7 +111,7 @@ export function useSelectionHandler() {
       url: window.location.href,
       pageTitle: document.title,
       notes: [],
-      color: DEFAULT_SETTINGS.defaultColor,
+      color: defaultColor,
       timestamp: Date.now(),
       position: {
         // Skip XPath tracking for v1 - just use empty values

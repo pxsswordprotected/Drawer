@@ -36,6 +36,7 @@ export const HighlightsDrawer: React.FC = () => {
     closeDrawer,
     drawerTrigger,
     loadAllHighlights,
+    loadSettings,
     selectedHighlightId,
     lastAddedHighlightId,
     clearLastAdded,
@@ -379,8 +380,9 @@ export const HighlightsDrawer: React.FC = () => {
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined') {
       loadAllHighlights();
+      loadSettings();
     }
-  }, [isOpen, loadAllHighlights]);
+  }, [isOpen, loadAllHighlights, loadSettings]);
 
   // Auto-expand current page group when drawer opens
   useEffect(() => {

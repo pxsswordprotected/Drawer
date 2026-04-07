@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Highlight, Note } from '@/shared/types';
 import { storageService } from '@/shared/storage';
+import { DEFAULT_SETTINGS } from '@/shared/constants';
 
 export type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
 
@@ -15,6 +16,7 @@ interface DrawerState {
   expandedGroupUrl: string | null;
   drawerTrigger: DrawerTrigger;
   logoResetCount: number;
+  defaultColor: string;
 
   openDrawer: (trigger: DrawerTrigger) => void;
   closeDrawer: () => void;
@@ -35,6 +37,8 @@ interface DrawerState {
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
   resetLogoPosition: () => void;
+  setDefaultColor: (color: string) => void;
+  loadSettings: () => Promise<void>;
 }
 
 // Request deduplication map - prevents duplicate concurrent requests
@@ -51,6 +55,7 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
   drawerTrigger: null,
   logoResetCount: 0,
+  defaultColor: DEFAULT_SETTINGS.defaultColor,
 
   openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger }),
   closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null, selectedHighlightId: null, drawerTrigger: null }),
@@ -147,6 +152,16 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   },
 
   resetLogoPosition: () => set((state) => ({ logoResetCount: state.logoResetCount + 1 })),
+
+  setDefaultColor: (color: string) => {
+    set({ defaultColor: color });
+    storageService.updateSettings({ defaultColor: color });
+  },
+
+  loadSettings: async () => {
+    const settings = await storageService.getSettings();
+    set({ defaultColor: settings.defaultColor });
+  },
 
   loadAllHighlights: async () => {
     if (loadingPromises.has('__all__')) {

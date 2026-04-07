@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export const HIGHLIGHT_COLORS = {
   yellow: '#FFEB3B',
   green: '#4CAF50',
+  orange: '#FF9800',
   blue: '#2196F3',
   pink: '#E91E63',
   purple: '#9C27B0',
