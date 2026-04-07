@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { HIGHLIGHT_COLORS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
@@ -27,6 +27,37 @@ export const DrawerSettings: React.FC = () => {
   const deleteAllHighlights = useDrawerStore((state) => state.deleteAllHighlights);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+
+  const [isHolding, setIsHolding] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startDelete = () => {
+    if (isDeleted) return;
+    setIsHolding(true);
+    holdTimerRef.current = setTimeout(() => {
+      setIsHolding(false);
+      setIsDeleted(true);
+      deleteAllHighlights();
+      resetTimerRef.current = setTimeout(() => {
+        setIsDeleted(false);
+      }, 2000);
+    }, 1000);
+  };
+
+  const stopDelete = () => {
+    if (isDeleted) return;
+    setIsHolding(false);
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, []);
 
   const handleBackup = async () => {
     const json = await storageService.exportHighlights();
@@ -111,11 +142,31 @@ export const DrawerSettings: React.FC = () => {
             Restore
           </button>
           <button
-            onClick={deleteAllHighlights}
-            className="px-4 text-sm font-light bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer flex items-center justify-center"
-            style={{ borderRadius: '8px', height: '32px' }}
+            onPointerDown={startDelete}
+            onPointerUp={stopDelete}
+            onPointerLeave={stopDelete}
+            className="px-4 text-sm font-light text-white cursor-pointer flex items-center justify-center overflow-hidden relative select-none"
+            style={{ borderRadius: '8px', height: '32px', backgroundColor: '#DC2626' }}
           >
-            Delete all
+            <span className={`relative z-10 ${isDeleted ? 'invisible' : ''}`}>Delete all</span>
+            {isDeleted && (
+              <span className="absolute inset-0 flex items-center justify-center z-10 text-white">Deleted</span>
+            )}
+            <div
+              aria-hidden
+              className="absolute -inset-px pointer-events-none"
+              style={{
+                backgroundColor: '#991b1b',
+                clipPath: isHolding || isDeleted
+                  ? 'inset(0px 0% 0px 0px)'
+                  : 'inset(0px 100% 0px 0px)',
+                transitionProperty: 'clip-path, background-color',
+                transitionDuration: isHolding ? '1000ms' : '400ms',
+                transitionTimingFunction: isHolding
+                  ? 'linear'
+                  : 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              }}
+            />
           </button>
           <input
             ref={fileInputRef}

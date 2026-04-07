@@ -707,16 +707,11 @@ export const HighlightsDrawer: React.FC = () => {
                     </>
                   ) : allHighlights.length === 0 ? (
                     <div className="flex flex-col gap-2 items-center justify-center h-full">
-                      <p className="text-text-main text-center text-md font-light">
+                      <p className={`text-center text-md transition-all duration-300 ${exportEmptyMessage ? 'font-normal text-red-300' : 'font-light text-text-main'}`}>
                         No highlights saved.
                         <br />
                         Select text on the page to start highlighting.
                       </p>
-                      {exportEmptyMessage && (
-                        <p className="text-text-secondary text-xs text-center font-light">
-                          Highlight text on a page to start exporting
-                        </p>
-                      )}
                     </div>
                   ) : (
                     (() => {
