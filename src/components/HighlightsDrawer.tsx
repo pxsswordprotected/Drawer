@@ -114,9 +114,9 @@ export const HighlightsDrawer: React.FC = () => {
   const [exportScope, setExportScope] = useState<ExportScope>('current');
   const [exportSelectedIds, setExportSelectedIds] = useState<Set<string>>(new Set());
   const [exportScopeError, setExportScopeError] = useState<string | null>(null);
-  const [exportIncludeNotes, setExportIncludeNotes] = useState(true);
-  const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(true);
-  const [exportIncludePageTitles, setExportIncludePageTitles] = useState(true);
+  const [exportIncludeNotes, setExportIncludeNotes] = useState(false);
+  const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(false);
+  const [exportIncludePageTitles, setExportIncludePageTitles] = useState(false);
 
   const currentPageHighlights = useMemo(
     () => allHighlights.filter((h) => h.url === currentUrl),
@@ -163,6 +163,7 @@ export const HighlightsDrawer: React.FC = () => {
         setExportSelectedIds(new Set());
       }
       setExportScope(newScope);
+      setExportIncludePageTitles(newScope !== 'current');
     },
     [currentPageHighlights, allHighlights]
   );
