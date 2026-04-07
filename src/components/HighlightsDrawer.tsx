@@ -120,6 +120,7 @@ export const HighlightsDrawer: React.FC = () => {
   const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(false);
   const [exportIncludePageTitles, setExportIncludePageTitles] = useState(false);
   const [settingsMode, setSettingsMode] = useState(false);
+  const [exportEmptyMessage, setExportEmptyMessage] = useState(false);
 
   const currentPageHighlights = useMemo(
     () => allHighlights.filter((h) => h.url === currentUrl),
@@ -527,6 +528,13 @@ export const HighlightsDrawer: React.FC = () => {
     setExpandedGroupUrl,
   ]);
 
+  // Exit settings when a mark is clicked on the page
+  useEffect(() => {
+    if (pendingScrollHighlightId && settingsMode) {
+      setSettingsMode(false);
+    }
+  }, [pendingScrollHighlightId, settingsMode]);
+
   // Scroll to highlight when triggered from page mark click
   useEffect(() => {
     if (!pendingScrollHighlightId || isLoading) return;
@@ -606,7 +614,7 @@ export const HighlightsDrawer: React.FC = () => {
   return (
     <>
       {/* Toolbar — fixed above draggable logo */}
-      {allHighlights.length > 0 && logoPosition && !isClosing && (
+      {logoPosition && !isClosing && (
         <DrawerToolbar
           logoPosition={logoPosition}
           isExportActive={exportMode}
@@ -615,6 +623,10 @@ export const HighlightsDrawer: React.FC = () => {
             if (exportMode) {
               setExportExiting(true);
               setTimeout(() => resetExportState(), 200);
+            } else if (allHighlights.length === 0) {
+              setSettingsMode(false);
+              setExportEmptyMessage(true);
+              setTimeout(() => setExportEmptyMessage(false), 3000);
             } else {
               setSettingsMode(false);
               setExportMode(true);
@@ -667,424 +679,431 @@ export const HighlightsDrawer: React.FC = () => {
           {settingsMode ? (
             <DrawerSettings />
           ) : (
-          <>
-            {/* Single scroll container with expandable items */}
-            <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
-              <div
-                className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${styles.highlightList}`}
-                data-has-expanded={selectedHighlightId ? '' : undefined}
-                data-group-expanded={expandedGroupUrl ? '' : undefined}
-                data-export-mode={exportMode && !exportExiting ? '' : undefined}
-              >
-                {isLoading ? (
-                  <>
-                    <div
-                      className="bg-[#373737] rounded-md animate-pulse"
-                      style={{ height: '64px' }}
-                    />
-                    <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                    <div
-                      className="bg-[#373737] rounded-md animate-pulse"
-                      style={{ height: '48px' }}
-                    />
-                    <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-                    <div
-                      className="bg-[#373737] rounded-md animate-pulse"
-                      style={{ height: '56px' }}
-                    />
-                  </>
-                ) : allHighlights.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <p className="text-text-secondary text-center">No highlights saved</p>
-                  </div>
-                ) : (
-                  (() => {
-                    let hiddenHighlightsBefore = 0;
-                    return pageGroups.map((group, groupIndex) => {
-                      const isCollapsed = expandedGroupUrl !== group.url;
-                      const rawGlobalIndex =
-                        highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0;
-                      const effectiveIndex = Math.max(0, rawGlobalIndex - hiddenHighlightsBefore);
-                      const correctedDelay = STAGGER_BASE + effectiveIndex * STAGGER_PER_ITEM;
-                      if (isCollapsed) {
-                        hiddenHighlightsBefore += group.highlights.length;
-                      }
-                      return (
-                        <React.Fragment key={group.url}>
-                          {groupIndex > 0 &&
-                            expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
-                              <div
-                                className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
-                                style={{
-                                  width: '300px',
-                                  ...(isStaggering
-                                    ? {
-                                        animationDelay: `${correctedDelay}ms`,
-                                      }
-                                    : {}),
-                                }}
-                              />
-                            )}
-                          <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
-                            {/* Section header — only when multiple page groups exist */}
-                            {(pageGroups.length > 1 || group.isCurrentPage) && (
-                              <div
-                                data-item-expanded={!isCollapsed ? '' : undefined}
-                                data-export-selected={
-                                  exportMode &&
-                                  group.highlights.some((h) => exportSelectedIds.has(h.id))
-                                    ? ''
-                                    : undefined
-                                }
-                                className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
-                                style={
-                                  isStaggering
-                                    ? {
-                                        animationDelay: `${correctedDelay}ms`,
-                                      }
-                                    : undefined
-                                }
-                              >
+            <>
+              {/* Single scroll container with expandable items */}
+              <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
+                <div
+                  className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${styles.highlightList}`}
+                  data-has-expanded={selectedHighlightId ? '' : undefined}
+                  data-group-expanded={expandedGroupUrl ? '' : undefined}
+                  data-export-mode={exportMode && !exportExiting ? '' : undefined}
+                >
+                  {isLoading ? (
+                    <>
+                      <div
+                        className="bg-[#373737] rounded-md animate-pulse"
+                        style={{ height: '64px' }}
+                      />
+                      <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                      <div
+                        className="bg-[#373737] rounded-md animate-pulse"
+                        style={{ height: '48px' }}
+                      />
+                      <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+                      <div
+                        className="bg-[#373737] rounded-md animate-pulse"
+                        style={{ height: '56px' }}
+                      />
+                    </>
+                  ) : allHighlights.length === 0 ? (
+                    <div className="flex flex-col gap-2 items-center justify-center h-full">
+                      <p className="text-text-secondary text-center">
+                        No highlights saved. Select text on the page to start highlighting.
+                      </p>
+                      {exportEmptyMessage && (
+                        <p className="text-text-secondary text-xs text-center font-light">
+                          Highlight text on a page to start exporting
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    (() => {
+                      let hiddenHighlightsBefore = 0;
+                      return pageGroups.map((group, groupIndex) => {
+                        const isCollapsed = expandedGroupUrl !== group.url;
+                        const rawGlobalIndex =
+                          highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0;
+                        const effectiveIndex = Math.max(0, rawGlobalIndex - hiddenHighlightsBefore);
+                        const correctedDelay = STAGGER_BASE + effectiveIndex * STAGGER_PER_ITEM;
+                        if (isCollapsed) {
+                          hiddenHighlightsBefore += group.highlights.length;
+                        }
+                        return (
+                          <React.Fragment key={group.url}>
+                            {groupIndex > 0 &&
+                              expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
                                 <div
-                                  data-page-header
-                                  className={styles.pageHeader}
-                                  onClick={(e) => {
-                                    // Always clear selected highlight when switching pages
-                                    if (selectedHighlightId) {
-                                      clearSelectedHighlight();
-                                    }
-                                    const isClosing = !isCollapsed;
-                                    toggleGroupExpanded(group.url);
-                                    if (isClosing) {
-                                      handleStaggerEnd();
-                                    }
-                                    if (isCollapsed) {
-                                      const headerEl = e.currentTarget as HTMLElement;
-                                      requestAnimationFrame(() => scrollTo(headerEl));
-                                    }
-                                  }}
-                                >
-                                  {exportMode &&
-                                    (() => {
-                                      const allInGroup = group.highlights.every((h) =>
-                                        exportSelectedIds.has(h.id)
-                                      );
-                                      const someInGroup = group.highlights.some((h) =>
-                                        exportSelectedIds.has(h.id)
-                                      );
-                                      return (
-                                        <input
-                                          type="checkbox"
-                                          checked={allInGroup}
-                                          ref={(el) => {
-                                            if (el) el.indeterminate = someInGroup && !allInGroup;
-                                          }}
-                                          onChange={(e) => {
-                                            e.stopPropagation();
-                                            toggleExportPage(group.highlights);
-                                          }}
-                                          onClick={(e) => e.stopPropagation()}
-                                          disabled={exportScreen === 'options'}
-                                          className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
-                                          style={{
-                                            position: 'absolute',
-                                            left: -24,
-                                            top: '5px',
-                                          }}
-                                        />
-                                      );
-                                    })()}
-                                  <p
-                                    className={`text-base ${styles.pageTitle} ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
-                                  >
-                                    {group.pageTitle || group.url}
-                                  </p>
-                                  {!exportMode && (
-                                    <div
-                                      className={styles.pageTrashIcon}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        deletePageGroup(group.url);
-                                      }}
-                                    >
-                                      <TrashIcon size={14} className="text-text-secondary" />
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Highlights within this group */}
-                            {!isCollapsed &&
-                              group.highlights.map((highlight, i) => {
-                                const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
-                                const isLastInGroup = i === group.highlights.length - 1;
-                                return (
-                                  <React.Fragment key={highlight.id}>
-                                    <div
-                                      ref={(el) => (itemRefs.current[globalIdx] = el)}
-                                      data-item-expanded={
-                                        selectedHighlightId === highlight.id ? '' : undefined
-                                      }
-                                      data-export-selected={
-                                        exportMode && exportSelectedIds.has(highlight.id)
-                                          ? ''
-                                          : undefined
-                                      }
-                                      className={
-                                        selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'
-                                      }
-                                    >
-                                      <HighlightItemExpandable
-                                        checkboxSlot={
-                                          exportMode ? (
-                                            <input
-                                              type="checkbox"
-                                              checked={exportSelectedIds.has(highlight.id)}
-                                              onChange={() => toggleExportHighlight(highlight.id)}
-                                              onClick={(e) => e.stopPropagation()}
-                                              disabled={exportScreen === 'options'}
-                                              className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
-                                              style={{
-                                                position: 'absolute',
-                                                left: -24,
-                                                top: '5px',
-                                              }}
-                                            />
-                                          ) : undefined
+                                  className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+                                  style={{
+                                    width: '300px',
+                                    ...(isStaggering
+                                      ? {
+                                          animationDelay: `${correctedDelay}ms`,
                                         }
-                                        highlight={highlight}
-                                        index={globalIdx}
-                                        onScrollToItem={(idx: number) => {
-                                          const el = itemRefs.current[idx];
-                                          if (el) scrollTo(el);
+                                      : {}),
+                                  }}
+                                />
+                              )}
+                            <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
+                              {/* Section header — only when multiple page groups exist */}
+                              {(pageGroups.length > 1 || group.isCurrentPage) && (
+                                <div
+                                  data-item-expanded={!isCollapsed ? '' : undefined}
+                                  data-export-selected={
+                                    exportMode &&
+                                    group.highlights.some((h) => exportSelectedIds.has(h.id))
+                                      ? ''
+                                      : undefined
+                                  }
+                                  className={`pt-4 ${isCollapsed ? 'pb-4' : 'pb-2'} ${isStaggering ? styles.staggerEntry : ''}`}
+                                  style={
+                                    isStaggering
+                                      ? {
+                                          animationDelay: `${correctedDelay}ms`,
+                                        }
+                                      : undefined
+                                  }
+                                >
+                                  <div
+                                    data-page-header
+                                    className={styles.pageHeader}
+                                    onClick={(e) => {
+                                      // Always clear selected highlight when switching pages
+                                      if (selectedHighlightId) {
+                                        clearSelectedHighlight();
+                                      }
+                                      const isClosing = !isCollapsed;
+                                      toggleGroupExpanded(group.url);
+                                      if (isClosing) {
+                                        handleStaggerEnd();
+                                      }
+                                      if (isCollapsed) {
+                                        const headerEl = e.currentTarget as HTMLElement;
+                                        requestAnimationFrame(() => scrollTo(headerEl));
+                                      }
+                                    }}
+                                  >
+                                    {exportMode &&
+                                      (() => {
+                                        const allInGroup = group.highlights.every((h) =>
+                                          exportSelectedIds.has(h.id)
+                                        );
+                                        const someInGroup = group.highlights.some((h) =>
+                                          exportSelectedIds.has(h.id)
+                                        );
+                                        return (
+                                          <input
+                                            type="checkbox"
+                                            checked={allInGroup}
+                                            ref={(el) => {
+                                              if (el) el.indeterminate = someInGroup && !allInGroup;
+                                            }}
+                                            onChange={(e) => {
+                                              e.stopPropagation();
+                                              toggleExportPage(group.highlights);
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            disabled={exportScreen === 'options'}
+                                            className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
+                                            style={{
+                                              position: 'absolute',
+                                              left: -24,
+                                              top: '5px',
+                                            }}
+                                          />
+                                        );
+                                      })()}
+                                    <p
+                                      className={`text-base ${styles.pageTitle} ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
+                                    >
+                                      {group.pageTitle || group.url}
+                                    </p>
+                                    {!exportMode && (
+                                      <div
+                                        className={styles.pageTrashIcon}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deletePageGroup(group.url);
                                         }}
-                                        isStaggering={isStaggering}
-                                        onStaggerEnd={
-                                          isLastInGroup && !isCollapsed
-                                            ? handleStaggerEnd
+                                      >
+                                        <TrashIcon size={14} className="text-text-secondary" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Highlights within this group */}
+                              {!isCollapsed &&
+                                group.highlights.map((highlight, i) => {
+                                  const globalIdx = highlightGlobalIndices.map.get(highlight.id)!;
+                                  const isLastInGroup = i === group.highlights.length - 1;
+                                  return (
+                                    <React.Fragment key={highlight.id}>
+                                      <div
+                                        ref={(el) => (itemRefs.current[globalIdx] = el)}
+                                        data-item-expanded={
+                                          selectedHighlightId === highlight.id ? '' : undefined
+                                        }
+                                        data-export-selected={
+                                          exportMode && exportSelectedIds.has(highlight.id)
+                                            ? ''
                                             : undefined
                                         }
-                                        hideActions={exportMode}
-                                      />
-                                    </div>
-                                    {!isLastInGroup && selectedHighlightId !== highlight.id && (
-                                      <div
-                                        className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
-                                        style={{
-                                          width: '300px',
-                                          ...(isStaggering
-                                            ? {
-                                                animationDelay: `${STAGGER_BASE + globalIdx * STAGGER_PER_ITEM + 17}ms`,
-                                              }
-                                            : {}),
-                                        }}
-                                      />
-                                    )}
-                                  </React.Fragment>
-                                );
-                              })}
-                          </div>
-                        </React.Fragment>
-                      );
-                    });
-                  })()
-                )}
+                                        className={
+                                          selectedHighlightId === highlight.id ? 'pt-4' : 'py-4'
+                                        }
+                                      >
+                                        <HighlightItemExpandable
+                                          checkboxSlot={
+                                            exportMode ? (
+                                              <input
+                                                type="checkbox"
+                                                checked={exportSelectedIds.has(highlight.id)}
+                                                onChange={() => toggleExportHighlight(highlight.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                disabled={exportScreen === 'options'}
+                                                className={`${styles.checkbox} ${exportExiting ? styles.checkboxExiting : styles.checkboxEntering}`}
+                                                style={{
+                                                  position: 'absolute',
+                                                  left: -24,
+                                                  top: '5px',
+                                                }}
+                                              />
+                                            ) : undefined
+                                          }
+                                          highlight={highlight}
+                                          index={globalIdx}
+                                          onScrollToItem={(idx: number) => {
+                                            const el = itemRefs.current[idx];
+                                            if (el) scrollTo(el);
+                                          }}
+                                          isStaggering={isStaggering}
+                                          onStaggerEnd={
+                                            isLastInGroup && !isCollapsed
+                                              ? handleStaggerEnd
+                                              : undefined
+                                          }
+                                          hideActions={exportMode}
+                                        />
+                                      </div>
+                                      {!isLastInGroup && selectedHighlightId !== highlight.id && (
+                                        <div
+                                          className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
+                                          style={{
+                                            width: '300px',
+                                            ...(isStaggering
+                                              ? {
+                                                  animationDelay: `${STAGGER_BASE + globalIdx * STAGGER_PER_ITEM + 17}ms`,
+                                                }
+                                              : {}),
+                                          }}
+                                        />
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                            </div>
+                          </React.Fragment>
+                        );
+                      });
+                    })()
+                  )}
+                </div>
               </div>
-            </div>
-            {/* Floating export bar */}
-            {exportMode &&
-              !isLoading &&
-              allHighlights.length > 0 &&
-              !(exportExiting && !exportSuccess) && (
-                <div
-                  className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg pl-[6px] pr-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
-                  style={{
-                    zIndex: 10,
-                    boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
-                    width: '236px',
-                  }}
-                >
+              {/* Floating export bar */}
+              {exportMode &&
+                !isLoading &&
+                allHighlights.length > 0 &&
+                !(exportExiting && !exportSuccess) && (
                   <div
-                    className={styles.exportScreenContainer}
-                    style={exportBarHeight ? { height: exportBarHeight } : undefined}
+                    className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg pl-[6px] pr-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
+                    style={{
+                      zIndex: 10,
+                      boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
+                      width: '236px',
+                    }}
                   >
-                    {/* Select screen */}
                     <div
-                      ref={exportSelectRef}
-                      className={`${styles.exportScreen} ${exportScreen === 'select' ? styles.exportScreenActive : styles.exportScreenInactive}`}
+                      className={styles.exportScreenContainer}
+                      style={exportBarHeight ? { height: exportBarHeight } : undefined}
                     >
-                      <div className="flex items-center justify-between">
-                        {/* Scope cycle button: vertical dots + active label */}
-                        <button
-                          onClick={cycleExportScope}
-                          className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5"
-                          style={{ background: 'none', border: 'none' }}
-                          aria-label={`Export scope: ${exportScope === 'current' ? 'Current page' : exportScope === 'all' ? 'All highlights' : 'Selected'}. Click to change.`}
-                        >
-                          <span className="flex flex-col items-center gap-1" aria-hidden="true">
-                            {(['current', 'all', 'selected'] as const).map((scope) => (
-                              <span
-                                key={scope}
-                                className={`block rounded-full transition-opacity ${
-                                  exportScope === scope
-                                    ? 'w-1.5 h-1.5 bg-text-main'
-                                    : 'w-1 h-1 bg-text-secondary opacity-40'
-                                }`}
-                              />
-                            ))}
-                          </span>
-                          <span
-                            className="text-sm font-light text-text-main"
-                            style={{ marginLeft: '6px' }}
-                          >
-                            {exportScope === 'current'
-                              ? `Current page (${currentPageHighlights.length})`
-                              : exportScope === 'all'
-                                ? `All highlights (${allHighlights.length})`
-                                : `Selected (${exportSelectedIds.size})`}
-                          </span>
-                        </button>
-                        {exportScopeError && (
-                          <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
-                        )}
-                        {/* Next button */}
-                        <button
-                          onClick={() => setExportScreen('options')}
-                          disabled={exportSelectedIds.size === 0}
-                          className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
-                          style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
-                    {/* Options screen */}
-                    <div
-                      ref={exportOptionsRef}
-                      className={`${styles.exportScreen} ${exportScreen === 'options' ? styles.exportScreenActive : styles.exportScreenInactive}`}
-                    >
+                      {/* Select screen */}
                       <div
-                        className="flex flex-col gap-2 pt-[7px] pl-[10px] pr-[2px]"
-                        style={{ marginBottom: '1px' }}
+                        ref={exportSelectRef}
+                        className={`${styles.exportScreen} ${exportScreen === 'select' ? styles.exportScreenActive : styles.exportScreenInactive}`}
                       >
-                        {/* Options */}
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-text-main text-sm font-light">Include notes</span>
-                          <input
-                            type="checkbox"
-                            checked={exportIncludeNotes}
-                            onChange={(e) => setExportIncludeNotes(e.target.checked)}
-                            className={styles.toggle}
-                          />
-                        </label>
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-text-main text-sm font-light">
-                            Include timestamps
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={exportIncludeTimestamps}
-                            onChange={(e) => setExportIncludeTimestamps(e.target.checked)}
-                            className={styles.toggle}
-                          />
-                        </label>
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-text-main text-sm font-light">
-                            Include page titles
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={exportIncludePageTitles}
-                            onChange={(e) => setExportIncludePageTitles(e.target.checked)}
-                            className={styles.toggle}
-                          />
-                        </label>
-                        {/* Back + Export action buttons */}
-                        <div className="flex gap-2">
-                          {/* Back arrow button */}
+                        <div className="flex items-center justify-between">
+                          {/* Scope cycle button: vertical dots + active label */}
                           <button
-                            onClick={() => setExportScreen('select')}
-                            disabled={exportSuccess !== null}
-                            className="flex items-center justify-center bg-[#373737] text-text-secondary hover:text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
-                            style={{
-                              borderRadius: '8px',
-                              height: '32px',
-                              width: '32px',
-                              flexShrink: 0,
-                            }}
+                            onClick={cycleExportScope}
+                            className="flex items-center gap-1.5 cursor-pointer px-2 py-1.5"
+                            style={{ background: 'none', border: 'none' }}
+                            aria-label={`Export scope: ${exportScope === 'current' ? 'Current page' : exportScope === 'all' ? 'All highlights' : 'Selected'}. Click to change.`}
                           >
-                            &larr;
+                            <span className="flex flex-col items-center gap-1" aria-hidden="true">
+                              {(['current', 'all', 'selected'] as const).map((scope) => (
+                                <span
+                                  key={scope}
+                                  className={`block rounded-full transition-opacity ${
+                                    exportScope === scope
+                                      ? 'w-1.5 h-1.5 bg-text-main'
+                                      : 'w-1 h-1 bg-text-secondary opacity-40'
+                                  }`}
+                                />
+                              ))}
+                            </span>
+                            <span
+                              className="text-sm font-light text-text-main"
+                              style={{ marginLeft: '6px' }}
+                            >
+                              {exportScope === 'current'
+                                ? `Current page (${currentPageHighlights.length})`
+                                : exportScope === 'all'
+                                  ? `All highlights (${allHighlights.length})`
+                                  : `Selected (${exportSelectedIds.size})`}
+                            </span>
                           </button>
-                          <div style={{ flex: '2 1 0', minWidth: 0 }}>
-                            {exportSuccess === 'copy' ? (
-                              <div
-                                className="w-full flex items-center justify-center"
-                                style={{
-                                  borderRadius: '8px',
-                                  height: '32px',
-                                  background: '#2a3a2a',
-                                }}
-                              >
-                                <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
-                                  <path
-                                    d="M1 5.5L5 9.5L13 1.5"
-                                    stroke="#4CAF50"
-                                    strokeWidth="1.5"
-                                    strokeLinejoin="miter"
-                                    strokeLinecap="square"
-                                  />
-                                </svg>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={handleExportCopy}
-                                disabled={exportSuccess !== null}
-                                className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                                style={{ borderRadius: '8px', height: '32px' }}
-                              >
-                                Copy
-                              </button>
-                            )}
-                          </div>
-                          <div style={{ flex: '3 1 0', minWidth: 0 }}>
-                            {exportSuccess === 'download' ? (
-                              <div
-                                className="w-full flex items-center justify-center"
-                                style={{
-                                  borderRadius: '8px',
-                                  height: '32px',
-                                  background: '#2a3a2a',
-                                }}
-                              >
-                                <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
-                                  <path
-                                    d="M1 5.5L5 9.5L13 1.5"
-                                    stroke="#4CAF50"
-                                    strokeWidth="1.5"
-                                    strokeLinejoin="miter"
-                                    strokeLinecap="square"
-                                  />
-                                </svg>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={handleExportDownload}
-                                disabled={exportSuccess !== null}
-                                className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                                style={{ borderRadius: '8px', height: '32px' }}
-                              >
-                                Download
-                              </button>
-                            )}
+                          {exportScopeError && (
+                            <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
+                          )}
+                          {/* Next button */}
+                          <button
+                            onClick={() => setExportScreen('options')}
+                            disabled={exportSelectedIds.size === 0}
+                            className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
+                            style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                      {/* Options screen */}
+                      <div
+                        ref={exportOptionsRef}
+                        className={`${styles.exportScreen} ${exportScreen === 'options' ? styles.exportScreenActive : styles.exportScreenInactive}`}
+                      >
+                        <div
+                          className="flex flex-col gap-2 pt-[7px] pl-[10px] pr-[2px]"
+                          style={{ marginBottom: '1px' }}
+                        >
+                          {/* Options */}
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-text-main text-sm font-light">Include notes</span>
+                            <input
+                              type="checkbox"
+                              checked={exportIncludeNotes}
+                              onChange={(e) => setExportIncludeNotes(e.target.checked)}
+                              className={styles.toggle}
+                            />
+                          </label>
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-text-main text-sm font-light">
+                              Include timestamps
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={exportIncludeTimestamps}
+                              onChange={(e) => setExportIncludeTimestamps(e.target.checked)}
+                              className={styles.toggle}
+                            />
+                          </label>
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-text-main text-sm font-light">
+                              Include page titles
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={exportIncludePageTitles}
+                              onChange={(e) => setExportIncludePageTitles(e.target.checked)}
+                              className={styles.toggle}
+                            />
+                          </label>
+                          {/* Back + Export action buttons */}
+                          <div className="flex gap-2">
+                            {/* Back arrow button */}
+                            <button
+                              onClick={() => setExportScreen('select')}
+                              disabled={exportSuccess !== null}
+                              className="flex items-center justify-center bg-[#373737] text-text-secondary hover:text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                              style={{
+                                borderRadius: '8px',
+                                height: '32px',
+                                width: '32px',
+                                flexShrink: 0,
+                              }}
+                            >
+                              &larr;
+                            </button>
+                            <div style={{ flex: '2 1 0', minWidth: 0 }}>
+                              {exportSuccess === 'copy' ? (
+                                <div
+                                  className="w-full flex items-center justify-center"
+                                  style={{
+                                    borderRadius: '8px',
+                                    height: '32px',
+                                    background: '#2a3a2a',
+                                  }}
+                                >
+                                  <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                                    <path
+                                      d="M1 5.5L5 9.5L13 1.5"
+                                      stroke="#4CAF50"
+                                      strokeWidth="1.5"
+                                      strokeLinejoin="miter"
+                                      strokeLinecap="square"
+                                    />
+                                  </svg>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={handleExportCopy}
+                                  disabled={exportSuccess !== null}
+                                  className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                                  style={{ borderRadius: '8px', height: '32px' }}
+                                >
+                                  Copy
+                                </button>
+                              )}
+                            </div>
+                            <div style={{ flex: '3 1 0', minWidth: 0 }}>
+                              {exportSuccess === 'download' ? (
+                                <div
+                                  className="w-full flex items-center justify-center"
+                                  style={{
+                                    borderRadius: '8px',
+                                    height: '32px',
+                                    background: '#2a3a2a',
+                                  }}
+                                >
+                                  <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
+                                    <path
+                                      d="M1 5.5L5 9.5L13 1.5"
+                                      stroke="#4CAF50"
+                                      strokeWidth="1.5"
+                                      strokeLinejoin="miter"
+                                      strokeLinecap="square"
+                                    />
+                                  </svg>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={handleExportDownload}
+                                  disabled={exportSuccess !== null}
+                                  className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                                  style={{ borderRadius: '8px', height: '32px' }}
+                                >
+                                  Download
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-          </>
+                )}
+            </>
           )}
         </div>
       </div>

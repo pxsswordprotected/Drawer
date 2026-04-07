@@ -20,6 +20,7 @@ export const DrawerSettings: React.FC = () => {
   const defaultColor = useDrawerStore((state) => state.defaultColor);
   const setDefaultColor = useDrawerStore((state) => state.setDefaultColor);
   const importBackup = useDrawerStore((state) => state.importBackup);
+  const deleteAllHighlights = useDrawerStore((state) => state.deleteAllHighlights);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
 
@@ -105,6 +106,14 @@ export const DrawerSettings: React.FC = () => {
         </div>
         {restoreError && <p className="text-red-400 text-xs font-light">{restoreError}</p>}
       </div>
+
+      <button
+        onClick={deleteAllHighlights}
+        className="px-3 text-sm font-light bg-red-600 text-white hover:bg-red-700 transition-colors cursor-pointer flex items-center justify-center"
+        style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
+      >
+        Delete all highlights
+      </button>
     </div>
   );
 };

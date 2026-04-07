@@ -40,6 +40,7 @@ interface DrawerState {
   setDefaultColor: (color: string) => void;
   loadSettings: () => Promise<void>;
   importBackup: (jsonString: string) => Promise<void>;
+  deleteAllHighlights: () => Promise<void>;
 }
 
 // Request deduplication map - prevents duplicate concurrent requests
@@ -162,6 +163,11 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   loadSettings: async () => {
     const settings = await storageService.getSettings();
     set({ defaultColor: settings.defaultColor });
+  },
+
+  deleteAllHighlights: async () => {
+    await storageService.clearAllHighlights();
+    set({ allHighlights: [], selectedHighlightId: null, expandedGroupUrl: null });
   },
 
   importBackup: async (jsonString: string) => {
