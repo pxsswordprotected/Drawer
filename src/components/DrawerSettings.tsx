@@ -23,6 +23,7 @@ export const DrawerSettings: React.FC = () => {
   const resetLogoPosition = useDrawerStore((state) => state.resetLogoPosition);
   const defaultColor = useDrawerStore((state) => state.defaultColor);
   const setDefaultColor = useDrawerStore((state) => state.setDefaultColor);
+  const allHighlights = useDrawerStore((state) => state.allHighlights);
   const importBackup = useDrawerStore((state) => state.importBackup);
   const deleteAllHighlights = useDrawerStore((state) => state.deleteAllHighlights);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -142,10 +143,10 @@ export const DrawerSettings: React.FC = () => {
             Restore
           </button>
           <button
-            onPointerDown={startDelete}
-            onPointerUp={stopDelete}
-            onPointerLeave={stopDelete}
-            className="px-4 text-sm font-light text-white cursor-pointer flex items-center justify-center overflow-hidden relative select-none"
+            onPointerDown={allHighlights.length > 0 ? startDelete : undefined}
+            onPointerUp={allHighlights.length > 0 ? stopDelete : undefined}
+            onPointerLeave={allHighlights.length > 0 ? stopDelete : undefined}
+            className={`px-4 text-sm font-light text-white flex items-center justify-center overflow-hidden relative select-none ${allHighlights.length > 0 || isDeleted ? 'cursor-pointer' : 'opacity-40 pointer-events-none'}`}
             style={{ borderRadius: '8px', height: '32px', backgroundColor: '#DC2626' }}
           >
             <span className={`relative z-10 ${isDeleted ? 'invisible' : ''}`}>Delete all</span>
