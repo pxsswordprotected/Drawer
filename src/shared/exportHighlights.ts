@@ -82,6 +82,21 @@ export function downloadMarkdown(md: string): void {
   }, 100);
 }
 
+export function downloadJson(json: string): void {
+  const blob = new Blob([json], { type: 'application/json' });
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = `highlights-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(objUrl);
+    a.remove();
+  }, 100);
+}
+
 export function copyMarkdown(md: string): Promise<void> {
   return navigator.clipboard.writeText(md);
 }
