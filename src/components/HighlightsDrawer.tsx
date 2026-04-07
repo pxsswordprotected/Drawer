@@ -9,6 +9,7 @@ import { TrashIcon } from '@/shared/TrashIcon';
 import { ExportScope } from './ExportPanel';
 import { DrawerToolbar } from './DrawerToolbar';
 import { generateMarkdown, downloadMarkdown, copyMarkdown } from '@/shared/exportHighlights';
+import { DrawerSettings } from './DrawerSettings';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -117,6 +118,7 @@ export const HighlightsDrawer: React.FC = () => {
   const [exportIncludeNotes, setExportIncludeNotes] = useState(false);
   const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(false);
   const [exportIncludePageTitles, setExportIncludePageTitles] = useState(false);
+  const [settingsMode, setSettingsMode] = useState(false);
 
   const currentPageHighlights = useMemo(
     () => allHighlights.filter((h) => h.url === currentUrl),
@@ -610,6 +612,7 @@ export const HighlightsDrawer: React.FC = () => {
               setExportExiting(true);
               setTimeout(() => resetExportState(), 200);
             } else {
+              setSettingsMode(false);
               setExportMode(true);
               if (currentPageHighlights.length > 0) {
                 setExportScope('current');
@@ -620,7 +623,12 @@ export const HighlightsDrawer: React.FC = () => {
               }
             }
           }}
-          onSettingsClick={() => {}}
+          onSettingsClick={() => {
+            if (!settingsMode && exportMode) {
+              resetExportState();
+            }
+            setSettingsMode((prev) => !prev);
+          }}
         />
       )}
       {/* Outer div — positioning only, translate updated by FAB rAF */}
@@ -652,6 +660,9 @@ export const HighlightsDrawer: React.FC = () => {
           onAnimationEnd={handleDrawerAnimationEnd}
           onKeyDown={handleKeyDown}
         >
+          {settingsMode ? (
+            <DrawerSettings />
+          ) : (
           <>
             {/* Single scroll container with expandable items */}
             <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
@@ -1070,6 +1081,7 @@ export const HighlightsDrawer: React.FC = () => {
                 </div>
               )}
           </>
+          )}
         </div>
       </div>
     </>
