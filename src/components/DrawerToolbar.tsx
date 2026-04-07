@@ -1,6 +1,7 @@
 import React from 'react';
 import { Settings } from 'lucide-react';
 import styles from './DrawerToolbar.module.css';
+import { DRAWER_CONFIG } from '../shared/constants';
 
 interface DrawerToolbarProps {
   logoPosition: { x: number; y: number };
@@ -39,12 +40,19 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
   logoPosition,
   onExportToggle,
   onSettingsClick,
-}) => (
+}) => {
+  const topAbove = logoPosition.y - LOGO_HALF - TOOLBAR_GAP - TOOLBAR_HEIGHT;
+  const fitsAbove = topAbove >= DRAWER_CONFIG.EDGE_MARGIN;
+  const top = fitsAbove
+    ? topAbove
+    : logoPosition.y + LOGO_HALF + TOOLBAR_GAP;
+
+  return (
   <div
     className="fixed flex flex-col items-center"
     style={{
       left: logoPosition.x - TOOLBAR_WIDTH / 2,
-      top: logoPosition.y - LOGO_HALF - TOOLBAR_GAP - TOOLBAR_HEIGHT,
+      top,
       zIndex: 1001,
       ...toolbarStyle,
     }}
@@ -70,4 +78,5 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
       <Settings size={18} strokeWidth={1.5} />
     </button>
   </div>
-);
+  );
+};
