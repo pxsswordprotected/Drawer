@@ -3,6 +3,7 @@ import { Highlight } from './types';
 export interface ExportOptions {
   includeNotes: boolean;
   includeTimestamps: boolean;
+  includePageTitles: boolean;
 }
 
 const escapeMd = (s: string) => s.replace(/([#>*_`\-\[\]\\|~])/g, '\\$1');
@@ -24,18 +25,19 @@ export function generateMarkdown(highlights: Highlight[], options: ExportOptions
     }))
     .sort((a, b) => a.highlights[0].timestamp - b.highlights[0].timestamp);
 
-  let md = `# Highlights Export\n\n`;
-  md += `*Exported ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}*\n\n---\n\n`;
+  let md = '';
 
   for (let gi = 0; gi < sortedGroups.length; gi++) {
     const group = sortedGroups[gi];
-    const pageTitle = group.highlights[0].pageTitle || group.url;
-    md += `## ${escapeMd(pageTitle)}\n\n`;
-    md += `[Source](${group.url})\n\n`;
+
+    if (options.includePageTitles) {
+      const pageTitle = group.highlights[0].pageTitle || group.url;
+      md += `## ${escapeMd(pageTitle)}\n\n`;
+      md += `[Source](${group.url})\n\n`;
+    }
 
     for (let hi = 0; hi < group.highlights.length; hi++) {
       const h = group.highlights[hi];
-
       if (options.includeTimestamps) {
         const date = new Date(h.timestamp).toLocaleDateString('en-US', {
           year: 'numeric',
@@ -44,15 +46,12 @@ export function generateMarkdown(highlights: Highlight[], options: ExportOptions
           hour: '2-digit',
           minute: '2-digit',
         });
-        md += `### ${hi + 1}. ${date}\n\n`;
-      } else {
-        md += `### ${hi + 1}.\n\n`;
+        md += `### ${date}\n\n`;
       }
 
       md += escapeMd(h.text).split('\n').map((line) => `> ${line}`).join('\n') + '\n\n';
 
       if (options.includeNotes && h.notes.length > 0) {
-        md += `**Notes**\n`;
         for (const note of h.notes) {
           md += `- ${escapeMd(note.text)}\n`;
         }
@@ -60,7 +59,7 @@ export function generateMarkdown(highlights: Highlight[], options: ExportOptions
       }
     }
 
-    if (gi < sortedGroups.length - 1) {
+    if (options.includePageTitles && gi < sortedGroups.length - 1) {
       md += `---\n\n`;
     }
   }

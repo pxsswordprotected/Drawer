@@ -63,7 +63,6 @@
   animation: itemStaggerEnter 250ms cubic-bezier(0.19, 1, 0.22, 1) both;
 }
 
-
 /* Disable animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   @keyframes drawerEnter {
@@ -129,6 +128,7 @@
 .pageTitle {
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -233,12 +233,14 @@
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .checkbox:checked {
-  background: #F5F5F5;
-  border-color: #F5F5F5;
+  background: #f5f5f5;
+  border-color: #f5f5f5;
 }
 
 .checkbox:checked::after {
@@ -248,14 +250,14 @@
   top: 1px;
   width: 4px;
   height: 8px;
-  border: solid #1A1A1A;
+  border: solid #1a1a1a;
   border-width: 0 1.5px 1.5px 0;
   transform: rotate(45deg);
 }
 
 .checkbox:indeterminate {
-  background: #F5F5F5;
-  border-color: #F5F5F5;
+  background: #f5f5f5;
+  border-color: #f5f5f5;
 }
 
 .checkbox:indeterminate::after {
@@ -265,7 +267,7 @@
   top: 5px;
   width: 6px;
   height: 1.5px;
-  background: #1A1A1A;
+  background: #1a1a1a;
 }
 
 .checkbox:disabled {
@@ -297,16 +299,18 @@
   width: 10px;
   height: 10px;
   border-radius: 9999px;
-  background: #8C8C8C;
-  transition: transform 0.15s, background 0.15s;
+  background: #8c8c8c;
+  transition:
+    transform 0.15s,
+    background 0.15s;
 }
 
 .toggle:checked {
-  background: #F5F5F5;
+  background: #f5f5f5;
 }
 
 .toggle:checked::after {
-  background: #1A1A1A;
+  background: #1a1a1a;
   transform: translateX(12px);
 }
 

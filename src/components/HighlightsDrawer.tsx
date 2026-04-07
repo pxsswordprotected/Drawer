@@ -112,6 +112,7 @@ export const HighlightsDrawer: React.FC = () => {
   const [exportScopeError, setExportScopeError] = useState<string | null>(null);
   const [exportIncludeNotes, setExportIncludeNotes] = useState(true);
   const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(true);
+  const [exportIncludePageTitles, setExportIncludePageTitles] = useState(true);
 
   const currentPageHighlights = useMemo(
     () => allHighlights.filter((h) => h.url === currentUrl),
@@ -185,12 +186,16 @@ export const HighlightsDrawer: React.FC = () => {
     setExportScopeError(null);
     setExportSuccess(null);
     setExportExiting(false);
+    setExportIncludeNotes(true);
+    setExportIncludeTimestamps(true);
+    setExportIncludePageTitles(true);
   }, []);
 
   const handleExportCopy = useCallback(async () => {
     const md = generateMarkdown(highlightsToExport, {
       includeNotes: exportIncludeNotes,
       includeTimestamps: exportIncludeTimestamps,
+      includePageTitles: exportIncludePageTitles,
     });
     try {
       await copyMarkdown(md);
@@ -202,12 +207,13 @@ export const HighlightsDrawer: React.FC = () => {
     } catch {
       /* silently fail */
     }
-  }, [highlightsToExport, exportIncludeNotes, exportIncludeTimestamps, resetExportState]);
+  }, [highlightsToExport, exportIncludeNotes, exportIncludeTimestamps, exportIncludePageTitles, resetExportState]);
 
   const handleExportDownload = useCallback(() => {
     const md = generateMarkdown(highlightsToExport, {
       includeNotes: exportIncludeNotes,
       includeTimestamps: exportIncludeTimestamps,
+      includePageTitles: exportIncludePageTitles,
     });
     downloadMarkdown(md);
     setExportSuccess('download');
@@ -215,7 +221,7 @@ export const HighlightsDrawer: React.FC = () => {
       setExportExiting(true);
       setTimeout(() => resetExportState(), 200);
     }, 1000);
-  }, [highlightsToExport, exportIncludeNotes, exportIncludeTimestamps, resetExportState]);
+  }, [highlightsToExport, exportIncludeNotes, exportIncludeTimestamps, exportIncludePageTitles, resetExportState]);
 
   // Scroll intent tracking
   const scrollIntentRef = useRef<'programmatic' | null>(null);
@@ -246,6 +252,7 @@ export const HighlightsDrawer: React.FC = () => {
         setExportScopeError(null);
         setExportIncludeNotes(true);
         setExportIncludeTimestamps(true);
+        setExportIncludePageTitles(true);
       }
     },
     [isClosing]
@@ -323,7 +330,6 @@ export const HighlightsDrawer: React.FC = () => {
     // Outer div: translate only (positioning)
     setDrawerStyle({
       translate: `${x}px ${y}px`,
-      willChange: 'translate',
     });
 
     // Inner div: transformOrigin for scale animation pivot
@@ -675,8 +681,7 @@ export const HighlightsDrawer: React.FC = () => {
                       return (
                         <React.Fragment key={group.url}>
                           {groupIndex > 0 &&
-                            (exportMode ||
-                              expandedGroupUrl !== pageGroups[groupIndex - 1]?.url) && (
+                            expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
                               <div
                                 className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
                                 style={{
@@ -862,7 +867,7 @@ export const HighlightsDrawer: React.FC = () => {
               allHighlights.length > 0 &&
               !(exportExiting && !exportSuccess) && (
                 <div
-                  className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg px-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
+                  className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg pl-[6px] pr-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
                   style={{
                     zIndex: 10,
                     boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
@@ -908,14 +913,17 @@ export const HighlightsDrawer: React.FC = () => {
                       <button
                         onClick={() => setExportScreen('options')}
                         disabled={exportSelectedIds.size === 0}
-                        className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                        className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
                         style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
                       >
                         Next ({exportSelectedIds.size})
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-2 pt-1" style={{ marginBottom: '-1px' }}>
+                    <div
+                      className="flex flex-col gap-2 pt-[7px] pl-[10px] pr-[2px]"
+                      style={{ marginBottom: '1px' }}
+                    >
                       {/* Options */}
                       <label className="flex items-center justify-between cursor-pointer">
                         <span className="text-text-main text-sm font-light">Include notes</span>
@@ -937,8 +945,19 @@ export const HighlightsDrawer: React.FC = () => {
                           className={styles.toggle}
                         />
                       </label>
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-text-main text-sm font-light">
+                          Include page titles
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={exportIncludePageTitles}
+                          onChange={(e) => setExportIncludePageTitles(e.target.checked)}
+                          className={styles.toggle}
+                        />
+                      </label>
                       {/* Back + Export action buttons */}
-                      <div className="flex gap-2 pt-1">
+                      <div className="flex gap-2">
                         {/* Back arrow button */}
                         <button
                           onClick={() => setExportScreen('select')}
