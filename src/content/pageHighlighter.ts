@@ -30,32 +30,42 @@ const highlightsDeletedViaHold = new Set<string>();
  * Direct attachment avoids host pages with stopPropagation() blocking events.
  */
 function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
+  let pendingStartTimer: ReturnType<typeof setTimeout> | null = null;
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let isLongPressCompleted = false;
   let activeFragments: HTMLElement[] = [];
   let activePointerId: number | null = null;
 
-  // Variables to hold original text selection state
+  // Variables to hold original text selection state safely
+  let isSelectionLocked = false;
   let originalUserSelect = '';
   let originalWebkitUserSelect = '';
 
   mark.style.setProperty('background-position', 'left center', 'important');
   mark.style.setProperty('background-repeat', 'no-repeat', 'important');
 
-  // Blocks text selection events
   const preventSelect = (e: Event) => {
-    if (pressTimer) e.preventDefault();
+    if (isSelectionLocked) e.preventDefault();
   };
 
   const restoreSelectionState = () => {
-    document.body.style.userSelect = originalUserSelect;
-    document.body.style.webkitUserSelect = originalWebkitUserSelect;
-    document.removeEventListener('selectstart', preventSelect);
+    if (isSelectionLocked) {
+      document.body.style.userSelect = originalUserSelect;
+      document.body.style.webkitUserSelect = originalWebkitUserSelect;
+      document.removeEventListener('selectstart', preventSelect);
+      isSelectionLocked = false;
+    }
   };
 
   const abortHold = (e?: PointerEvent) => {
     if (activePointerId === null) return;
     if (e && e.pointerId !== activePointerId) return;
+
+    // Clear the intentionality delay if it hasn't fired yet
+    if (pendingStartTimer) {
+      clearTimeout(pendingStartTimer);
+      pendingStartTimer = null;
+    }
 
     if (pressTimer) {
       clearTimeout(pressTimer);
@@ -114,39 +124,47 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     activePointerId = e.pointerId;
     isLongPressCompleted = false;
 
-    // Lock text selection globally during the hold
-    originalUserSelect = document.body.style.userSelect;
-    originalWebkitUserSelect = document.body.style.webkitUserSelect;
-    document.body.style.userSelect = 'none';
-    document.body.style.webkitUserSelect = 'none';
-    document.addEventListener('selectstart', preventSelect);
-    window.getSelection()?.removeAllRanges();
-
-    mark.setPointerCapture(activePointerId);
-
     activeFragments = Array.from(
       document.querySelectorAll(`mark[data-highlight-id="${highlightId}"]`)
     ) as HTMLElement[];
 
-    activeFragments.forEach((frag) => {
-      frag.style.setProperty('transition', 'background-size 2s linear', 'important');
-      frag.style.setProperty('background-size', '0% 100%', 'important');
-    });
+    // 150ms intentionality delay: filters out standard clicks
+    pendingStartTimer = setTimeout(() => {
+      pendingStartTimer = null;
 
-    pressTimer = setTimeout(() => {
-      pressTimer = null;
-      finalizeHoldDelete();
-    }, 2000);
+      // Lock text selection globally only after confirming it is a hold
+      isSelectionLocked = true;
+      originalUserSelect = document.body.style.userSelect;
+      originalWebkitUserSelect = document.body.style.webkitUserSelect;
+      document.body.style.userSelect = 'none';
+      document.body.style.webkitUserSelect = 'none';
+      document.addEventListener('selectstart', preventSelect);
+      window.getSelection()?.removeAllRanges();
+
+      if (activePointerId !== null) {
+        mark.setPointerCapture(activePointerId);
+      }
+
+      activeFragments.forEach((frag) => {
+        frag.style.setProperty('transition', 'background-size 1s linear', 'important');
+        frag.style.setProperty('background-size', '0% 100%', 'important');
+      });
+
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        finalizeHoldDelete();
+      }, 1000);
+    }, 60);
   });
 
   mark.addEventListener('pointermove', (e) => {
-    if (!pressTimer || e.pointerId !== activePointerId) return;
+    // Ignore movement if neither timer is running
+    if (!pendingStartTimer && !pressTimer) return;
+    if (e.pointerId !== activePointerId) return;
 
-    // Check what element the cursor is physically hovering over right now
     const hit = document.elementFromPoint(e.clientX, e.clientY);
     const isOverHighlight = hit?.closest(`mark[data-highlight-id="${highlightId}"]`);
 
-    // If the cursor left the highlight fragments, cancel the deletion
     if (!isOverHighlight) {
       abortHold(e);
     }
