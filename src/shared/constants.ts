@@ -8,9 +8,12 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_SETTINGS: Settings = {
-  drawerPosition: { x: typeof window !== 'undefined' ? window.innerWidth - 420 : 0, y: typeof window !== 'undefined' ? window.innerHeight - 600 : 0 },
+  drawerPosition: {
+    x: typeof window !== 'undefined' ? window.innerWidth - 420 : 0,
+    y: typeof window !== 'undefined' ? window.innerHeight - 600 : 0,
+  },
   drawerVisible: true,
-  defaultColor: '#FFEB3B', // Yellow highlight
+  defaultColor: '#ffff02', // Yellow highlight
   highlightShortcut: 'Ctrl+Shift+H',
   drawerShortcut: 'Ctrl+Shift+D',
   autoSync: false,
@@ -18,12 +21,12 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export const HIGHLIGHT_COLORS = {
-  yellow: '#FFEB3B',
+  yellow: '#ffff02',
   green: '#4CAF50',
   orange: '#FF9800',
-  blue: '#2196F3',
+  blue: '#1780fd',
   pink: '#E91E63',
-  purple: '#9C27B0',
+  purple: '#7c4bf5',
 } as const;
 
 export const DRAWER_CONFIG = {

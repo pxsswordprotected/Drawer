@@ -217,17 +217,14 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     NodeFilter.SHOW_TEXT,
     {
       acceptNode: (node) => {
-        // Skip text nodes already inside a highlight mark
         if (node.parentElement?.closest('mark[data-highlight-id]')) {
           return NodeFilter.FILTER_REJECT;
         }
-        // Only accept nodes that intersect the selection range
         return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       },
     }
   );
 
-  // Collect all matching text nodes
   const textNodes: Text[] = [];
   let currentNode = treeWalker.nextNode();
   while (currentNode) {
@@ -235,7 +232,6 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     currentNode = treeWalker.nextNode();
   }
 
-  // Edge case: commonAncestorContainer is itself a text node
   if (
     textNodes.length === 0 &&
     range.commonAncestorContainer.nodeType === Node.TEXT_NODE &&
@@ -244,89 +240,130 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     textNodes.push(range.commonAncestorContainer as Text);
   }
 
-  // --- Per-highlight seeded variation (shared across all fragments) ---
-  const rand = mulberry32(hashSeed(highlightId));
+  const validTextNodes = textNodes.filter((textNode) => {
+    let startOffset = 0;
+    let endOffset = textNode.length;
+    if (textNode === range.startContainer) startOffset = range.startOffset;
+    if (textNode === range.endContainer) endOffset = range.endOffset;
+    return startOffset < endOffset;
+  });
 
-  // Gradient angles
+  // 1. Split text nodes at boundaries to isolate the exact selection
+  // Doing this in reverse prevents offset shifting, then unshift builds a forward-ordered array.
+  const exactNodes: Text[] = [];
+  for (let i = validTextNodes.length - 1; i >= 0; i--) {
+    const textNode = validTextNodes[i];
+    let startOffset = 0;
+    let endOffset = textNode.length;
+
+    if (textNode === range.startContainer) startOffset = range.startOffset;
+    if (textNode === range.endContainer) endOffset = range.endOffset;
+
+    let targetNode = textNode;
+    if (endOffset < textNode.length) {
+      targetNode.splitText(endOffset);
+    }
+    if (startOffset > 0) {
+      targetNode = targetNode.splitText(startOffset);
+    }
+    exactNodes.unshift(targetNode);
+  }
+
+  // 2. Group adjacent text nodes that share the same parent
+  const chunks: Text[][] = [];
+  let currentChunk: Text[] = [];
+
+  for (let i = 0; i < exactNodes.length; i++) {
+    const node = exactNodes[i];
+    if (currentChunk.length === 0) {
+      currentChunk.push(node);
+    } else {
+      const lastNode = currentChunk[currentChunk.length - 1];
+      // Check if they are direct contiguous siblings in the DOM
+      if (lastNode.nextSibling === node && lastNode.parentNode === node.parentNode) {
+        currentChunk.push(node);
+      } else {
+        chunks.push(currentChunk);
+        currentChunk = [node];
+      }
+    }
+  }
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  // Pre-calculations for styles
+  const rand = mulberry32(hashSeed(highlightId));
   const angle1 = clamp(173 + rand() * 4, 173, 177).toFixed(1);
   const angle2 = clamp(81 + rand() * 5, 81, 86).toFixed(1);
 
-  // Leading/trailing asymmetry (writing-direction-aware)
   const isRTL =
     getComputedStyle(range.commonAncestorContainer.parentElement ?? document.body).direction ===
     'rtl';
+
   const leadRaw = clamp(25 + (rand() * 6 - 3), 22, 28);
   const trailRaw = clamp(40 + (rand() * 6 - 3), 37, 43);
   const startOpacity = isRTL ? trailRaw : leadRaw;
   const endOpacity = isRTL ? leadRaw : trailRaw;
 
-  // Thickness from total highlight length + RNG bias
   const totalLen = range.toString().length;
   const lengthFactor = totalLen < 15 ? 1.08 : totalLen > 80 ? 0.93 : 1.0;
   const thicknessBias = clamp(0.96 + rand() * 0.08, 0.96, 1.04);
   const finalThickness = clamp(lengthFactor * thicknessBias, 0.92, 1.1);
+
   const padTop = (0.27 * finalThickness).toFixed(2);
   const padBot = (0.03 * finalThickness).toFixed(2);
   const margTop = (-0.27 * finalThickness).toFixed(2);
   const margBot = (-0.03 * finalThickness).toFixed(2);
 
-  // Border-radius from 3 correlated knobs
   const rLeft = clamp(0.1 + (rand() * 0.12 - 0.06), 0.04, 0.58);
   const rRight = clamp(0.5 + (rand() * 0.12 - 0.06), 0.04, 0.58);
   const rWobble = rand() * 0.08 - 0.04;
   const br = [
-    rLeft.toFixed(2), // top-left h
-    rRight.toFixed(2), // top-right h
-    clamp(0.15 + (rand() * 0.12 - 0.06), 0.04, 0.58).toFixed(2), // bottom-right h
-    clamp(0.4 + (rand() * 0.12 - 0.06), 0.04, 0.58).toFixed(2), // bottom-left h
-    clamp(0.5 + rWobble, 0.04, 0.58).toFixed(2), // top-left v
-    clamp(0.1 + rWobble, 0.04, 0.58).toFixed(2), // top-right v
-    clamp(0.4 + rWobble, 0.04, 0.58).toFixed(2), // bottom-right v
-    clamp(0.15 + rWobble, 0.04, 0.58).toFixed(2), // bottom-left v
+    rLeft.toFixed(2),
+    rRight.toFixed(2),
+    clamp(0.15 + (rand() * 0.12 - 0.06), 0.04, 0.58).toFixed(2),
+    clamp(0.4 + (rand() * 0.12 - 0.06), 0.04, 0.58).toFixed(2),
+    clamp(0.5 + rWobble, 0.04, 0.58).toFixed(2),
+    clamp(0.1 + rWobble, 0.04, 0.58).toFixed(2),
+    clamp(0.4 + rWobble, 0.04, 0.58).toFixed(2),
+    clamp(0.15 + rWobble, 0.04, 0.58).toFixed(2),
   ];
-  const borderRadius = `${br[0]}em ${br[1]}em ${br[2]}em ${br[3]}em / ${br[4]}em ${br[5]}em ${br[6]}em ${br[7]}em`;
 
-  // Shadow
   const shadowBlur = clamp(1.5 + rand() * 1, 1.5, 2.5).toFixed(1);
-
-  // Precomputed shared CSS strings
   const sharedGradient1 = `linear-gradient(${angle1}deg, transparent 20%, color-mix(in srgb, ${color}, transparent 85%) 50%, transparent 80%)`;
   const sharedShadow = `inset 0 -1px ${shadowBlur}px color-mix(in srgb, ${color}, transparent 90%)`;
-  const sharedPadding = `${padTop}em 0.16em ${padBot}em 0.34em`;
-  const sharedMargin = `${margTop}em -0.16em ${margBot}em -0.34em`;
 
-  // Process in reverse document order to maintain valid offsets
-  for (let i = textNodes.length - 1; i >= 0; i--) {
-    const textNode = textNodes[i];
+  // 3. Process grouped chunks (in reverse to safely modify DOM)
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const chunk = chunks[i];
 
-    let startOffset = 0;
-    let endOffset = textNode.length;
+    const isFirstChunk = i === 0;
+    const isLastChunk = i === chunks.length - 1;
 
-    // Adjust offsets for boundary nodes
-    if (textNode === range.startContainer) {
-      startOffset = range.startOffset;
-    }
-    if (textNode === range.endContainer) {
-      endOffset = range.endOffset;
-    }
+    // Apply flat "puzzle piece" edges only if the chunks are separated by HTML elements
+    const applyLeftEdge = isRTL ? isLastChunk : isFirstChunk;
+    const applyRightEdge = isRTL ? isFirstChunk : isLastChunk;
 
-    // Skip empty splits (browser quirk: intersectsNode can match boundary nodes with 0 chars)
-    if (startOffset >= endOffset) continue;
+    const pLeft = applyLeftEdge ? '0.34em' : '0em';
+    const pRight = applyRightEdge ? '0.16em' : '0em';
+    const mLeft = applyLeftEdge ? '-0.34em' : '0em';
+    const mRight = applyRightEdge ? '-0.16em' : '0em';
 
-    // Split the text node to isolate the selected portion
-    let targetNode = textNode;
+    const fragPadding = `${padTop}em ${pRight} ${padBot}em ${pLeft}`;
+    const fragMargin = `${margTop}em ${mRight} ${margBot}em ${mLeft}`;
 
-    // Split off the end portion first (so start offset stays valid)
-    if (endOffset < textNode.length) {
-      targetNode.splitText(endOffset);
-    }
+    const brTL = applyLeftEdge ? br[0] : '0';
+    const brTR = applyRightEdge ? br[1] : '0';
+    const brBR = applyRightEdge ? br[2] : '0';
+    const brBL = applyLeftEdge ? br[3] : '0';
+    const brTLV = applyLeftEdge ? br[4] : '0';
+    const brTRV = applyRightEdge ? br[5] : '0';
+    const brBRV = applyRightEdge ? br[6] : '0';
+    const brBLV = applyLeftEdge ? br[7] : '0';
 
-    // Split off the start portion
-    if (startOffset > 0) {
-      targetNode = targetNode.splitText(startOffset);
-    }
+    const fragBorderRadius = `${brTL}em ${brTR}em ${brBR}em ${brBL}em / ${brTLV}em ${brTRV}em ${brBRV}em ${brBLV}em`;
 
-    // --- Per-fragment micro-jitter ---
     const bgOffsetX = clamp(rand() * 4 - 2, -2, 2).toFixed(1);
     const midDrift1 = clamp(rand() * 4 - 2, -2, 2);
     const midDrift2 = clamp(rand() * 4 - 2, -2, 2);
@@ -335,37 +372,36 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
 
     const gradient2 = `linear-gradient(${angle2}deg, color-mix(in srgb, ${color}, transparent ${startOpacity.toFixed(0)}%), color-mix(in srgb, ${color}, transparent ${fragMid1}%) 4%, color-mix(in srgb, ${color}, transparent ${fragMid2}%) 96%, color-mix(in srgb, ${color}, transparent ${endOpacity.toFixed(0)}%))`;
 
-    // Create the <mark> element
     const mark = document.createElement('mark');
     mark.setAttribute('data-highlight-id', highlightId);
     mark.style.cssText = `
-      background-color: transparent !important;
-      background-image: ${sharedGradient1}, ${gradient2} !important;
-      border-radius: ${borderRadius} !important;
-      margin: ${sharedMargin} !important;
-      padding: ${sharedPadding} !important;
-      box-shadow: ${sharedShadow} !important;
-      -webkit-box-decoration-break: clone !important;
-      box-decoration-break: clone !important;
-      color: inherit !important;
-      cursor: pointer !important;
-      display: inline !important;
-      background-position: ${bgOffsetX}px center !important;
-      background-repeat: no-repeat !important;
-      background-size: 0% 100% !important;
-      transition: background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1) !important;
-    `;
+       background-color: transparent !important;
+       background-image: ${sharedGradient1}, ${gradient2} !important;
+       border-radius: ${fragBorderRadius} !important;
+       margin: ${fragMargin} !important;
+       padding: ${fragPadding} !important;
+       box-shadow: ${sharedShadow} !important;
+       -webkit-box-decoration-break: clone !important;
+       box-decoration-break: clone !important;
+       color: inherit !important;
+       cursor: pointer !important;
+       display: inline !important;
+       background-position: ${bgOffsetX}px center !important;
+       background-repeat: no-repeat !important;
+       background-size: 0% 100% !important;
+       transition: background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1) !important;
+     `;
 
-    // Wrap: insert mark before the text node, then move text node inside
-    targetNode.parentNode!.insertBefore(mark, targetNode);
-    mark.appendChild(targetNode);
+    // Wrap the entire chunk in a single <mark>
+    const firstNode = chunk[0];
+    firstNode.parentNode!.insertBefore(mark, firstNode);
 
-    // Trigger the animation on the next frame
+    chunk.forEach((node) => mark.appendChild(node));
+
     requestAnimationFrame(() => {
       mark.style.backgroundSize = '100% 100%';
     });
 
-    // Attach click handler directly to this mark
     attachMarkClickHandler(mark, highlightId);
   }
 }

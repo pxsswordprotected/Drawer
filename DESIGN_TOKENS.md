@@ -38,7 +38,7 @@ Use other weights only when explicitly needed (e.g., headings, emphasis).
 - `text-success` / `bg-success` - #14C935 (Success, good-to-go states)
 
 ### Highlight Colors (for text highlighting)
-- Yellow: #FFEB3B
+- Yellow: ##ffff02
 - Green: #4CAF50
 - Blue: #2196F3
 - Pink: #E91E63

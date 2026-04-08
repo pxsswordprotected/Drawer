@@ -22,7 +22,7 @@ export default {
 
         // Highlight colors (for text highlighting feature)
         highlight: {
-          yellow: '#FFEB3B',
+          yellow: '#ffff02',
           green: '#4CAF50',
           blue: '#2196F3',
           pink: '#E91E63',
