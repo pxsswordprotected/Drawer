@@ -44,6 +44,7 @@ export const DrawerSettings: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoreSuccess, setRestoreSuccess] = useState(false);
+  const [backupSuccess, setBackupSuccess] = useState(false);
 
   const [isHolding, setIsHolding] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
@@ -79,6 +80,8 @@ export const DrawerSettings: React.FC = () => {
   const handleBackup = async () => {
     const json = await storageService.exportHighlights();
     downloadJson(json);
+    setBackupSuccess(true);
+    setTimeout(() => setBackupSuccess(false), 2000);
   };
 
   const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,15 +144,26 @@ export const DrawerSettings: React.FC = () => {
         <span className="text-text-secondary text-xs font-light">Data</span>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleBackup}
-            className={`${buttonClass} ${allHighlights.length === 0 ? 'opacity-40 pointer-events-none' : ''}`}
-            style={buttonStyle}
+            onClick={() => !backupSuccess && handleBackup()}
+            className={`${buttonClass} relative overflow-hidden ${allHighlights.length === 0 || backupSuccess ? 'pointer-events-none' : ''}`}
+            style={{ ...buttonStyle, background: backupSuccess ? '#2a3a2a' : undefined }}
           >
-            Backup
+            <span className={backupSuccess ? 'invisible' : ''}>Backup</span>
+            {backupSuccess && (
+              <svg className="absolute" width="14" height="11" viewBox="0 0 14 11" fill="none">
+                <path
+                  d="M1 5.5L5 9.5L13 1.5"
+                  stroke="#4CAF50"
+                  strokeWidth="1.5"
+                  strokeLinejoin="miter"
+                  strokeLinecap="square"
+                />
+              </svg>
+            )}
           </button>
           <button
             onClick={() => !restoreSuccess && fileInputRef.current?.click()}
-            className={`${buttonClass} relative overflow-hidden`}
+            className={`${buttonClass} relative overflow-hidden ${restoreSuccess ? 'pointer-events-none' : ''}`}
             style={{ ...buttonStyle, background: restoreSuccess ? '#2a3a2a' : undefined }}
           >
             <span className={restoreSuccess ? 'invisible' : ''}>Restore</span>
