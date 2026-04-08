@@ -60,7 +60,13 @@ export const useDrawerStore = create<DrawerState>((set) => ({
   defaultColor: DEFAULT_SETTINGS.defaultColor,
 
   openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger }),
-  closeDrawer: () => set({ isOpen: false, pendingScrollHighlightId: null, selectedHighlightId: null, drawerTrigger: null }),
+  closeDrawer: () =>
+    set({
+      isOpen: false,
+      pendingScrollHighlightId: null,
+      selectedHighlightId: null,
+      drawerTrigger: null,
+    }),
   toggleDrawer: (trigger: DrawerTrigger = 'logo') =>
     set((state) => ({
       isOpen: !state.isOpen,
@@ -92,6 +98,8 @@ export const useDrawerStore = create<DrawerState>((set) => ({
     set((state) => ({
       allHighlights: state.allHighlights.filter((h) => h.id !== id),
       selectedHighlightId: state.selectedHighlightId === id ? null : state.selectedHighlightId,
+      pendingScrollHighlight:
+        state.pendingScrollHighlightId === id ? null : state.pendingScrollHighlightId,
     }));
   },
 

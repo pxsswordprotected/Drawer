@@ -29,14 +29,21 @@ const highlightsDeletedViaHold = new Set<string>();
  * Attaches pointer and click handlers directly to a <mark> element.
  * Direct attachment avoids host pages with stopPropagation() blocking events.
  */
+/**
+ * Attaches pointer and click handlers directly to a <mark> element.
+ * Direct attachment avoids host pages with stopPropagation() blocking events.
+ */
 function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   let pendingStartTimer: ReturnType<typeof setTimeout> | null = null;
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let isLongPressCompleted = false;
+
+  // NEW: Tracks if the user intentionally held longer than 65ms
+  let isHoldInteraction = false;
+
   let activeFragments: HTMLElement[] = [];
   let activePointerId: number | null = null;
 
-  // Variables to hold original text selection state safely
   let isSelectionLocked = false;
   let originalUserSelect = '';
   let originalWebkitUserSelect = '';
@@ -61,7 +68,6 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     if (activePointerId === null) return;
     if (e && e.pointerId !== activePointerId) return;
 
-    // Clear the intentionality delay if it hasn't fired yet
     if (pendingStartTimer) {
       clearTimeout(pendingStartTimer);
       pendingStartTimer = null;
@@ -96,10 +102,6 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   const finalizeHoldDelete = () => {
     isLongPressCompleted = true;
 
-    setTimeout(() => {
-      isLongPressCompleted = false;
-    }, 300);
-
     restoreSelectionState();
 
     if (activePointerId !== null && mark.hasPointerCapture(activePointerId)) {
@@ -107,6 +109,9 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     }
 
     highlightsDeletedViaHold.add(highlightId);
+
+    //Immediately destroy the DOM elements!
+    removeHighlightMarks(highlightId, { skipAnimation: true });
 
     const store = useDrawerStore.getState();
     if (store.deleteHighlight) {
@@ -124,15 +129,19 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     activePointerId = e.pointerId;
     isLongPressCompleted = false;
 
+    // RESET the flag on every new press
+    isHoldInteraction = false;
+
     activeFragments = Array.from(
       document.querySelectorAll(`mark[data-highlight-id="${highlightId}"]`)
     ) as HTMLElement[];
 
-    // 150ms intentionality delay: filters out standard clicks
     pendingStartTimer = setTimeout(() => {
       pendingStartTimer = null;
 
-      // Lock text selection globally only after confirming it is a hold
+      // The 65ms threshold passed. This is now officially a hold.
+      isHoldInteraction = true;
+
       isSelectionLocked = true;
       originalUserSelect = document.body.style.userSelect;
       originalWebkitUserSelect = document.body.style.webkitUserSelect;
@@ -146,19 +155,18 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
       }
 
       activeFragments.forEach((frag) => {
-        frag.style.setProperty('transition', 'background-size 1s linear', 'important');
+        frag.style.setProperty('transition', 'background-size 0.75s linear', 'important');
         frag.style.setProperty('background-size', '0% 100%', 'important');
       });
 
       pressTimer = setTimeout(() => {
         pressTimer = null;
         finalizeHoldDelete();
-      }, 1000);
-    }, 60);
+      }, 750);
+    }, 75);
   });
 
   mark.addEventListener('pointermove', (e) => {
-    // Ignore movement if neither timer is running
     if (!pendingStartTimer && !pressTimer) return;
     if (e.pointerId !== activePointerId) return;
 
@@ -176,8 +184,12 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   mark.addEventListener('click', (e) => {
     e.stopPropagation();
 
-    if (isLongPressCompleted) {
+    // Block the click if the interaction lasted longer than 65ms OR was deleted
+    if (isHoldInteraction || isLongPressCompleted) {
       e.preventDefault();
+
+      // Reset the flag so you can still standard-click the highlight later if you aborted the delete
+      isHoldInteraction = false;
       return;
     }
 
