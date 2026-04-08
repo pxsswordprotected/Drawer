@@ -50,11 +50,11 @@ export default {
       },
 
       fontSize: {
-        xs: ['0.75rem', { lineHeight: '1rem', fontWeight: '300' }], // 12px
-        sm: ['0.875rem', { lineHeight: '1.25rem', fontWeight: '300' }], // 14px
-        base: ['1rem', { lineHeight: '1.5rem', fontWeight: '300' }], // 16px
-        lg: ['1.125rem', { lineHeight: '1.75rem', fontWeight: '300' }], // 18px
-        xl: ['1.25rem', { lineHeight: '1.75rem', fontWeight: '300' }], // 20px
+        xs: ['12px', { lineHeight: '16px', fontWeight: '300' }],
+        sm: ['14px', { lineHeight: '20px', fontWeight: '300' }],
+        base: ['16px', { lineHeight: '24px', fontWeight: '300' }],
+        lg: ['18px', { lineHeight: '28px', fontWeight: '300' }],
+        xl: ['20px', { lineHeight: '28px', fontWeight: '300' }],
       },
 
       // Simple shadows for dark mode (subtle)
@@ -65,8 +65,8 @@ export default {
 
       // Simple border radius
       borderRadius: {
-        DEFAULT: '0.5rem', // 8px
-        lg: '0.75rem', // 12px
+        DEFAULT: '8px',
+        lg: '12px',
       },
 
       // Animation durations

@@ -38,7 +38,12 @@ export function createShadowRootUI(): ShadowRootUI {
       box-sizing: border-box;
     }
 
+    :host {
+      all: initial;
+    }
+
     #react-root {
+      display: block;
       font-family: 'Geist', system-ui, -apple-system, sans-serif;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;

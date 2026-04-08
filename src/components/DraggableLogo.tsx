@@ -108,6 +108,8 @@ export const DraggableLogo: React.FC = () => {
 
   const [isDragging, setIsDragging] = useState(false);
 
+  const blockSelect = (e: Event) => e.preventDefault();
+
   const handleDragStart = () => {
     wasDragged.current = false;
   };
@@ -116,6 +118,7 @@ export const DraggableLogo: React.FC = () => {
     if (!wasDragged.current) {
       wasDragged.current = true;
       setIsDragging(true);
+      document.addEventListener('selectstart', blockSelect);
       const drawer = getDrawerElement();
       if (drawer) drawer.style.willChange = 'translate';
       if (isOpen) closeDrawer();
@@ -133,6 +136,7 @@ export const DraggableLogo: React.FC = () => {
 
   const handleDragStop = (_e: DraggableEvent, data: DraggableData) => {
     setIsDragging(false);
+    document.removeEventListener('selectstart', blockSelect);
     const drawer = getDrawerElement();
     if (drawer) drawer.style.willChange = 'auto';
     setTimeout(() => {

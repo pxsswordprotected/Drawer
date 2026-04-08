@@ -5,18 +5,21 @@ import { ContentApp } from './ContentApp';
 import { createShadowRootUI } from './shadowRoot';
 import { useDrawerStore } from '@/store/drawerStore';
 
+// Cross-browser runtime API (Firefox exposes `browser`, Chrome exposes `chrome`)
+const runtime = (typeof browser !== 'undefined' ? browser : chrome).runtime;
+
 // Create shadow DOM and mount React
 const { shadowRoot, reactRoot } = createShadowRootUI();
 
 // Inject built CSS into shadow root
-const cssUrl = browser.runtime.getURL('content.css');
+const cssUrl = runtime.getURL('content.css');
 const link = document.createElement('link');
 link.rel = 'stylesheet';
 link.href = cssUrl;
 shadowRoot.prepend(link);
 
 // Inject self-hosted Geist font into shadow root
-const fontUrl = browser.runtime.getURL('fonts/Geist-Variable.woff2');
+const fontUrl = runtime.getURL('fonts/Geist-Variable.woff2');
 const fontStyle = document.createElement('style');
 fontStyle.textContent = `
   @font-face {
@@ -38,7 +41,7 @@ root.render(
 );
 
 // Listen for messages from background script
-browser.runtime.onMessage.addListener((message: { type: string }) => {
+runtime.onMessage.addListener((message: { type: string }) => {
   if (message.type === 'TOGGLE_DRAWER') {
     useDrawerStore.getState().toggleDrawer('keyboard');
   }
