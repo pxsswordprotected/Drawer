@@ -8,7 +8,8 @@
       "Bash(timeout 15 tail:*)",
       "Bash(tail:*)",
       "Bash(xargs cat:*)",
-      "Bash(grep -r border-divider /c/Everything/Programming/Code/Drawer/src --include=*.css --include=*.config.*)"
+      "Bash(grep -r border-divider /c/Everything/Programming/Code/Drawer/src --include=*.css --include=*.config.*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
