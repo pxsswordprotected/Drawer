@@ -8,6 +8,9 @@ const COLOR_OPTIONS = [
   { name: 'Yellow', value: HIGHLIGHT_COLORS.yellow },
   { name: 'Green', value: HIGHLIGHT_COLORS.green },
   { name: 'Orange', value: HIGHLIGHT_COLORS.orange },
+  { name: 'Blue', value: HIGHLIGHT_COLORS.blue },
+  { name: 'Pink', value: HIGHLIGHT_COLORS.pink },
+  { name: 'Purple', value: HIGHLIGHT_COLORS.purple },
 ] as const;
 
 const highlighterStyle = (color: string, isSelected: boolean) => ({
