@@ -262,14 +262,15 @@ export const HighlightsDrawer: React.FC = () => {
   // Scroll intent tracking
   const scrollIntentRef = useRef<'programmatic' | null>(null);
   const scrollEndCleanup = useRef<(() => void) | null>(null);
+  const hasOpenedBefore = useRef(false);
 
   // Sync visibility and stagger with isOpen + trigger intent
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true);
       setIsClosing(false);
-      if (drawerTrigger === 'logo') setIsStaggering(true);
-      if (drawerTrigger === 'mark') setIsStaggering(false);
+      if (drawerTrigger === 'logo' && !hasOpenedBefore.current) setIsStaggering(true);
+      hasOpenedBefore.current = true;
     } else {
       setIsClosing(true);
       setIsStaggering(false);
@@ -377,13 +378,19 @@ export const HighlightsDrawer: React.FC = () => {
     });
   }, [logoPosition]);
 
-  // Load all highlights when drawer opens
+  // Load data eagerly on mount
   useEffect(() => {
-    if (isOpen && typeof window !== 'undefined') {
+    loadAllHighlights();
+    loadSettings();
+  }, []);
+
+  // Refresh highlights on open (could have been added from page while closed)
+  // Settings stay cached — user can only change them from within the drawer
+  useEffect(() => {
+    if (isOpen) {
       loadAllHighlights();
-      loadSettings();
     }
-  }, [isOpen, loadAllHighlights, loadSettings]);
+  }, [isOpen]);
 
   // Auto-expand current page group when drawer opens
   useEffect(() => {
@@ -609,10 +616,8 @@ export const HighlightsDrawer: React.FC = () => {
     setIsStaggering(false);
   }
 
-  if (!isVisible) return null;
-
   return (
-    <>
+    <div style={{ contentVisibility: isVisible ? 'visible' : 'hidden' }}>
       {/* Toolbar — fixed above draggable logo */}
       {logoPosition && !isClosing && (
         <DrawerToolbar
@@ -1104,6 +1109,6 @@ export const HighlightsDrawer: React.FC = () => {
             </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
