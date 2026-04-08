@@ -46,6 +46,14 @@ export const DraggableLogo: React.FC = () => {
   const isOpen = useDrawerStore((state) => state.isOpen);
   const logoResetCount = useDrawerStore((state) => state.logoResetCount);
 
+  // Sync initial FAB center to store on mount so drawer can position itself
+  // even if opened via highlight click before any FAB interaction
+  useEffect(() => {
+    const pos = getInitialPosition();
+    const center = { x: pos.x + LOGO_SIZE / 2, y: pos.y + LOGO_SIZE / 2 };
+    setLogoPosition(center);
+  }, [setLogoPosition]);
+
   useEffect(() => {
     if (logoResetCount === 0) return;
     const pos = getInitialPosition();
