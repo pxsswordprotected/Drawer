@@ -126,24 +126,11 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
   // Shadow
   const shadowBlur = clamp(1.5 + rand() * 1, 1.5, 2.5).toFixed(1);
 
-  // Edge curve mask parameters (per-highlight, shared across fragments)
-  const topBow = clamp(rand() * 3 - 1.5, -1.5, 1.5).toFixed(1);
-  const botBow = clamp(rand() * 3 - 1.5, -1.5, 1.5).toFixed(1);
-  const topWidth = clamp(120 + rand() * 60, 120, 180).toFixed(0);
-  const botWidth = clamp(120 + rand() * 60, 120, 180).toFixed(0);
-  const maskPhaseBase = rand() * 40; // 0-40px base offset
-
   // Precomputed shared CSS strings
   const sharedGradient1 = `linear-gradient(${angle1}deg, transparent 20%, color-mix(in srgb, ${color}, transparent 85%) 50%, transparent 80%)`;
   const sharedShadow = `inset 0 -1px ${shadowBlur}px color-mix(in srgb, ${color}, transparent 90%)`;
   const sharedPadding = `${padTop}em 0.16em ${padBot}em 0.34em`;
   const sharedMargin = `${margTop}em -0.16em ${margBot}em -0.34em`;
-  const sharedMaskImage = [
-    `radial-gradient(ellipse ${topWidth}% ${topBow}px at 50% -0.5px, black 40%, transparent 100%)`,
-    `radial-gradient(ellipse ${botWidth}% ${botBow}px at 50% calc(100% + 0.5px), black 40%, transparent 100%)`,
-    `linear-gradient(to bottom, transparent 0px, black 2px, black calc(100% - 2px), transparent 100%)`,
-  ].join(', ');
-  const sharedMaskSize = '100% 100%, 100% 100%, 100% 100%';
 
   // Process in reverse document order to maintain valid offsets
   for (let i = textNodes.length - 1; i >= 0; i--) {
@@ -182,9 +169,6 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     const midDrift2 = clamp(rand() * 4 - 2, -2, 2);
     const fragMid1 = clamp(88 + midDrift1, 86, 92).toFixed(0);
     const fragMid2 = clamp(72 + midDrift2, 70, 76).toFixed(0);
-    const maskDriftX = clamp(rand() * 6 - 3, -3, 3);
-    const maskPosX = clamp(maskPhaseBase + maskDriftX, -3, 43).toFixed(1);
-    const maskPos = `${maskPosX}px 0, ${maskPosX}px 0, 0 0`;
 
     const gradient2 = `linear-gradient(${angle2}deg, color-mix(in srgb, ${color}, transparent ${startOpacity.toFixed(0)}%), color-mix(in srgb, ${color}, transparent ${fragMid1}%) 4%, color-mix(in srgb, ${color}, transparent ${fragMid2}%) 96%, color-mix(in srgb, ${color}, transparent ${endOpacity.toFixed(0)}%))`;
 
@@ -207,14 +191,6 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
       background-repeat: no-repeat !important;
       background-size: 0% 100% !important;
       transition: background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1) !important;
-      -webkit-mask-image: ${sharedMaskImage} !important;
-      mask-image: ${sharedMaskImage} !important;
-      -webkit-mask-size: ${sharedMaskSize} !important;
-      mask-size: ${sharedMaskSize} !important;
-      -webkit-mask-repeat: no-repeat !important;
-      mask-repeat: no-repeat !important;
-      -webkit-mask-position: ${maskPos} !important;
-      mask-position: ${maskPos} !important;
     `;
 
     // Wrap: insert mark before the text node, then move text node inside
