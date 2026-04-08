@@ -1,6 +1,6 @@
 import { useDrawerStore } from '@/store/drawerStore';
 
-// ─── Seeded PRNG utilities ───
+// --- Seeded PRNG utilities ---
 
 function hashSeed(id: string): number {
   let h = 0;
@@ -22,16 +22,149 @@ function mulberry32(seed: number): () => number {
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+// Module-level state to track hold-deleted IDs (The Handoff)
+const highlightsDeletedViaHold = new Set<string>();
+
 /**
- * Attaches a click handler directly to a <mark> element.
+ * Attaches pointer and click handlers directly to a <mark> element.
  * Direct attachment avoids host pages with stopPropagation() blocking events.
  */
 function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
+  let pressTimer: ReturnType<typeof setTimeout> | null = null;
+  let isLongPressCompleted = false;
+  let activeFragments: HTMLElement[] = [];
+  let activePointerId: number | null = null;
+
+  // Variables to hold original text selection state
+  let originalUserSelect = '';
+  let originalWebkitUserSelect = '';
+
+  mark.style.setProperty('background-position', 'left center', 'important');
+  mark.style.setProperty('background-repeat', 'no-repeat', 'important');
+
+  // Blocks text selection events
+  const preventSelect = (e: Event) => {
+    if (pressTimer) e.preventDefault();
+  };
+
+  const restoreSelectionState = () => {
+    document.body.style.userSelect = originalUserSelect;
+    document.body.style.webkitUserSelect = originalWebkitUserSelect;
+    document.removeEventListener('selectstart', preventSelect);
+  };
+
+  const abortHold = (e?: PointerEvent) => {
+    if (activePointerId === null) return;
+    if (e && e.pointerId !== activePointerId) return;
+
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+
+    restoreSelectionState();
+
+    if (mark.hasPointerCapture(activePointerId)) {
+      mark.releasePointerCapture(activePointerId);
+    }
+
+    if (activeFragments.length > 0) {
+      activeFragments.forEach((frag) => {
+        frag.style.setProperty(
+          'transition',
+          'background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1)',
+          'important'
+        );
+        frag.style.setProperty('background-size', '100% 100%', 'important');
+      });
+    }
+
+    activeFragments = [];
+    activePointerId = null;
+  };
+
+  const finalizeHoldDelete = () => {
+    isLongPressCompleted = true;
+
+    setTimeout(() => {
+      isLongPressCompleted = false;
+    }, 300);
+
+    restoreSelectionState();
+
+    if (activePointerId !== null && mark.hasPointerCapture(activePointerId)) {
+      mark.releasePointerCapture(activePointerId);
+    }
+
+    highlightsDeletedViaHold.add(highlightId);
+
+    const store = useDrawerStore.getState();
+    if (store.deleteHighlight) {
+      store.deleteHighlight(highlightId);
+    }
+
+    activeFragments = [];
+    activePointerId = null;
+  };
+
+  mark.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    activePointerId = e.pointerId;
+    isLongPressCompleted = false;
+
+    // Lock text selection globally during the hold
+    originalUserSelect = document.body.style.userSelect;
+    originalWebkitUserSelect = document.body.style.webkitUserSelect;
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+    document.addEventListener('selectstart', preventSelect);
+    window.getSelection()?.removeAllRanges();
+
+    mark.setPointerCapture(activePointerId);
+
+    activeFragments = Array.from(
+      document.querySelectorAll(`mark[data-highlight-id="${highlightId}"]`)
+    ) as HTMLElement[];
+
+    activeFragments.forEach((frag) => {
+      frag.style.setProperty('transition', 'background-size 2s linear', 'important');
+      frag.style.setProperty('background-size', '0% 100%', 'important');
+    });
+
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      finalizeHoldDelete();
+    }, 2000);
+  });
+
+  mark.addEventListener('pointermove', (e) => {
+    if (!pressTimer || e.pointerId !== activePointerId) return;
+
+    // Check what element the cursor is physically hovering over right now
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const isOverHighlight = hit?.closest(`mark[data-highlight-id="${highlightId}"]`);
+
+    // If the cursor left the highlight fragments, cancel the deletion
+    if (!isOverHighlight) {
+      abortHold(e);
+    }
+  });
+
+  mark.addEventListener('pointerup', abortHold as EventListener);
+  mark.addEventListener('pointercancel', abortHold as EventListener);
+
   mark.addEventListener('click', (e) => {
     e.stopPropagation();
+
+    if (isLongPressCompleted) {
+      e.preventDefault();
+      return;
+    }
+
     const store = useDrawerStore.getState();
 
-    // Toggle: if this highlight is already expanded, close the drawer
     if (store.isOpen && store.selectedHighlightId === highlightId) {
       store.closeDrawer();
       return;
@@ -81,7 +214,7 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     textNodes.push(range.commonAncestorContainer as Text);
   }
 
-  // ─── Per-highlight seeded variation (shared across all fragments) ───
+  // --- Per-highlight seeded variation (shared across all fragments) ---
   const rand = mulberry32(hashSeed(highlightId));
 
   // Gradient angles
@@ -101,24 +234,24 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
   const totalLen = range.toString().length;
   const lengthFactor = totalLen < 15 ? 1.08 : totalLen > 80 ? 0.93 : 1.0;
   const thicknessBias = clamp(0.96 + rand() * 0.08, 0.96, 1.04);
-  const finalThickness = clamp(lengthFactor * thicknessBias, 0.92, 1.10);
+  const finalThickness = clamp(lengthFactor * thicknessBias, 0.92, 1.1);
   const padTop = (0.27 * finalThickness).toFixed(2);
   const padBot = (0.03 * finalThickness).toFixed(2);
   const margTop = (-0.27 * finalThickness).toFixed(2);
   const margBot = (-0.03 * finalThickness).toFixed(2);
 
   // Border-radius from 3 correlated knobs
-  const rLeft = clamp(0.10 + (rand() * 0.12 - 0.06), 0.04, 0.58);
-  const rRight = clamp(0.50 + (rand() * 0.12 - 0.06), 0.04, 0.58);
+  const rLeft = clamp(0.1 + (rand() * 0.12 - 0.06), 0.04, 0.58);
+  const rRight = clamp(0.5 + (rand() * 0.12 - 0.06), 0.04, 0.58);
   const rWobble = rand() * 0.08 - 0.04;
   const br = [
-    rLeft.toFixed(2),                              // top-left h
-    rRight.toFixed(2),                             // top-right h
+    rLeft.toFixed(2), // top-left h
+    rRight.toFixed(2), // top-right h
     clamp(0.15 + (rand() * 0.12 - 0.06), 0.04, 0.58).toFixed(2), // bottom-right h
-    clamp(0.40 + (rand() * 0.12 - 0.06), 0.04, 0.58).toFixed(2), // bottom-left h
-    clamp(0.50 + rWobble, 0.04, 0.58).toFixed(2), // top-left v
-    clamp(0.10 + rWobble, 0.04, 0.58).toFixed(2), // top-right v
-    clamp(0.40 + rWobble, 0.04, 0.58).toFixed(2), // bottom-right v
+    clamp(0.4 + (rand() * 0.12 - 0.06), 0.04, 0.58).toFixed(2), // bottom-left h
+    clamp(0.5 + rWobble, 0.04, 0.58).toFixed(2), // top-left v
+    clamp(0.1 + rWobble, 0.04, 0.58).toFixed(2), // top-right v
+    clamp(0.4 + rWobble, 0.04, 0.58).toFixed(2), // bottom-right v
     clamp(0.15 + rWobble, 0.04, 0.58).toFixed(2), // bottom-left v
   ];
   const borderRadius = `${br[0]}em ${br[1]}em ${br[2]}em ${br[3]}em / ${br[4]}em ${br[5]}em ${br[6]}em ${br[7]}em`;
@@ -163,7 +296,7 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
       targetNode = targetNode.splitText(startOffset);
     }
 
-    // ─── Per-fragment micro-jitter ───
+    // --- Per-fragment micro-jitter ---
     const bgOffsetX = clamp(rand() * 4 - 2, -2, 2).toFixed(1);
     const midDrift1 = clamp(rand() * 4 - 2, -2, 2);
     const midDrift2 = clamp(rand() * 4 - 2, -2, 2);
@@ -209,17 +342,34 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
 
 /**
  * Removes all <mark> elements for a given highlight ID.
- * Does NOT call .normalize() — leaves text nodes fragmented to avoid
+ * Does NOT call .normalize() leaves text nodes fragmented to avoid
  * breaking host page framework state.
  */
-export function removeHighlightMarks(highlightId: string): void {
+export function removeHighlightMarks(
+  highlightId: string,
+  options?: { skipAnimation?: boolean }
+): void {
+  const skipAnimation = options?.skipAnimation || highlightsDeletedViaHold.has(highlightId);
+
+  if (skipAnimation) {
+    highlightsDeletedViaHold.delete(highlightId);
+  }
+
   const marks = document.querySelectorAll<HTMLElement>(`mark[data-highlight-id="${highlightId}"]`);
 
   marks.forEach((mark) => {
     const parent = mark.parentNode;
     if (!parent) return;
 
-    // Animate out: reverse the enter animation (100% → 0%)
+    if (skipAnimation) {
+      while (mark.firstChild) {
+        parent.insertBefore(mark.firstChild, mark);
+      }
+      parent.removeChild(mark);
+      return;
+    }
+
+    // Animate out: reverse the enter animation (100% to 0%)
     const onEnd = () => {
       mark.removeEventListener('transitionend', onEnd);
       // Unwrap: move children out, then remove the mark
@@ -230,6 +380,11 @@ export function removeHighlightMarks(highlightId: string): void {
     };
 
     mark.addEventListener('transitionend', onEnd);
-    mark.style.backgroundSize = '0% 100%';
+    mark.style.setProperty(
+      'transition',
+      'background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1)',
+      'important'
+    );
+    mark.style.setProperty('background-size', '0% 100%', 'important');
   });
 }
