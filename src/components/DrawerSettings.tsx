@@ -68,9 +68,13 @@ export const DrawerSettings: React.FC = () => {
   };
 
   const stopDelete = () => {
-    if (isDeleted) return;
+    // Abort the deletion timer
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    // Reset the visual state (scale and fill)
     setIsHolding(false);
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
   };
 
   useEffect(() => {
@@ -183,24 +187,34 @@ export const DrawerSettings: React.FC = () => {
             )}
           </button>
           <button
-            onPointerDown={allHighlights.length > 0 ? startDelete : undefined}
-            onPointerUp={allHighlights.length > 0 ? stopDelete : undefined}
-            onPointerLeave={allHighlights.length > 0 ? stopDelete : undefined}
-            className={`px-4 text-sm font-light text-white flex items-center justify-center overflow-hidden relative select-none ${allHighlights.length > 0 || isDeleted ? 'cursor-pointer' : 'opacity-40 pointer-events-none'}`}
+            onPointerDown={allHighlights.length > 0 && !isDeleted ? startDelete : undefined}
+            onPointerUp={allHighlights.length > 0 && !isDeleted ? stopDelete : undefined}
+            onPointerLeave={allHighlights.length > 0 && !isDeleted ? stopDelete : undefined}
+            onPointerCancel={allHighlights.length > 0 && !isDeleted ? stopDelete : undefined}
+            className={`px-4 text-sm font-light text-white flex items-center justify-center overflow-hidden relative select-none transition-transform duration-100 ${
+              isHolding ? 'scale-[97%]' : 'scale-100'
+            } ${
+              // Only fade out if it's empty AND we are NOT showing the "Deleted" success message
+              !isDeleted && allHighlights.length === 0 ? 'opacity-40' : ''
+            } ${
+              // Only make it clickable if it's not deleted and has highlights
+              !isDeleted && allHighlights.length > 0 ? 'cursor-pointer' : 'pointer-events-none'
+            }`}
             style={{ borderRadius: '8px', height: '32px', backgroundColor: '#DC2626' }}
           >
-            <span className={`relative z-10 ${isDeleted ? 'invisible' : ''}`}>Delete all</span>
+            <span className={`relative z-10  ${isDeleted ? 'invisible' : ''}`}>Delete all</span>
             {isDeleted && (
-              <span className="absolute inset-0 flex items-center justify-center z-10 text-white">Deleted</span>
+              <span className="absolute inset-0 flex items-center justify-center z-10 text-white">
+                Deleted
+              </span>
             )}
             <div
               aria-hidden
               className="absolute -inset-px pointer-events-none"
               style={{
                 backgroundColor: '#991b1b',
-                clipPath: isHolding || isDeleted
-                  ? 'inset(0px 0% 0px 0px)'
-                  : 'inset(0px 100% 0px 0px)',
+                clipPath:
+                  isHolding || isDeleted ? 'inset(0px 0% 0px 0px)' : 'inset(0px 100% 0px 0px)',
                 transitionProperty: 'clip-path, background-color',
                 transitionDuration: isHolding ? '1000ms' : '400ms',
                 transitionTimingFunction: isHolding
