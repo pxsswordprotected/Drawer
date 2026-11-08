@@ -12,13 +12,17 @@ interface SelectionState {
   selectedText: string;
 }
 
+// Single shared object: setting it while already hidden is an Object.is no-op, so
+// ordinary clicks on the host page don't re-render the app tree.
+const HIDDEN_SELECTION: SelectionState = Object.freeze({
+  visible: false,
+  x: 0,
+  y: 0,
+  selectedText: '',
+});
+
 export function useSelectionHandler() {
-  const [selectionState, setSelectionState] = useState<SelectionState>({
-    visible: false,
-    x: 0,
-    y: 0,
-    selectedText: '',
-  });
+  const [selectionState, setSelectionState] = useState<SelectionState>(HIDDEN_SELECTION);
   const defaultColor = useDrawerStore((state) => state.defaultColor);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -37,7 +41,7 @@ export function useSelectionHandler() {
     setTimeout(() => {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) {
-        setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+        setSelectionState(HIDDEN_SELECTION);
         return;
       }
 
@@ -45,7 +49,7 @@ export function useSelectionHandler() {
 
       // Hide icon if no text is selected
       if (!selectedText || selectedText.length === 0) {
-        setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+        setSelectionState(HIDDEN_SELECTION);
         return;
       }
 
@@ -59,7 +63,7 @@ export function useSelectionHandler() {
 
         // Check if selection is inside drawer (look for parent with data-drawer attribute or specific class)
         if (element?.closest('[data-drawer]') || element?.closest('.fixed.bg-bg-main')) {
-          setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+          setSelectionState(HIDDEN_SELECTION);
           return;
         }
       }
@@ -94,7 +98,7 @@ export function useSelectionHandler() {
       setIsSaving(false);
       setIsSaved(false);
       setIsDismissing(false);
-      setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+      setSelectionState(HIDDEN_SELECTION);
     }
   }, [selectionState.visible, isSaved]);
 
@@ -143,13 +147,13 @@ export function useSelectionHandler() {
 
       // Clear the selection, trigger morph animation, then hide after 500ms
       window.getSelection()?.removeAllRanges();
-      setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+      setSelectionState(HIDDEN_SELECTION);
       setIsSaving(false);
       setIsSaved(false);
       setIsDismissing(false);
     } catch (error) {
       console.error('Failed to save highlight:', error);
-      setSelectionState({ visible: false, x: 0, y: 0, selectedText: '' });
+      setSelectionState(HIDDEN_SELECTION);
       setIsSaving(false);
       setIsSaved(false);
     }

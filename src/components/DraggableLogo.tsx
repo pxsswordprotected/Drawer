@@ -10,6 +10,9 @@ const Draggable = lazy(() => import('react-draggable'));
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 const LOGO_SIZE = 44;
+// Pointer travel (px) before a press counts as a drag. react-draggable fires
+// onDrag on any 1px move, so without this, click jitter swallows the click.
+const DRAG_THRESHOLD = 4;
 
 type Pos = { x: number; y: number };
 type Bounds = { left: number; top: number; right: number; bottom: number };
@@ -31,12 +34,14 @@ const getInitialPosition = (): Pos => ({
   y: window.innerHeight - EDGE_MARGIN - LOGO_SIZE,
 });
 
-export const DraggableLogo: React.FC = () => {
+// memo: no props, so parent re-renders (e.g. every host-page mouseup) never reach it
+export const DraggableLogo = React.memo(function DraggableLogo() {
   const [position, setPosition] = useState<Pos>(getInitialPosition);
   const [bounds, setBounds] = useState<Bounds>(getBounds);
 
   const logoRef = useRef<HTMLDivElement>(null);
   const wasDragged = useRef(false);
+  const dragStartRef = useRef<Pos>({ x: 0, y: 0 });
   const latestCenterRef = useRef<Pos>({ x: 0, y: 0 });
   const rafRef = useRef<number | null>(null);
 
@@ -110,12 +115,17 @@ export const DraggableLogo: React.FC = () => {
 
   const blockSelect = (e: Event) => e.preventDefault();
 
-  const handleDragStart = () => {
+  const handleDragStart = (_e: DraggableEvent, data: DraggableData) => {
     wasDragged.current = false;
+    dragStartRef.current = { x: data.x, y: data.y };
   };
 
   const handleDrag = (_e: DraggableEvent, data: DraggableData) => {
     if (!wasDragged.current) {
+      const dx = data.x - dragStartRef.current.x;
+      const dy = data.y - dragStartRef.current.y;
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+
       wasDragged.current = true;
       setIsDragging(true);
       document.addEventListener('selectstart', blockSelect);
@@ -135,6 +145,8 @@ export const DraggableLogo: React.FC = () => {
   };
 
   const handleDragStop = (_e: DraggableEvent, data: DraggableData) => {
+    // Sub-threshold press: let the click handler toggle; controlled position snaps back
+    if (!wasDragged.current) return;
     setIsDragging(false);
     document.removeEventListener('selectstart', blockSelect);
     const drawer = getDrawerElement();
@@ -209,4 +221,4 @@ export const DraggableLogo: React.FC = () => {
       </Draggable>
     </Suspense>
   );
-};
+});

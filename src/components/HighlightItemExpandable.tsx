@@ -15,7 +15,9 @@ interface HighlightItemExpandableProps {
   checkboxSlot?: React.ReactNode;
 }
 
-export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = ({
+// memo + boolean selector: selecting a highlight re-renders only the rows whose
+// expanded state changed, not every row in the list
+export const HighlightItemExpandable = React.memo(function HighlightItemExpandable({
   highlight,
   index,
   isStaggering = false,
@@ -23,19 +25,22 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
   onScrollToItem,
   hideActions = false,
   checkboxSlot,
-}) => {
-  const selectedHighlightId = useDrawerStore((s) => s.selectedHighlightId);
+}: HighlightItemExpandableProps) {
+  const isExpanded = useDrawerStore((s) => s.selectedHighlightId === highlight.id);
   const selectHighlight = useDrawerStore((s) => s.selectHighlight);
   const clearSelectedHighlight = useDrawerStore((s) => s.clearSelectedHighlight);
   const deleteHighlight = useDrawerStore((s) => s.deleteHighlight);
-  const isExpanded = selectedHighlightId === highlight.id;
 
   // Track previous expanded state to detect switch-collapse (another highlight selected)
   const prevExpandedRef = useRef(isExpanded);
   useEffect(() => {
     prevExpandedRef.current = isExpanded;
   });
-  const isSwitchCollapse = prevExpandedRef.current && !isExpanded && selectedHighlightId != null;
+  // Only evaluated in the render where this row just collapsed. Reading the store here
+  // (instead of subscribing) keeps other rows from re-rendering when selection
+  // toggles between none and some.
+  const isSwitchCollapse =
+    prevExpandedRef.current && !isExpanded && useDrawerStore.getState().selectedHighlightId != null;
 
   const sortedNotes = useMemo(
     () => [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp),
@@ -138,4 +143,4 @@ export const HighlightItemExpandable: React.FC<HighlightItemExpandableProps> = (
       </div>
     </div>
   );
-};
+});

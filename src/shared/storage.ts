@@ -255,10 +255,13 @@ export class StorageService {
       }
       const existingHighlights = await this.getHighlights();
       const merged = [...existingHighlights, ...data.highlights];
-      // Remove duplicates by ID
-      const unique = merged.filter(
-        (highlight, index, self) => index === self.findIndex((h) => h.id === highlight.id)
-      );
+      // Remove duplicates by ID (first occurrence wins); Set lookup keeps this O(n)
+      const seen = new Set<string>();
+      const unique = merged.filter((highlight) => {
+        if (seen.has(highlight.id)) return false;
+        seen.add(highlight.id);
+        return true;
+      });
       await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, unique);
     } catch (error) {
       console.error('Failed to import highlights:', error);

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Highlight } from '@/shared/types';
 import { DRAWER_CONFIG } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
@@ -27,7 +28,10 @@ interface PageGroup {
   mostRecentTimestamp: number;
 }
 
-export const HighlightsDrawer: React.FC = () => {
+// memo: no props, so parent re-renders (e.g. every host-page mouseup) never reach it
+export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
+  // useShallow: re-render only when these fields change, not on unrelated store
+  // updates (defaultColor, logoResetCount)
   const {
     isOpen,
     allHighlights,
@@ -48,7 +52,29 @@ export const HighlightsDrawer: React.FC = () => {
     pendingScrollHighlightId,
     clearPendingScrollHighlight,
     deletePageGroup,
-  } = useDrawerStore();
+  } = useDrawerStore(
+    useShallow((s) => ({
+      isOpen: s.isOpen,
+      allHighlights: s.allHighlights,
+      isLoading: s.isLoading,
+      logoPosition: s.logoPosition,
+      closeDrawer: s.closeDrawer,
+      drawerTrigger: s.drawerTrigger,
+      loadAllHighlights: s.loadAllHighlights,
+      loadSettings: s.loadSettings,
+      selectedHighlightId: s.selectedHighlightId,
+      lastAddedHighlightId: s.lastAddedHighlightId,
+      clearLastAdded: s.clearLastAdded,
+      expandedGroupUrl: s.expandedGroupUrl,
+      toggleGroupExpanded: s.toggleGroupExpanded,
+      setExpandedGroupUrl: s.setExpandedGroupUrl,
+      clearSelectedHighlight: s.clearSelectedHighlight,
+      selectHighlight: s.selectHighlight,
+      pendingScrollHighlightId: s.pendingScrollHighlightId,
+      clearPendingScrollHighlight: s.clearPendingScrollHighlight,
+      deletePageGroup: s.deletePageGroup,
+    }))
+  );
 
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
 
@@ -279,7 +305,9 @@ export const HighlightsDrawer: React.FC = () => {
 
   const handleDrawerAnimationEnd = useCallback(
     (e: React.AnimationEvent) => {
-      if (e.target === e.currentTarget && isClosing) {
+      // isClosing comes from the last render and can be stale: a reopen click may already
+      // have flipped the store back to open before this exit animation's end event fires.
+      if (e.target === e.currentTarget && isClosing && !useDrawerStore.getState().isOpen) {
         setIsVisible(false);
         setIsClosing(false);
         setExportMode(false);
@@ -333,6 +361,15 @@ export const HighlightsDrawer: React.FC = () => {
     container.addEventListener('scrollend', onScrollEnd, { once: true });
     scrollEndCleanup.current = cleanup;
   }, []);
+
+  // Stable identity so memoized HighlightItemExpandable rows can skip re-renders
+  const handleScrollToItem = useCallback(
+    (idx: number) => {
+      const el = itemRefs.current[idx];
+      if (el) scrollTo(el);
+    },
+    [scrollTo]
+  );
 
   // Calculate drawer position based on logo position
   useEffect(() => {
@@ -826,7 +863,7 @@ export const HighlightsDrawer: React.FC = () => {
                                           deletePageGroup(group.url);
                                         }}
                                       >
-                                        <TrashIcon size={14} className="text-text-secondary" />
+                                        <TrashIcon size={14} className="text-error" />
                                       </div>
                                     )}
                                   </div>
@@ -874,10 +911,7 @@ export const HighlightsDrawer: React.FC = () => {
                                           }
                                           highlight={highlight}
                                           index={globalIdx}
-                                          onScrollToItem={(idx: number) => {
-                                            const el = itemRefs.current[idx];
-                                            if (el) scrollTo(el);
-                                          }}
+                                          onScrollToItem={handleScrollToItem}
                                           isStaggering={isStaggering}
                                           onStaggerEnd={
                                             isLastInGroup && !isCollapsed
@@ -1111,4 +1145,4 @@ export const HighlightsDrawer: React.FC = () => {
       </div>
     </div>
   );
-};
+});

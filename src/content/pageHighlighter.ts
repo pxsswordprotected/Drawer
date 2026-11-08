@@ -217,10 +217,13 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     NodeFilter.SHOW_TEXT,
     {
       acceptNode: (node) => {
+        // Range check first: it rejects most nodes under a large common ancestor
+        // before the costlier closest() selector walk runs.
+        if (!range.intersectsNode(node)) return NodeFilter.FILTER_REJECT;
         if (node.parentElement?.closest('mark[data-highlight-id]')) {
           return NodeFilter.FILTER_REJECT;
         }
-        return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
       },
     }
   );

@@ -8,7 +8,7 @@ export type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
 interface DrawerState {
   isOpen: boolean;
   allHighlights: Highlight[];
-  isLoading: boolean;
+  isLoading: boolean; // True only until the first load completes; refreshes are silent
   logoPosition: { x: number; y: number } | null;
   selectedHighlightId: string | null;
   lastAddedHighlightId: string | null;
@@ -46,10 +46,10 @@ interface DrawerState {
 // Request deduplication map - prevents duplicate concurrent requests
 const loadingPromises = new Map<string, Promise<void>>();
 
-export const useDrawerStore = create<DrawerState>((set) => ({
+export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: false,
   allHighlights: [],
-  isLoading: false,
+  isLoading: true,
   logoPosition: null,
   selectedHighlightId: null,
   lastAddedHighlightId: null,
@@ -190,11 +190,14 @@ export const useDrawerStore = create<DrawerState>((set) => ({
     }
 
     const promise = (async () => {
-      set({ isLoading: true });
-
+      // No isLoading toggle here: swapping the list for the skeleton on every
+      // refresh resets scroll position and detaches the current-page section.
       try {
         const highlights = await storageService.getHighlights();
-        set({ allHighlights: highlights, isLoading: false });
+        // Storage returns fresh copies every read. Keep the current array when the
+        // content is identical so a drawer open doesn't re-render every row.
+        const unchanged = JSON.stringify(highlights) === JSON.stringify(get().allHighlights);
+        set(unchanged ? { isLoading: false } : { allHighlights: highlights, isLoading: false });
       } catch (error) {
         console.error('Failed to load highlights:', error);
         set({ allHighlights: [], isLoading: false });
