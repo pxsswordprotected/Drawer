@@ -39,6 +39,8 @@ export interface Settings {
   syncEndpoint?: string; // Future: API endpoint
 }
 
+export type ExportScope = 'current' | 'all' | 'selected';
+
 // Message types for extension communication
 export enum MessageType {
   SAVE_HIGHLIGHT = 'SAVE_HIGHLIGHT',

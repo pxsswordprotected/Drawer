@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { useShallow } from 'zustand/react/shallow';
-import { Highlight } from '@/shared/types';
+import { Highlight, ExportScope } from '@/shared/types';
 import { DRAWER_CONFIG } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
 import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 import { HighlightItemExpandable } from './HighlightItemExpandable';
 import { TrashIcon } from '@/shared/TrashIcon';
-import { ExportScope } from './ExportPanel';
 import { DrawerToolbar } from './DrawerToolbar';
 import { generateMarkdown, downloadMarkdown, copyMarkdown } from '@/shared/exportHighlights';
 import { DrawerSettings } from './DrawerSettings';
@@ -17,7 +16,6 @@ const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 // Stagger animation constants (shared between delay calculations and scroll timing)
 const STAGGER_BASE = 20;
 const STAGGER_PER_ITEM = 35;
-const STAGGER_DURATION = 250;
 
 // ─── Page grouping types ───
 interface PageGroup {
@@ -456,11 +454,13 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeDrawer();
+    // Shadow roots and documents are both EventTargets; type the handler as Event so one
+    // listener signature fits either root.
+    const handleEscape = (e: Event) => {
+      if ((e as KeyboardEvent).key === 'Escape') closeDrawer();
     };
 
-    const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
+    const root: EventTarget = drawerRef.current?.getRootNode() ?? document;
     root.addEventListener('keydown', handleEscape);
     return () => root.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeDrawer]);

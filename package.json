@@ -22,13 +22,10 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "geist": "^1.5.1",
     "lucide-react": "^0.563.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-draggable": "^4.4.6",
-    "react-toastify": "^10.0.5",
-    "slowmo": "^0.16.2",
     "webextension-polyfill": "^0.12.0",
     "zustand": "^4.5.2"
   },
@@ -48,7 +45,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "postcss": "^8.4.38",
     "prettier": "^3.2.5",
-    "shave": "^5.1.0",
+    "slowmo": "^0.16.2",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.5",
     "vite": "^5.2.10",

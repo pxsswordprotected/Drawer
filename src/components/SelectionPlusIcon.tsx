@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 
 interface SelectionPlusIconProps {
   visible: boolean;
@@ -16,7 +16,6 @@ export const SelectionPlusIcon: React.FC<SelectionPlusIconProps> = ({
   y,
   onClick,
   disabled = false,
-  isSuccess = false,
   isDismissing = false,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);

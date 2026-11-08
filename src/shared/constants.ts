@@ -39,11 +39,6 @@ export const DRAWER_CONFIG = {
   EDGE_MARGIN: 24, // Margin from viewport edges for logo and drawer
 } as const;
 
-export const TOAST_CONFIG = {
-  DURATION: 4000, // 4 seconds
-  POSITION: 'top-right',
-} as const;
-
 export const XPATH_CONFIG = {
   TEXT_CONTEXT_LENGTH: 50, // Characters before/after for fallback matching
 } as const;

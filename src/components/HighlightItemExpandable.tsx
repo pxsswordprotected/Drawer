@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
 import { TrashIcon } from '@/shared/TrashIcon';
-import { NoteInput, NoteItem } from './HighlightDetailView';
+import { NoteInput, NoteItem } from './Notes';
 import styles from './HighlightItemExpandable.module.css';
 
 interface HighlightItemExpandableProps {

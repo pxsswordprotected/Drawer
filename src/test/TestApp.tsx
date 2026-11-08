@@ -5,7 +5,6 @@ import { SelectionPlusIcon } from '../components/SelectionPlusIcon';
 import { useSelectionHandler } from './useSelectionHandler';
 import { useDrawerStore } from '@/store/drawerStore';
 import { removeHighlightMarks } from '../content/pageHighlighter';
-import { Agentation } from 'agentation';
 
 export const TestApp: React.FC = () => {
   const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } =

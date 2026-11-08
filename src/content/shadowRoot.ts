@@ -48,30 +48,8 @@ export function createShadowRootUI(): ShadowRootUI {
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
-
-    /* Ensure toasts are positioned correctly within Shadow DOM */
-    .Toastify__toast-container {
-      position: fixed !important;
-    }
   `;
   shadowRoot.appendChild(baseStyles);
 
   return { shadowRoot, reactRoot, container };
-}
-
-/**
- * Remove the Shadow DOM container from the page
- */
-export function removeShadowRootUI(): void {
-  const container = document.getElementById(DRAWER_CONFIG.SHADOW_DOM_ID);
-  if (container) {
-    container.remove();
-  }
-}
-
-/**
- * Check if Shadow DOM UI already exists
- */
-export function shadowRootUIExists(): boolean {
-  return document.getElementById(DRAWER_CONFIG.SHADOW_DOM_ID) !== null;
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Highlight } from '@/shared/types';
-import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
 import { useDrawerStore } from '@/store/drawerStore';
 import { applyHighlightToRange } from './pageHighlighter';
@@ -59,7 +58,9 @@ export function useSelectionHandler() {
         const range = selection.getRangeAt(0);
         const container = range.commonAncestorContainer;
         const element =
-          container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+          container.nodeType === Node.ELEMENT_NODE
+            ? (container as Element)
+            : container.parentElement;
 
         // Check if selection is inside drawer (look for parent with data-drawer attribute or specific class)
         if (element?.closest('[data-drawer]') || element?.closest('.fixed.bg-bg-main')) {

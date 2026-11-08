@@ -6,7 +6,7 @@ export interface ExportOptions {
   includePageTitles: boolean;
 }
 
-const escapeMd = (s: string) => s.replace(/([#>*_`\-\[\]\\|~])/g, '\\$1');
+const escapeMd = (s: string) => s.replace(/([#>*_`\-[\]\\|~])/g, '\\$1');
 
 export function generateMarkdown(highlights: Highlight[], options: ExportOptions): string {
   if (highlights.length === 0) return '';

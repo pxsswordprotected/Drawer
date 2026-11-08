@@ -8,7 +8,7 @@ module.exports = {
     'plugin:react-hooks/recommended',
     'prettier',
   ],
-  ignorePatterns: ['dist', '.eslintrc.js'],
+  ignorePatterns: ['dist', '.eslintrc.cjs'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 'latest',
@@ -26,5 +26,14 @@ module.exports = {
   rules: {
     'react/react-in-jsx-scope': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
+    // `const { note, ...rest } = h` intentionally drops a legacy field (storage migration)
+    '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
   },
+  overrides: [
+    {
+      // Dev-only test page: article prose contains literal quotes/apostrophes
+      files: ['src/test/**'],
+      rules: { 'react/no-unescaped-entities': 'off' },
+    },
+  ],
 };

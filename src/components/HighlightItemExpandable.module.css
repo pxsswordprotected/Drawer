@@ -116,7 +116,7 @@
   }
 }
 
-/* Stagger entry animation — copied from HighlightItem.module.css */
+/* Stagger entry animation */
 @keyframes itemStaggerEnter {
   from {
     opacity: 0;
