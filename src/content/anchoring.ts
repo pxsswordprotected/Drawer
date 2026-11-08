@@ -103,11 +103,18 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
   };
 }
 
-/** Tag names of the nearest PATH_DEPTH element ancestors of `node`, outermost first. */
+// Container tags that shape a page's layout; inline formatting (em, a, span…) is
+// skipped so adding formatting doesn't change the path.
+const PATH_TAGS: Record<string, true> = {
+  ...BLOCK_TAGS, UL: true, OL: true, DL: true, TABLE: true, THEAD: true, TBODY: true, TR: true,
+  FIGURE: true, FORM: true, FIELDSET: true, DETAILS: true,
+};
+
+/** Tag names of the nearest PATH_DEPTH container ancestors of `node`, outermost first. */
 function tagPath(node: Node, root: Node): string {
   const tags: string[] = [];
   for (let el: Node | null = node.nodeType === 1 ? node : node.parentNode; el && el !== root && tags.length < PATH_DEPTH; el = el.parentNode) {
-    if (el.nodeType === 1) tags.unshift((el as Element).tagName);
+    if (el.nodeType === 1 && PATH_TAGS[(el as Element).tagName]) tags.unshift((el as Element).tagName);
   }
   return tags.join('>');
 }
@@ -241,7 +248,7 @@ const MIN_SCORE = 0.45;
 const MIN_BLOCK = 0.3;
 const BLOCK_WEIGHT = 0.4;
 const POSITION_WEIGHT = 0.15;
-const PATH_WEIGHT = 0.1;
+const PATH_WEIGHT = 0.2;
 const PATH_DEPTH = 4;
 const MAX_CANDIDATES = 2000;
 
@@ -311,12 +318,13 @@ export function resolveHighlight(
     const exact = xpathExact(c.s, c.e);
     const ctx = contextScore(c.s, c.e);
     const bs = blockSim(c.s);
-    const textual = bs === null ? ctx : (1 - BLOCK_WEIGHT) * ctx + BLOCK_WEIGHT * bs;
+    const storedPath = position.path;
+    // Same container structure nudges up, a different one nudges down (± PATH_WEIGHT/2).
+    const struct = storedPath ? PATH_WEIGHT * (pathSim(tagPath(idx.nodes[idx.nodeOf[c.s]], root), storedPath) - 0.5) : 0;
+    const textual = (bs === null ? ctx : (1 - BLOCK_WEIGHT) * ctx + BLOCK_WEIGHT * bs) + struct;
     if (hasContext && !exact && (textual < MIN_SCORE || (bs !== null && bs < MIN_BLOCK))) return -Infinity;
     const pos = position.at === undefined || !page.length ? 0 : POSITION_WEIGHT * Math.abs(c.s / page.length - position.at);
-    const storedPath = position.path;
-    const struct = storedPath ? PATH_WEIGHT * pathSim(tagPath(idx.nodes[idx.nodeOf[c.s]], root), storedPath) : 0;
-    return textual + (exact ? 0.5 : 0) - c.dist / needle.length - pos + struct;
+    return textual + (exact ? 0.5 : 0) - c.dist / needle.length - pos;
   };
   const choose = (cands: Cand[]) => {
     let best: Cand | null = null;
