@@ -33,6 +33,8 @@ export interface HighlightPosition {
     head: string; // first 32 chars
     tail: string; // last 32 chars
     len: number; // total length
+    prev?: string; // last 24 chars of page text before the block
+    next?: string; // first 24 chars of page text after the block
   };
   at?: number; // highlight start as a fraction (0..1) of the page's whitespace-free text
   path?: string; // tag names of the start node's nearest 4 element ancestors, e.g. "DIV>BLOCKQUOTE>P"

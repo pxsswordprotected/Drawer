@@ -74,6 +74,19 @@ function blockPrint(el: Element): NonNullable<HighlightPosition['block']> {
   return { head: t.slice(0, 32), tail: t.slice(-32), len: t.length };
 }
 
+/** blockPrint plus the text surrounding the block (used when saving). */
+function blockPrintWithNeighbors(el: Element, root: Node): NonNullable<HighlightPosition['block']> {
+  const doc = el.ownerDocument;
+  const r = doc.createRange();
+  r.setStart(root, 0);
+  r.setEndBefore(el);
+  const prev = squeeze(r.toString()).slice(-NEIGHBOR);
+  r.setStartAfter(el);
+  r.setEnd(root, root.childNodes.length);
+  const next = squeeze(r.toString()).slice(0, NEIGHBOR);
+  return { ...blockPrint(el), prev, next };
+}
+
 /** Capture a serializable description of `range` within `root`. */
 export function describeRange(range: Range, root: Node): HighlightPosition {
   const doc = root.ownerDocument ?? (root as Document);
@@ -97,7 +110,7 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
       before: beforeText.slice(-CONTEXT),
       after: afterText.slice(0, CONTEXT),
     },
-    ...(block ? { block: blockPrint(block) } : {}),
+    ...(block ? { block: blockPrintWithNeighbors(block, root) } : {}),
     at: total ? lead / total : 0,
     path: tagPath(range.startContainer, root),
   };
@@ -250,6 +263,8 @@ const BLOCK_WEIGHT = 0.4;
 const POSITION_WEIGHT = 0.15;
 const PATH_WEIGHT = 0.2;
 const PATH_DEPTH = 4;
+const NEIGHBOR = 24; // chars of text stored on each side of the highlight's block
+const NEIGHBOR_WEIGHT = 0.3; // share of block similarity taken from that surrounding text
 const MAX_CANDIDATES = 2000;
 
 /**
@@ -299,6 +314,23 @@ export function resolveHighlight(
     idx.nodeOf[e - 1] === xEnd &&
     idx.offsetOf[e - 1] + 1 === position.endOffset;
 
+  // Squeezed index where each text node starts (for locating a block's neighbors).
+  let nodeIndex: Map<Node, number> | null = null;
+  const blockStart = (el: Element) => {
+    const first = doc.createTreeWalker(el, 4).nextNode();
+    if (!first) return -1;
+    if (!nodeIndex) {
+      nodeIndex = new Map();
+      for (let k = idx.nodeOf.length - 1; k >= 0; k--) nodeIndex.set(idx.nodes[idx.nodeOf[k]], k);
+    }
+    // First squeezed char at or after the block's first text node.
+    const ni = idx.nodes.indexOf(first as Text);
+    for (let n = ni; n !== -1 && n < idx.nodes.length; n++) {
+      const k = nodeIndex.get(idx.nodes[n]);
+      if (k !== undefined) return k;
+    }
+    return -1;
+  };
   const blockCache = new Map<Element | null, number>();
   const blockSim = (s: number) => {
     const fp = position.block;
@@ -307,7 +339,18 @@ export function resolveHighlight(
     let sim = blockCache.get(el);
     if (sim === undefined) {
       const cur = el ? blockPrint(el) : { head: '', tail: '', len: 0 };
-      sim = (dice(cur.head, fp.head) + dice(cur.tail, fp.tail)) / 2;
+      const inner = (dice(cur.head, fp.head) + dice(cur.tail, fp.tail)) / 2;
+      let outer: number | null = null;
+      if (el && (fp.prev || fp.next)) {
+        const start = blockStart(el);
+        if (start !== -1) {
+          const sides: number[] = [];
+          if (fp.prev) sides.push(dice(page.slice(Math.max(0, start - fp.prev.length), start), fp.prev));
+          if (fp.next) sides.push(dice(page.slice(start + cur.len, start + cur.len + fp.next.length), fp.next));
+          outer = sides.reduce((a, b) => a + b, 0) / sides.length;
+        }
+      }
+      sim = outer === null ? inner : (1 - NEIGHBOR_WEIGHT) * inner + NEIGHBOR_WEIGHT * outer;
       blockCache.set(el, sim);
     }
     return sim;
