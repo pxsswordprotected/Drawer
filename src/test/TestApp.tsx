@@ -4,7 +4,7 @@ import { HighlightsDrawer } from '../components/HighlightsDrawer';
 import { SelectionPlusIcon } from '../components/SelectionPlusIcon';
 import { useSelectionHandler } from './useSelectionHandler';
 import { useDrawerStore } from '@/store/drawerStore';
-import { removeHighlightMarks } from '../content/pageHighlighter';
+import { removeHighlightMarks, restoreHighlights } from '../content/pageHighlighter';
 
 export const TestApp: React.FC = () => {
   const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } =
@@ -21,6 +21,7 @@ export const TestApp: React.FC = () => {
       }
     }
     prevIdsRef.current = currentIds;
+    restoreHighlights(allHighlights);
   }, [allHighlights]);
 
   return (

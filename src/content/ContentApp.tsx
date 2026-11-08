@@ -4,13 +4,13 @@ import { HighlightsDrawer } from '../components/HighlightsDrawer';
 import { SelectionPlusIcon } from '../components/SelectionPlusIcon';
 import { useSelectionHandler } from './useSelectionHandler';
 import { useDrawerStore } from '@/store/drawerStore';
-import { removeHighlightMarks } from './pageHighlighter';
+import { removeHighlightMarks, restoreHighlights } from './pageHighlighter';
 
 export const ContentApp: React.FC = () => {
   const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } =
     useSelectionHandler();
 
-  // React layer for mark cleanup: detect deleted highlights and remove their marks
+  // React layer for page marks: restore saved highlights on load, remove marks of deleted ones
   const allHighlights = useDrawerStore((s) => s.allHighlights);
   const prevIdsRef = useRef<Set<string>>(new Set());
 
@@ -22,6 +22,7 @@ export const ContentApp: React.FC = () => {
       }
     }
     prevIdsRef.current = currentIds;
+    restoreHighlights(allHighlights);
   }, [allHighlights]);
 
   return (

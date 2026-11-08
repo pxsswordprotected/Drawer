@@ -1,4 +1,6 @@
 import { useDrawerStore } from '@/store/drawerStore';
+import type { Highlight } from '@/shared/types';
+import { resolveHighlight } from './anchoring';
 
 // --- Seeded PRNG utilities ---
 
@@ -456,4 +458,23 @@ export function removeHighlightMarks(
     );
     mark.style.setProperty('background-size', '0% 100%', 'important');
   });
+}
+
+// Highlights we've already tried to restore on this page load (found or orphaned),
+// so repeated store updates don't re-run the search.
+const restoreAttempted = new Set<string>();
+
+/**
+ * Re-applies marks for saved highlights of the current page that aren't on the page
+ * yet (page reload / revisit). Highlights that can't be located are left unmarked.
+ */
+export function restoreHighlights(highlights: Highlight[]): void {
+  const url = window.location.href;
+  for (const h of highlights) {
+    if (h.url !== url || restoreAttempted.has(h.id)) continue;
+    restoreAttempted.add(h.id);
+    if (document.querySelector(`mark[data-highlight-id="${h.id}"]`)) continue;
+    const range = resolveHighlight(h.text, h.position, document.body);
+    if (range) applyHighlightToRange(range, h.id, h.color);
+  }
 }

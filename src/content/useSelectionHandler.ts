@@ -3,6 +3,7 @@ import { Highlight } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 import { useDrawerStore } from '@/store/drawerStore';
 import { applyHighlightToRange } from './pageHighlighter';
+import { describeRange } from './anchoring';
 
 interface SelectionState {
   visible: boolean;
@@ -110,6 +111,10 @@ export function useSelectionHandler() {
     // Disable button immediately to prevent rapid clicks
     setIsSaving(true);
 
+    // Capture the live range before marks split its text nodes or the selection clears
+    const selection = window.getSelection();
+    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
     const highlight: Highlight = {
       id: crypto.randomUUID(),
       text: selectionState.selectedText,
@@ -118,21 +123,18 @@ export function useSelectionHandler() {
       notes: [],
       color: defaultColor,
       timestamp: Date.now(),
-      position: {
-        // Skip XPath tracking for v1 - just use empty values
-        startXPath: '',
-        endXPath: '',
-        startOffset: 0,
-        endOffset: 0,
-        textContext: { before: '', after: '' },
-      },
+      position: range
+        ? describeRange(range, document.body)
+        : {
+            startXPath: '',
+            endXPath: '',
+            startOffset: 0,
+            endOffset: 0,
+            textContext: { before: '', after: '' },
+          },
     };
 
     try {
-      // Capture the live range before clearing selection
-      const selection = window.getSelection();
-      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-
       // Wrap selected text in <mark> elements on the page
       if (range) {
         applyHighlightToRange(range, highlight.id, highlight.color);
