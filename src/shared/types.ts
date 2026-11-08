@@ -37,7 +37,8 @@ export interface HighlightPosition {
     next?: string; // first 24 chars of page text after the block
   };
   at?: number; // highlight start as a fraction (0..1) of the page's whitespace-free text
-  path?: string; // tag names of the start node's nearest 4 element ancestors, e.g. "DIV>BLOCKQUOTE>P"
+  path?: string; // tag names of the start node's nearest 4 container ancestors, e.g. "DIV>BLOCKQUOTE>P"
+  twins?: number; // copies on the page that matched this highlight equally well when saved (≥2)
 }
 
 export interface Settings {

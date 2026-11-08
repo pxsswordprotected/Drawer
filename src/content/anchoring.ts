@@ -101,7 +101,7 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
   const block = blockElement(range.startContainer, root);
   const lead = squeeze(beforeText).length;
   const total = lead + squeeze(range.toString()).length + squeeze(afterText).length;
-  return {
+  const position: HighlightPosition = {
     startXPath: xpathFor(range.startContainer, root),
     endXPath: xpathFor(range.endContainer, root),
     startOffset: range.startOffset,
@@ -114,6 +114,10 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
     at: total ? lead / total : 0,
     path: tagPath(range.startContainer, root),
   };
+  // How many copies on the page already look like this highlight (itself included).
+  const { passing } = locate(range.toString(), position, root);
+  if (passing > 1) position.twins = passing;
+  return position;
 }
 
 // Container tags that shape a page's layout; inline formatting (em, a, span…) is
@@ -266,20 +270,19 @@ const PATH_DEPTH = 4;
 const NEIGHBOR = 24; // chars of text stored on each side of the highlight's block
 const NEIGHBOR_WEIGHT = 0.3; // share of block similarity taken from that surrounding text
 const MAX_CANDIDATES = 2000;
+// When a twin copy vanished, the survivor must be within this fraction of the page
+// from the saved position (deleting a block shifts positions a little).
+const TWIN_POSITION_TOLERANCE = 0.05;
 
-/**
- * Find the highlight described by `text` + `position` inside `root`.
- * Returns null when the highlight can't be located (e.g. its text was removed).
- * Must not mutate the DOM.
- */
-export function resolveHighlight(
-  text: string,
-  position: HighlightPosition,
-  root: Node
-): Range | null {
+interface Resolved {
+  range: Range | null;
+  passing: number; // exact copies that passed the acceptance gate
+}
+
+function locate(text: string, position: HighlightPosition, root: Node): Resolved {
   const doc = root.ownerDocument ?? (root as Document);
   const needle = squeeze(text);
-  if (!needle) return null;
+  if (!needle) return { range: null, passing: 0 };
   const idx = buildIndex(root);
   const page = idx.text;
 
@@ -372,21 +375,36 @@ export function resolveHighlight(
   const choose = (cands: Cand[]) => {
     let best: Cand | null = null;
     let bestScore = -Infinity;
+    let passing = 0;
     for (const c of cands) {
       const sc = score(c);
+      if (sc === -Infinity) continue;
+      passing++;
       if (sc > bestScore) {
         bestScore = sc;
         best = c;
       }
     }
-    return { best, bestScore };
+    return { best, bestScore, passing };
+  };
+
+  // If the page held several indistinguishable copies when the highlight was saved
+  // and fewer remain now, one of them was removed and it may have been ours. Only
+  // accept a survivor that sits where ours was.
+  const finish = (best: Cand | null, passing: number): Resolved => {
+    if (!best) return { range: null, passing };
+    const lostTwin = (position.twins ?? 0) > 1 && passing < position.twins!;
+    if (lostTwin && !xpathExact(best.s, best.e) && position.at !== undefined && page.length) {
+      if (Math.abs(best.s / page.length - position.at) > TWIN_POSITION_TOLERANCE) return { range: null, passing };
+    }
+    return { range: toRange(idx, best.s, best.e, doc), passing };
   };
 
   // 1. Exact (whitespace-insensitive) occurrences. A confident hit ends the search.
   const exact = occurrences(page, needle, MAX_CANDIDATES).map((s): Cand => ({ s, e: s + needle.length, dist: 0 }));
   const exactPick = choose(exact);
   if (exactPick.best && (!hasContext || exactPick.bestScore >= 0.9)) {
-    return toRange(idx, exactPick.best.s, exactPick.best.e, doc);
+    return finish(exactPick.best, exactPick.passing);
   }
 
   // 2. Fuzzy: the highlighted text itself may have been lightly edited (typo fix),
@@ -419,5 +437,14 @@ export function resolveHighlight(
     }
   }
   const { best } = choose([...exact, ...fuzzy]);
-  return best ? toRange(idx, best.s, best.e, doc) : null;
+  return finish(best, exactPick.passing);
+}
+
+/**
+ * Find the highlight described by `text` + `position` inside `root`.
+ * Returns null when the highlight can't be located (e.g. its text was removed).
+ * Must not mutate the DOM.
+ */
+export function resolveHighlight(text: string, position: HighlightPosition, root: Node): Range | null {
+  return locate(text, position, root).range;
 }
