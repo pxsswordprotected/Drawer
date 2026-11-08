@@ -31,7 +31,20 @@ export default defineConfig(({ mode }) => {
 
   // Default: test page dev server
   return {
-    plugins,
+    plugins: [
+      ...plugins,
+      {
+        name: 'serve-test-page-at-root',
+        configureServer(server) {
+          server.middlewares.use((req, _res, next) => {
+            if (req.url === '/' || req.url?.startsWith('/?')) {
+              req.url = '/src/test/index.html';
+            }
+            next();
+          });
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
