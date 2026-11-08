@@ -240,55 +240,62 @@ export function resolveHighlight(
     idx.nodeOf[e - 1] === xEnd &&
     idx.offsetOf[e - 1] + 1 === position.endOffset;
 
-  const choose = (cands: [number, number][], penalty: (s: number, e: number) => number) => {
-    let best: [number, number] | null = null;
+  type Cand = { s: number; e: number; dist: number };
+  const score = (c: Cand) => {
+    const exact = xpathExact(c.s, c.e);
+    const ctx = contextScore(c.s, c.e);
+    if (hasContext && !exact && ctx < MIN_CONTEXT) return -Infinity;
+    return ctx + (exact ? 0.5 : 0) - c.dist / needle.length;
+  };
+  const choose = (cands: Cand[]) => {
+    let best: Cand | null = null;
     let bestScore = -Infinity;
-    for (const [s, e] of cands) {
-      const exact = xpathExact(s, e);
-      const ctx = contextScore(s, e);
-      if (hasContext && !exact && ctx < MIN_CONTEXT) continue;
-      const score = ctx + (exact ? 0.5 : 0) - penalty(s, e);
-      if (score > bestScore) {
-        bestScore = score;
-        best = [s, e];
+    for (const c of cands) {
+      const sc = score(c);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = c;
       }
     }
-    return best;
+    return { best, bestScore };
   };
 
-  // 1. Exact (whitespace-insensitive) occurrences.
-  const exact = occurrences(page, needle, MAX_CANDIDATES).map((s): [number, number] => [s, s + needle.length]);
-  if (exact.length) {
-    const best = choose(exact, () => 0);
-    return best ? toRange(idx, best[0], best[1], doc) : null;
+  // 1. Exact (whitespace-insensitive) occurrences. A confident hit ends the search.
+  const exact = occurrences(page, needle, MAX_CANDIDATES).map((s): Cand => ({ s, e: s + needle.length, dist: 0 }));
+  const exactPick = choose(exact);
+  if (exactPick.best && (!hasContext || exactPick.bestScore >= 0.9)) {
+    return toRange(idx, exactPick.best.s, exactPick.best.e, doc);
   }
 
-  // 2. Fuzzy: the text was lightly edited (typo fix etc.). Locate by a prefix and/or
-  //    suffix probe, then accept if the edit distance is small.
+  // 2. Fuzzy: the highlighted text itself may have been lightly edited (typo fix),
+  //    in which case any exact hit is a different passage repeating the old words.
+  //    Locate by prefix/suffix probes; keep spans within a small edit distance.
   const len = needle.length;
-  if (len < 12) return null;
-  const K = Math.min(24, Math.floor(len / 3));
-  const prefix = needle.slice(0, K);
-  const suffix = needle.slice(len - K);
-  const maxDist = Math.max(1, Math.floor(len * 0.1));
-  const cands: [number, number][] = [];
-  for (const s of occurrences(page, prefix, 200)) {
-    const suffixAt = page.indexOf(suffix, s + Math.max(K, len - K - maxDist));
-    const e = suffixAt !== -1 && suffixAt + K - s <= len + maxDist ? suffixAt + K : Math.min(page.length, s + len);
-    cands.push([s, e]);
+  const fuzzy: Cand[] = [];
+  if (len >= 8) {
+    const K = Math.min(24, Math.floor(len / 3));
+    const prefix = needle.slice(0, K);
+    const suffix = needle.slice(len - K);
+    const maxDist = Math.max(1, Math.floor(len * 0.1));
+    const spans: [number, number][] = [];
+    for (const s of occurrences(page, prefix, 200)) {
+      const suffixAt = page.indexOf(suffix, s + Math.max(K, len - K - maxDist));
+      const e = suffixAt !== -1 && suffixAt + K - s <= len + maxDist ? suffixAt + K : Math.min(page.length, s + len);
+      spans.push([s, e]);
+    }
+    for (const q of occurrences(page, suffix, 200)) {
+      const s = q + K - len;
+      if (s >= 0) spans.push([s, q + K]);
+    }
+    const seen = new Set<string>();
+    for (const [s, e] of spans) {
+      const key = s + ':' + e;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const dist = editDistance(page.slice(s, e), needle, maxDist);
+      if (dist > 0 && dist <= maxDist) fuzzy.push({ s, e, dist });
+    }
   }
-  for (const q of occurrences(page, suffix, 200)) {
-    const s = q + K - len;
-    if (s >= 0) cands.push([s, q + K]);
-  }
-  const dist = new Map<string, number>();
-  const distOf = (s: number, e: number) => {
-    const key = s + ':' + e;
-    let d = dist.get(key);
-    if (d === undefined) dist.set(key, (d = editDistance(page.slice(s, e), needle, maxDist)));
-    return d;
-  };
-  const close = cands.filter(([s, e]) => distOf(s, e) <= maxDist);
-  const best = choose(close, (s, e) => distOf(s, e) / len);
-  return best ? toRange(idx, best[0], best[1], doc) : null;
+  const { best } = choose([...exact, ...fuzzy]);
+  return best ? toRange(idx, best.s, best.e, doc) : null;
 }
