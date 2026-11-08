@@ -27,6 +27,14 @@ export interface HighlightPosition {
     before: string; // 50 chars before
     after: string; // 50 chars after
   };
+  // Optional (added later; older highlights lack them). Disambiguate repeated text.
+  block?: {
+    // Whitespace-free text of the block element containing the highlight start
+    head: string; // first 32 chars
+    tail: string; // last 32 chars
+    len: number; // total length
+  };
+  at?: number; // highlight start as a fraction (0..1) of the page's whitespace-free text
 }
 
 export interface Settings {

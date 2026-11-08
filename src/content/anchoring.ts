@@ -54,6 +54,26 @@ function textNodes(root: Node): Text[] {
   return out;
 }
 
+const BLOCK_TAGS: Record<string, true> = {
+  P: true, LI: true, TD: true, TH: true, DT: true, DD: true, BLOCKQUOTE: true, PRE: true,
+  H1: true, H2: true, H3: true, H4: true, H5: true, H6: true, FIGCAPTION: true, CAPTION: true,
+  SUMMARY: true, DIV: true, SECTION: true, ARTICLE: true, ASIDE: true, MAIN: true,
+  HEADER: true, FOOTER: true, NAV: true,
+};
+
+/** Nearest block-level ancestor of `node` below `root`, or null. */
+function blockElement(node: Node, root: Node): Element | null {
+  for (let el: Node | null = node.nodeType === 1 ? node : node.parentNode; el && el !== root; el = el.parentNode) {
+    if (el.nodeType === 1 && BLOCK_TAGS[(el as Element).tagName]) return el as Element;
+  }
+  return null;
+}
+
+function blockPrint(el: Element): NonNullable<HighlightPosition['block']> {
+  const t = squeeze(el.textContent ?? '');
+  return { head: t.slice(0, 32), tail: t.slice(-32), len: t.length };
+}
+
 /** Capture a serializable description of `range` within `root`. */
 export function describeRange(range: Range, root: Node): HighlightPosition {
   const doc = root.ownerDocument ?? (root as Document);
@@ -64,6 +84,10 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
   after.setStart(range.endContainer, range.endOffset);
   after.setEnd(root, root.childNodes.length);
   const beforeText = before.toString();
+  const afterText = after.toString();
+  const block = blockElement(range.startContainer, root);
+  const lead = squeeze(beforeText).length;
+  const total = lead + squeeze(range.toString()).length + squeeze(afterText).length;
   return {
     startXPath: xpathFor(range.startContainer, root),
     endXPath: xpathFor(range.endContainer, root),
@@ -71,8 +95,10 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
     endOffset: range.endOffset,
     textContext: {
       before: beforeText.slice(-CONTEXT),
-      after: after.toString().slice(0, CONTEXT),
+      after: afterText.slice(0, CONTEXT),
     },
+    ...(block ? { block: blockPrint(block) } : {}),
+    at: total ? lead / total : 0,
   };
 }
 
@@ -188,9 +214,14 @@ function occurrences(hay: string, needle: string, cap: number): number[] {
   return out;
 }
 
-// Candidates whose surrounding text matches the stored context less than this are
-// treated as a different passage that merely repeats the words.
-const MIN_CONTEXT = 0.3;
+// Candidate scoring. `textual` blends surrounding-text similarity with similarity of
+// the enclosing block; below MIN_SCORE (or a clearly different block) a candidate is
+// treated as a different passage that merely repeats the words. Page position only
+// breaks ties between otherwise equal copies.
+const MIN_SCORE = 0.45;
+const MIN_BLOCK = 0.3;
+const BLOCK_WEIGHT = 0.4;
+const POSITION_WEIGHT = 0.15;
 const MAX_CANDIDATES = 2000;
 
 /**
@@ -240,12 +271,29 @@ export function resolveHighlight(
     idx.nodeOf[e - 1] === xEnd &&
     idx.offsetOf[e - 1] + 1 === position.endOffset;
 
+  const blockCache = new Map<Element | null, number>();
+  const blockSim = (s: number) => {
+    const fp = position.block;
+    if (!fp) return null;
+    const el = blockElement(idx.nodes[idx.nodeOf[s]], root);
+    let sim = blockCache.get(el);
+    if (sim === undefined) {
+      const cur = el ? blockPrint(el) : { head: '', tail: '', len: 0 };
+      sim = (dice(cur.head, fp.head) + dice(cur.tail, fp.tail)) / 2;
+      blockCache.set(el, sim);
+    }
+    return sim;
+  };
+
   type Cand = { s: number; e: number; dist: number };
   const score = (c: Cand) => {
     const exact = xpathExact(c.s, c.e);
     const ctx = contextScore(c.s, c.e);
-    if (hasContext && !exact && ctx < MIN_CONTEXT) return -Infinity;
-    return ctx + (exact ? 0.5 : 0) - c.dist / needle.length;
+    const bs = blockSim(c.s);
+    const textual = bs === null ? ctx : (1 - BLOCK_WEIGHT) * ctx + BLOCK_WEIGHT * bs;
+    if (hasContext && !exact && (textual < MIN_SCORE || (bs !== null && bs < MIN_BLOCK))) return -Infinity;
+    const pos = position.at === undefined || !page.length ? 0 : POSITION_WEIGHT * Math.abs(c.s / page.length - position.at);
+    return textual + (exact ? 0.5 : 0) - c.dist / needle.length - pos;
   };
   const choose = (cands: Cand[]) => {
     let best: Cand | null = null;
