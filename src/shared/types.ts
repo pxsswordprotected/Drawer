@@ -35,6 +35,7 @@ export interface HighlightPosition {
     len: number; // total length
   };
   at?: number; // highlight start as a fraction (0..1) of the page's whitespace-free text
+  path?: string; // tag names of the start node's nearest 4 element ancestors, e.g. "DIV>BLOCKQUOTE>P"
 }
 
 export interface Settings {

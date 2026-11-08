@@ -99,7 +99,26 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
     },
     ...(block ? { block: blockPrint(block) } : {}),
     at: total ? lead / total : 0,
+    path: tagPath(range.startContainer, root),
   };
+}
+
+/** Tag names of the nearest PATH_DEPTH element ancestors of `node`, outermost first. */
+function tagPath(node: Node, root: Node): string {
+  const tags: string[] = [];
+  for (let el: Node | null = node.nodeType === 1 ? node : node.parentNode; el && el !== root && tags.length < PATH_DEPTH; el = el.parentNode) {
+    if (el.nodeType === 1) tags.unshift((el as Element).tagName);
+  }
+  return tags.join('>');
+}
+
+/** Fraction of ancestor tags that match, compared from the innermost outward. */
+function pathSim(a: string, b: string): number {
+  const x = a.split('>');
+  const y = b.split('>');
+  let n = 0;
+  while (n < x.length && n < y.length && x[x.length - 1 - n] === y[y.length - 1 - n]) n++;
+  return n / PATH_DEPTH;
 }
 
 // ── Text index ──────────────────────────────────────────────────────────────
@@ -222,6 +241,8 @@ const MIN_SCORE = 0.45;
 const MIN_BLOCK = 0.3;
 const BLOCK_WEIGHT = 0.4;
 const POSITION_WEIGHT = 0.15;
+const PATH_WEIGHT = 0.1;
+const PATH_DEPTH = 4;
 const MAX_CANDIDATES = 2000;
 
 /**
@@ -293,7 +314,9 @@ export function resolveHighlight(
     const textual = bs === null ? ctx : (1 - BLOCK_WEIGHT) * ctx + BLOCK_WEIGHT * bs;
     if (hasContext && !exact && (textual < MIN_SCORE || (bs !== null && bs < MIN_BLOCK))) return -Infinity;
     const pos = position.at === undefined || !page.length ? 0 : POSITION_WEIGHT * Math.abs(c.s / page.length - position.at);
-    return textual + (exact ? 0.5 : 0) - c.dist / needle.length - pos;
+    const storedPath = position.path;
+    const struct = storedPath ? PATH_WEIGHT * pathSim(tagPath(idx.nodes[idx.nodeOf[c.s]], root), storedPath) : 0;
+    return textual + (exact ? 0.5 : 0) - c.dist / needle.length - pos + struct;
   };
   const choose = (cands: Cand[]) => {
     let best: Cand | null = null;
