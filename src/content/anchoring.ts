@@ -63,12 +63,37 @@ function nodeAtXPath(path: string, root: Node): Node | null {
   return cur;
 }
 
-/** Text of all Text nodes under `root` in document order (same as Range#toString). */
+// The extension's own UI. In the extension it lives in a shadow root (which tree
+// walkers don't enter), but on the dev test page it sits in the same document, and
+// its highlight list repeats every saved highlight's text.
+const IGNORE_SELECTOR = '[data-drawer]';
+const SKIP_TAGS: Record<string, true> = { SCRIPT: true, STYLE: true, NOSCRIPT: true, TEMPLATE: true };
+
+/** Page Text nodes under `root` in document order, minus script/style and our own UI. */
 function textNodes(root: Node): Text[] {
   const doc = root.ownerDocument ?? (root as Document);
-  const walker = doc.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+  const walker = doc.createTreeWalker(root, 1 | 4 /* SHOW_ELEMENT | SHOW_TEXT */, {
+    acceptNode: (n) =>
+      n.nodeType !== 1
+        ? 1 /* FILTER_ACCEPT */
+        : SKIP_TAGS[(n as Element).tagName] || (n as Element).matches(IGNORE_SELECTOR)
+          ? 2 /* FILTER_REJECT: skip the whole subtree */
+          : 3 /* FILTER_SKIP: descend without returning the element */,
+  });
   const out: Text[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) out.push(n as Text);
+  return out;
+}
+
+/** Like Range#toString, but only over `nodes` (so ignored subtrees don't leak in). */
+function rangeText(r: Range, nodes: Text[]): string {
+  let out = '';
+  for (const n of nodes) {
+    if (!r.intersectsNode(n)) continue;
+    const s = n === r.startContainer ? r.startOffset : 0;
+    const e = n === r.endContainer ? r.endOffset : n.length;
+    if (e > s) out += n.data.slice(s, e);
+  }
   return out;
 }
 
@@ -93,32 +118,33 @@ function blockPrint(el: Element): NonNullable<HighlightPosition['block']> {
 }
 
 /** blockPrint plus the text surrounding the block (used when saving). */
-function blockPrintWithNeighbors(el: Element, root: Node): NonNullable<HighlightPosition['block']> {
+function blockPrintWithNeighbors(el: Element, root: Node, nodes: Text[]): NonNullable<HighlightPosition['block']> {
   const doc = el.ownerDocument;
   const r = doc.createRange();
   r.setStart(root, 0);
   r.setEndBefore(el);
-  const prev = squeeze(r.toString()).slice(-NEIGHBOR);
+  const prev = squeeze(rangeText(r, nodes)).slice(-NEIGHBOR);
   r.setStartAfter(el);
   r.setEnd(root, root.childNodes.length);
-  const next = squeeze(r.toString()).slice(0, NEIGHBOR);
+  const next = squeeze(rangeText(r, nodes)).slice(0, NEIGHBOR);
   return { ...blockPrint(el), prev, next };
 }
 
 /** Capture a serializable description of `range` within `root`. */
 export function describeRange(range: Range, root: Node): HighlightPosition {
   const doc = root.ownerDocument ?? (root as Document);
+  const nodes = textNodes(root);
   const before = doc.createRange();
   before.setStart(root, 0);
   before.setEnd(range.startContainer, range.startOffset);
   const after = doc.createRange();
   after.setStart(range.endContainer, range.endOffset);
   after.setEnd(root, root.childNodes.length);
-  const beforeText = before.toString();
-  const afterText = after.toString();
+  const beforeText = rangeText(before, nodes);
+  const afterText = rangeText(after, nodes);
   const block = blockElement(range.startContainer, root);
   const lead = squeeze(beforeText).length;
-  const total = lead + squeeze(range.toString()).length + squeeze(afterText).length;
+  const total = lead + squeeze(rangeText(range, nodes)).length + squeeze(afterText).length;
   const position: HighlightPosition = {
     startXPath: xpathFor(range.startContainer, root),
     endXPath: xpathFor(range.endContainer, root),
@@ -128,7 +154,7 @@ export function describeRange(range: Range, root: Node): HighlightPosition {
       before: beforeText.slice(-CONTEXT),
       after: afterText.slice(0, CONTEXT),
     },
-    ...(block ? { block: blockPrintWithNeighbors(block, root) } : {}),
+    ...(block ? { block: blockPrintWithNeighbors(block, root, nodes) } : {}),
     at: total ? lead / total : 0,
     path: tagPath(range.startContainer, root),
   };
@@ -186,8 +212,6 @@ function squeeze(s: string): string {
   return out;
 }
 
-const SKIP_TAGS: Record<string, true> = { SCRIPT: true, STYLE: true, NOSCRIPT: true, TEMPLATE: true };
-
 interface TextIndex {
   nodes: Text[];
   text: string; // squeezed page text
@@ -196,7 +220,7 @@ interface TextIndex {
 }
 
 function buildIndex(root: Node): TextIndex {
-  const nodes = textNodes(root).filter((n) => !(n.parentElement && SKIP_TAGS[n.parentElement.tagName]));
+  const nodes = textNodes(root);
   let total = 0;
   for (const n of nodes) total += n.length;
   const nodeOf = new Int32Array(total);
