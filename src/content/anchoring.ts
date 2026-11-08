@@ -34,15 +34,33 @@ function xpathFor(node: Node, root: Node): string {
   return cur === root ? '/' + parts.join('/') : '';
 }
 
+/**
+ * Follow a path produced by `xpathFor` from `root`. Walks children directly (same
+ * counting rules as xpathFor) instead of document.evaluate: cheaper, and immune to
+ * XPath's namespace handling of HTML/SVG element names.
+ */
 function nodeAtXPath(path: string, root: Node): Node | null {
   if (!path) return null;
-  const doc = root.ownerDocument ?? (root as Document);
-  try {
-    return doc.evaluate('.' + path, root, null, 9 /* FIRST_ORDERED_NODE_TYPE */, null)
-      .singleNodeValue;
-  } catch {
-    return null;
+  let cur: Node = root;
+  for (const step of path.split('/').slice(1)) {
+    const m = /^([^[\]/]+)\[(\d+)\]$/.exec(step);
+    if (!m) return null;
+    const isText = m[1] === 'text()';
+    const name = m[1].toUpperCase();
+    const want = Number(m[2]);
+    let seen = 0;
+    let next: Node | null = null;
+    for (let c = cur.firstChild; c; c = c.nextSibling) {
+      const hit = isText ? c.nodeType === TEXT_NODE : c.nodeType === 1 && c.nodeName.toUpperCase() === name;
+      if (hit && ++seen === want) {
+        next = c;
+        break;
+      }
+    }
+    if (!next) return null;
+    cur = next;
   }
+  return cur;
 }
 
 /** Text of all Text nodes under `root` in document order (same as Range#toString). */
