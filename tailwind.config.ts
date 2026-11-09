@@ -15,6 +15,7 @@ export default {
           secondary: '#8C8C8C', // Secondary/muted text
         },
         divider: '#484848', // Dividers/borders
+        edge: 'rgba(255, 255, 255, 0.1)', // Faint outline: visible on dark pages, invisible on light ones
 
         // Semantic colors
         error: '#CC2424',

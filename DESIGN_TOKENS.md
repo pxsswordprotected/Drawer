@@ -32,6 +32,7 @@ Use other weights only when explicitly needed (e.g., headings, emphasis).
 
 ### UI Elements
 - `border-divider` - #484848 (Borders, dividers)
+- `ring-edge` / `border-edge` - rgba(255, 255, 255, 0.1) (Faint white outline for floating surfaces; shows only where the page behind is dark)
 
 ### Semantic Colors
 - `text-error` / `bg-error` - #CC2424 (Errors, destructive actions)

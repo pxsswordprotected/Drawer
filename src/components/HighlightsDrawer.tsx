@@ -708,10 +708,9 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         <div
           ref={innerRef}
           tabIndex={0}
-          className={`relative w-full h-full bg-bg-elevated rounded-lg overflow-hidden ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
+          className={`relative w-full h-full bg-bg-elevated rounded-lg overflow-hidden shadow-[0_2px_5px_-1px_rgba(0,0,0,0.35)] ring-1 ring-edge ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
           style={{
             contain: 'paint',
-            boxShadow: '0 2px 5px -1px rgba(0, 0, 0, 0.35)',
             outline: 'none',
             ...innerStyle,
           }}
