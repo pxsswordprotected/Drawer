@@ -14,6 +14,10 @@ const LOGO_SIZE = 44;
 // onDrag on any 1px move, so without this, click jitter swallows the click.
 const DRAG_THRESHOLD = 4;
 
+// Module scope: add/removeEventListener must receive the same function identity,
+// and handleDrag/handleDragStop run in different renders.
+const blockSelect = (e: Event) => e.preventDefault();
+
 type Pos = { x: number; y: number };
 type Bounds = { left: number; top: number; right: number; bottom: number };
 
@@ -112,8 +116,6 @@ export const DraggableLogo = React.memo(function DraggableLogo() {
   };
 
   const [isDragging, setIsDragging] = useState(false);
-
-  const blockSelect = (e: Event) => e.preventDefault();
 
   const handleDragStart = (_e: DraggableEvent, data: DraggableData) => {
     wasDragged.current = false;
