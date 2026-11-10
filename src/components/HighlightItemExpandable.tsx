@@ -38,9 +38,12 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
   });
   // Only evaluated in the render where this row just collapsed. Reading the store here
   // (instead of subscribing) keeps other rows from re-rendering when selection
-  // toggles between none and some.
+  // toggles between none and some. Collapses while the drawer is closed (deselect after
+  // the exit animation) are instant too, so nothing animates on the next open.
   const isSwitchCollapse =
-    prevExpandedRef.current && !isExpanded && useDrawerStore.getState().selectedHighlightId != null;
+    prevExpandedRef.current &&
+    !isExpanded &&
+    (useDrawerStore.getState().selectedHighlightId != null || !useDrawerStore.getState().isOpen);
 
   const sortedNotes = useMemo(
     () => [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp),

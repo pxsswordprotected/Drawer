@@ -60,17 +60,17 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   defaultColor: DEFAULT_SETTINGS.defaultColor,
 
   openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger }),
+  // Closing keeps selectedHighlightId so the drawer's contents stay still during the exit
+  // animation; HighlightsDrawer clears it once the drawer is hidden.
   closeDrawer: () =>
     set({
       isOpen: false,
       pendingScrollHighlightId: null,
-      selectedHighlightId: null,
       drawerTrigger: null,
     }),
   toggleDrawer: (trigger: DrawerTrigger = 'logo') =>
     set((state) => ({
       isOpen: !state.isOpen,
-      selectedHighlightId: !state.isOpen ? state.selectedHighlightId : null,
       drawerTrigger: !state.isOpen ? trigger : null,
     })),
   setLogoPosition: (position) => set({ logoPosition: position }),

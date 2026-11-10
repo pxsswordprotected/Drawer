@@ -309,9 +309,11 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         setExportIncludePageTitles(true);
         setExportBarHeight(undefined);
         setSettingsMode(false);
+        // Deselect only now that the drawer is hidden, so nothing moves during the exit
+        clearSelectedHighlight();
       }
     },
-    [isClosing]
+    [isClosing, clearSelectedHighlight]
   );
 
   const handleStaggerEnd = useCallback(() => {
