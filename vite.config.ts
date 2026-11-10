@@ -4,10 +4,14 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const plugins = [react()];
+  // Debug log (src/shared/debugLog.ts) is compiled in for the dev page and
+  // `build:extension:debug`; the normal extension build drops it entirely.
+  const define = { __DRAWER_DEBUG__: JSON.stringify(mode !== 'extension') };
 
-  if (mode === 'extension') {
+  if (mode === 'extension' || mode === 'extension-debug') {
     return {
       plugins,
+      define,
       resolve: {
         alias: {
           '@': path.resolve(__dirname, './src'),
@@ -31,6 +35,7 @@ export default defineConfig(({ mode }) => {
 
   // Default: test page dev server
   return {
+    define,
     plugins: [
       ...plugins,
       {

@@ -5,7 +5,7 @@ import { Highlight, Note, Settings } from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 
 // Detect if we're in a browser extension context
-const isExtensionContext = (): boolean => {
+export const isExtensionContext = (): boolean => {
   try {
     return typeof chrome !== 'undefined' && chrome.storage !== undefined;
   } catch {

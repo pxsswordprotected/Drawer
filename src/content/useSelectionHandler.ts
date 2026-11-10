@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Highlight } from '@/shared/types';
 import { storageService } from '@/shared/storage';
+import { debugLog, describeRangeEnds, errorInfo, excerpt, snippetOf } from '@/shared/debugLog';
 import { useDrawerStore } from '@/store/drawerStore';
-import { applyHighlightToRange } from './pageHighlighter';
-import { describeRange } from './anchoring';
+import { applyHighlightToRange, trackHighlight } from './pageHighlighter';
+import { describeRange, trimRangeToText } from './anchoring';
 
 interface SelectionState {
   visible: boolean;
@@ -25,6 +26,8 @@ export function useSelectionHandler() {
   const [selectionState, setSelectionState] = useState<SelectionState>(HIDDEN_SELECTION);
   const defaultColor = useDrawerStore((state) => state.defaultColor);
   const [isSaving, setIsSaving] = useState(false);
+  // Click count (1 drag/click, 2 double, 3 triple) of the press that made the selection
+  const clickCountRef = useRef(0);
 
   // Handle mouse up - fires once when selection is done
   const handleMouseUp = useCallback((event: MouseEvent) => {
@@ -33,6 +36,7 @@ export function useSelectionHandler() {
     if (target.closest('[data-selection-plus-icon]')) {
       return;
     }
+    clickCountRef.current = event.detail;
 
     // Small delay to let selection settle
     setTimeout(() => {
@@ -51,8 +55,11 @@ export function useSelectionHandler() {
       }
 
       // Hide icon if the selection is entirely inside one existing highlight (its marks
-      // cover contiguous text, so matching start and end means nothing new is selected)
-      const selRange = selection.getRangeAt(0);
+      // cover contiguous text, so matching start and end means nothing new is selected).
+      // The range is trimmed to its visible text first, so a triple-click's overshoot into
+      // the next block can't misplace the plus icon or defeat this check.
+      const rawRange = selection.getRangeAt(0);
+      const selRange = trimRangeToText(rawRange) ?? rawRange;
       const highlightIdAt = (node: Node) =>
         (node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement)
           ?.closest('mark[data-highlight-id]')
@@ -81,8 +88,7 @@ export function useSelectionHandler() {
       }
 
       // Get the bounding rect of the selection
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+      const rect = selRange.getBoundingClientRect();
 
       // Position the plus icon at the end of the selection (bottom-right)
       // Add screen edge check to prevent off-screen positioning
@@ -114,9 +120,21 @@ export function useSelectionHandler() {
     // Disable button immediately to prevent rapid clicks
     setIsSaving(true);
 
-    // Capture the live range before marks split its text nodes or the selection clears
+    // Capture the live range before marks split its text nodes or the selection clears.
+    // Trim it to the visible text: triple-click ranges end at the start of the next block.
     const selection = window.getSelection();
-    const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const rawRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const range = rawRange ? trimRangeToText(rawRange) : null;
+    const rawEnds = __DRAWER_DEBUG__ && rawRange ? describeRangeEnds(rawRange) : null;
+    // Read before marks are inserted, which split the nodes the range points at
+    const wasTrimmed =
+      __DRAWER_DEBUG__ &&
+      !!rawRange &&
+      !!range &&
+      (rawRange.startContainer !== range.startContainer ||
+        rawRange.startOffset !== range.startOffset ||
+        rawRange.endContainer !== range.endContainer ||
+        rawRange.endOffset !== range.endOffset);
 
     const highlight: Highlight = {
       id: crypto.randomUUID(),
@@ -137,13 +155,42 @@ export function useSelectionHandler() {
           },
     };
 
+    // The common ancestor survives mark insertion; used for the debug snippet on failure
+    const ancestor = range?.commonAncestorContainer ?? null;
+
     try {
       // Wrap selected text in <mark> elements on the page
+      let skippedWhitespaceNodes = 0;
       if (range) {
-        applyHighlightToRange(range, highlight.id, highlight.color);
+        skippedWhitespaceNodes = applyHighlightToRange(range, highlight.id, highlight.color);
       }
 
       await storageService.saveHighlight(highlight);
+      // Keep it marked if the host page rebuilds its DOM (see restoreHighlights)
+      trackHighlight(highlight);
+
+      if (__DRAWER_DEBUG__) {
+        const markCount = document.querySelectorAll(`mark[data-highlight-id="${highlight.id}"]`).length;
+        debugLog('highlight.save', {
+          id: highlight.id,
+          text: excerpt(highlight.text),
+          length: highlight.text.length,
+          hadRange: !!range,
+          markCount,
+          skippedWhitespaceNodes,
+          clickCount: clickCountRef.current,
+          trimmed: wasTrimmed,
+          rawRange: rawEnds,
+          position: {
+            hasXPath: !!highlight.position.startXPath,
+            hasBlock: !!highlight.position.block,
+            at: highlight.position.at,
+            path: highlight.position.path,
+            twins: highlight.position.twins,
+          },
+          ...(markCount === 0 ? { snippet: snippetOf(ancestor) } : {}),
+        });
+      }
 
       // Live-update drawer if it's open
       if (useDrawerStore.getState().isOpen) {
@@ -156,6 +203,9 @@ export function useSelectionHandler() {
       setIsSaving(false);
     } catch (error) {
       console.error('Failed to save highlight:', error);
+      if (__DRAWER_DEBUG__) {
+        debugLog('highlight.saveError', { ...errorInfo(error), snippet: snippetOf(ancestor) });
+      }
       setSelectionState(HIDDEN_SELECTION);
       setIsSaving(false);
     }

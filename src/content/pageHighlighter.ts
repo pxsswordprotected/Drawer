@@ -1,6 +1,7 @@
 import { useDrawerStore } from '@/store/drawerStore';
 import type { Highlight } from '@/shared/types';
-import { resolveHighlight } from './anchoring';
+import { debugLog, excerpt, pageTextIncludes, snippetOf } from '@/shared/debugLog';
+import { nodeAtXPath, resolveHighlight } from './anchoring';
 
 // --- Seeded PRNG utilities ---
 
@@ -106,6 +107,9 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   const finalizeHoldDelete = () => {
     isLongPressCompleted = true;
     removeReleaseListeners();
+    if (__DRAWER_DEBUG__) {
+      debugLog('mark.holdDelete', { id: highlightId, ms: Math.round(performance.now() - pressStartTime) });
+    }
 
     restoreSelectionState();
 
@@ -130,11 +134,20 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     const releasedOnHighlight = !!hit?.closest(`mark[data-highlight-id="${highlightId}"]`);
     isHoldInteraction =
       !releasedOnHighlight || performance.now() - pressStartTime >= CLICK_GRACE_MS;
+    if (__DRAWER_DEBUG__) {
+      debugLog('mark.release', {
+        id: highlightId,
+        ms: Math.round(performance.now() - pressStartTime),
+        onHighlight: releasedOnHighlight,
+        countsAsClick: !isHoldInteraction,
+      });
+    }
     abortHold(e);
   };
 
   const onCancel = (e: PointerEvent) => {
     if (e.pointerId !== activePointerId) return;
+    if (__DRAWER_DEBUG__) debugLog('mark.pressCancelled', { id: highlightId, pointerType: e.pointerType });
     isHoldInteraction = true;
     abortHold(e);
   };
@@ -199,6 +212,9 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     const isOverHighlight = hit?.closest(`mark[data-highlight-id="${highlightId}"]`);
 
     if (!isOverHighlight) {
+      if (__DRAWER_DEBUG__) {
+        debugLog('mark.dragOff', { id: highlightId, ms: Math.round(performance.now() - pressStartTime) });
+      }
       isHoldInteraction = true; // dragged off: neither a click nor a delete
       abortHold(e);
     }
@@ -212,6 +228,19 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
 
   mark.addEventListener('click', (e) => {
     e.stopPropagation();
+
+    if (__DRAWER_DEBUG__) {
+      const store = useDrawerStore.getState();
+      const result =
+        isHoldInteraction || isLongPressCompleted
+          ? 'blocked'
+          : e.detail >= 2
+            ? 'multiClickIgnored'
+            : store.isOpen && store.selectedHighlightId === highlightId
+              ? 'closeDrawer'
+              : 'openDrawer';
+      debugLog('mark.click', { id: highlightId, detail: e.detail, result });
+    }
 
     // Block the click after a hold, drag-off, cancel, or delete
     if (isHoldInteraction || isLongPressCompleted) {
@@ -238,12 +267,37 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   });
 }
 
+// Whitespace/zero-width characters only
+const BLANK_TEXT = /^[\s\u200b-\u200d]*$/;
+
+const isInlineLevel = (node: Node | null): boolean =>
+  !!node &&
+  (node.nodeType === Node.TEXT_NODE ||
+    (node.nodeType === Node.ELEMENT_NODE &&
+      getComputedStyle(node as Element).display.startsWith('inline')));
+
+/**
+ * True for a whitespace-only text node that is layout filler rather than a space between
+ * words: between blocks, or directly inside a flex/grid container. Such nodes render as
+ * nothing, but wrapping one in a <mark> gives it a box (padding, background, and in
+ * flex/grid a flex item), which highlights an empty line and shifts the layout. A space
+ * between two inline siblings is real text and is kept so the highlight has no gap.
+ */
+function isLayoutWhitespace(node: Text): boolean {
+  if (!BLANK_TEXT.test(node.data)) return false;
+  const parent = node.parentElement;
+  const parentDisplay = parent ? getComputedStyle(parent).display : '';
+  if (/flex|grid/.test(parentDisplay)) return true;
+  return !(isInlineLevel(node.previousSibling) && isInlineLevel(node.nextSibling));
+}
+
 /**
  * Wraps the selected text in <mark> elements on the host page DOM.
  * Handles multi-node selections via TreeWalker, processing in reverse
  * document order to avoid offset invalidation when splitting text nodes.
+ * Returns how many layout-whitespace text nodes it skipped (for the debug log).
  */
-export function applyHighlightToRange(range: Range, highlightId: string, color: string): void {
+export function applyHighlightToRange(range: Range, highlightId: string, color: string): number {
   const treeWalker = document.createTreeWalker(
     range.commonAncestorContainer,
     NodeFilter.SHOW_TEXT,
@@ -275,12 +329,18 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     textNodes.push(range.commonAncestorContainer as Text);
   }
 
+  let skippedWhitespaceNodes = 0;
   const validTextNodes = textNodes.filter((textNode) => {
     let startOffset = 0;
     let endOffset = textNode.length;
     if (textNode === range.startContainer) startOffset = range.startOffset;
     if (textNode === range.endContainer) endOffset = range.endOffset;
-    return startOffset < endOffset;
+    if (startOffset >= endOffset) return false;
+    if (isLayoutWhitespace(textNode)) {
+      skippedWhitespaceNodes++;
+      return false;
+    }
+    return true;
   });
 
   // 1. Split text nodes at boundaries to isolate the exact selection
@@ -439,6 +499,7 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
 
     attachMarkClickHandler(mark, highlightId);
   }
+  return skippedWhitespaceNodes;
 }
 
 /**
@@ -451,6 +512,7 @@ export function removeHighlightMarks(
   options?: { skipAnimation?: boolean }
 ): void {
   const skipAnimation = options?.skipAnimation;
+  tracked.delete(highlightId); // deleted: the restore observer must not bring it back
 
   const marks = document.querySelectorAll<HTMLElement>(`mark[data-highlight-id="${highlightId}"]`);
 
@@ -486,21 +548,133 @@ export function removeHighlightMarks(
   });
 }
 
-// Highlights we've already tried to restore on this page load (found or orphaned),
-// so repeated store updates don't re-run the search.
-const restoreAttempted = new Set<string>();
+// ─── Restoring marks on revisit ───
+//
+// Marks are plain DOM nodes inside a page we don't control. Hydrating server-rendered
+// pages (Substack) rebuild their DOM shortly after load and drop our marks, and client-
+// rendered pages (X/Twitter) add their text after we first look for it. So restoring is
+// not a one-shot: every saved highlight of the current URL stays "tracked", and a
+// debounced MutationObserver re-resolves and re-marks any whose marks are missing.
+
+const RESTORE_DEBOUNCE_MS = 200; // wait for a burst of page mutations to settle…
+const RESTORE_MAX_WAIT_MS = 1000; // …but never longer than this on pages that never settle
+const RESTORE_MAX_BACKOFF_MS = 10000; // spacing between searches for text that isn't there
+const RESTORE_MAX_APPLICATIONS = 25; // stop re-marking a highlight the page keeps wiping
+
+interface RestoreState {
+  highlight: Highlight;
+  applications: number; // times marks were applied (>1 means the page removed them)
+  misses: number; // consecutive searches that found nothing
+  nextTryAt: number;
+}
+
+const tracked = new Map<string, RestoreState>();
+let restoreObserver: MutationObserver | null = null;
+let restoreTimer: ReturnType<typeof setTimeout> | null = null;
+let firstPendingAt = 0;
+
+const hasMarks = (id: string) => !!document.querySelector(`mark[data-highlight-id="${id}"]`);
+
+/** Marks the highlight for restoring (used right after saving, before the store has it) */
+export function trackHighlight(h: Highlight): void {
+  if (!tracked.has(h.id)) tracked.set(h.id, { highlight: h, applications: 1, misses: 0, nextTryAt: 0 });
+  watchPageChanges();
+}
 
 /**
  * Re-applies marks for saved highlights of the current page that aren't on the page
- * yet (page reload / revisit). Highlights that can't be located are left unmarked.
+ * (page reload / revisit / page rebuilt its DOM). `highlights` is the full saved list.
+ * Highlights that can't be located yet are retried when the page changes.
  */
 export function restoreHighlights(highlights: Highlight[]): void {
-  const url = window.location.href;
+  const ids = new Set(highlights.map((h) => h.id));
+  for (const id of tracked.keys()) if (!ids.has(id)) tracked.delete(id);
   for (const h of highlights) {
-    if (h.url !== url || restoreAttempted.has(h.id)) continue;
-    restoreAttempted.add(h.id);
-    if (document.querySelector(`mark[data-highlight-id="${h.id}"]`)) continue;
-    const range = resolveHighlight(h.text, h.position, document.body);
-    if (range) applyHighlightToRange(range, h.id, h.color);
+    const state = tracked.get(h.id);
+    if (state) state.highlight = h;
+    else tracked.set(h.id, { highlight: h, applications: 0, misses: 0, nextTryAt: 0 });
   }
+  restorePending();
+  watchPageChanges();
+}
+
+function watchPageChanges(): void {
+  if (restoreObserver) return;
+  restoreObserver = new MutationObserver(scheduleRestore);
+  restoreObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
+function scheduleRestore(): void {
+  const now = performance.now();
+  if (!firstPendingAt) firstPendingAt = now;
+  clearTimeout(restoreTimer ?? undefined);
+  const wait = Math.max(0, Math.min(RESTORE_DEBOUNCE_MS, firstPendingAt + RESTORE_MAX_WAIT_MS - now));
+  restoreTimer = setTimeout(() => {
+    restoreTimer = null;
+    firstPendingAt = 0;
+    restorePending();
+  }, wait);
+}
+
+function restorePending(): void {
+  if (document.hidden) return;
+  const url = window.location.href;
+  const now = performance.now();
+  for (const state of tracked.values()) {
+    const h = state.highlight;
+    if (h.url !== url || hasMarks(h.id)) continue;
+    if (state.applications >= RESTORE_MAX_APPLICATIONS || now < state.nextTryAt) continue;
+
+    const started = __DRAWER_DEBUG__ ? performance.now() : 0;
+    const range = resolveHighlight(h.text, h.position, document.body);
+    // Read before marks are inserted, which split the range's text nodes
+    const foundText = __DRAWER_DEBUG__ && range ? range.toString() : null;
+    if (range) {
+      applyHighlightToRange(range, h.id, h.color);
+      state.applications++;
+      state.misses = 0;
+    } else {
+      state.misses++;
+      state.nextTryAt = now + Math.min(RESTORE_MAX_BACKOFF_MS, 250 * 2 ** state.misses);
+    }
+    if (__DRAWER_DEBUG__) logRestore(state, performance.now() - started, foundText);
+  }
+}
+
+// Debug builds: one event per successful restore, and per failed search at attempts 1, 2,
+// 4, 8… (retries run on every page change, so logging each miss would flood the log).
+// `application` > 1 means the page removed the marks and they were re-applied.
+function logRestore(state: RestoreState, ms: number, foundText: string | null): void {
+  const h = state.highlight;
+  const squeeze = (s: string) => s.replace(/\s+/g, '');
+  const base = { id: h.id, text: excerpt(h.text), ms: Math.round(ms), sincePageLoadMs: Math.round(performance.now()) };
+
+  if (foundText !== null) {
+    const exact = squeeze(foundText) === squeeze(h.text);
+    debugLog('restore.found', {
+      ...base,
+      application: state.applications,
+      exact,
+      ...(exact
+        ? {}
+        : {
+            foundText: excerpt(foundText),
+            snippet: snippetOf(document.querySelector(`mark[data-highlight-id="${h.id}"]`)),
+          }),
+    });
+    return;
+  }
+
+  if (state.misses & (state.misses - 1)) return; // log misses 1, 2, 4, 8… only
+  debugLog('restore.notFound', {
+    ...base,
+    misses: state.misses,
+    textInPage: pageTextIncludes(h.text),
+    position: {
+      hasXPath: !!h.position.startXPath,
+      hasBlock: !!h.position.block,
+      twins: h.position.twins,
+    },
+    snippetAtSavedPath: state.misses === 1 ? snippetOf(nodeAtXPath(h.position.startXPath, document.body)) : null,
+  });
 }

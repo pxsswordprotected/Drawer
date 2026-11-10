@@ -39,7 +39,7 @@ function xpathFor(node: Node, root: Node): string {
  * counting rules as xpathFor) instead of document.evaluate: cheaper, and immune to
  * XPath's namespace handling of HTML/SVG element names.
  */
-function nodeAtXPath(path: string, root: Node): Node | null {
+export function nodeAtXPath(path: string, root: Node): Node | null {
   if (!path) return null;
   let cur: Node = root;
   for (const step of path.split('/').slice(1)) {
@@ -210,6 +210,39 @@ function squeeze(s: string): string {
   let out = '';
   for (let i = 0; i < s.length; i++) if (!isSpace(s.charCodeAt(i))) out += s[i];
   return out;
+}
+
+/**
+ * Copy of `range` shrunk to its first and last non-whitespace character, or null when it
+ * holds no visible text. Triple-click selections end at the start of the *next* block, so
+ * the raw range also covers the whitespace/empty nodes between blocks; describing or
+ * wrapping those saves a wrong end position and highlights empty space.
+ */
+export function trimRangeToText(range: Range): Range | null {
+  const root = range.commonAncestorContainer;
+  const nodes = root.nodeType === TEXT_NODE ? [root as Text] : textNodes(root);
+  let first: { node: Text; offset: number } | null = null;
+  let last: { node: Text; offset: number } | null = null;
+  for (const node of nodes) {
+    if (!range.intersectsNode(node)) continue;
+    const from = node === range.startContainer ? range.startOffset : 0;
+    const to = node === range.endContainer ? range.endOffset : node.length;
+    for (let i = from; i < to; i++) {
+      if (isSpace(node.data.charCodeAt(i))) continue;
+      if (!first) first = { node, offset: i };
+      break;
+    }
+    for (let i = to - 1; i >= from; i--) {
+      if (isSpace(node.data.charCodeAt(i))) continue;
+      last = { node, offset: i + 1 };
+      break;
+    }
+  }
+  if (!first || !last) return null;
+  const trimmed = range.cloneRange();
+  trimmed.setStart(first.node, first.offset);
+  trimmed.setEnd(last.node, last.offset);
+  return trimmed;
 }
 
 interface TextIndex {

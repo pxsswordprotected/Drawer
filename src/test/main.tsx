@@ -4,6 +4,9 @@ import { TestApp } from './TestApp';
 import '../index.css';
 import { Agentation } from 'agentation';
 import { Slowmo } from 'slowmo/react';
+import { initDebugLog } from '@/shared/debugLog';
+
+if (__DRAWER_DEBUG__) initDebugLog();
 
 // slowmo's dial defaults to the bottom-right corner, on top of the drawer logo. Start it
 // bottom-left instead; once dragged, slowmo saves and reuses the user's position.

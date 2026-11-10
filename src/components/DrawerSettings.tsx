@@ -3,6 +3,7 @@ import { useDrawerStore } from '@/store/drawerStore';
 import { HIGHLIGHT_COLORS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
 import { downloadJson } from '@/shared/exportHighlights';
+import { DebugLogControls } from './DebugLogControls';
 
 const COLOR_OPTIONS = [
   { name: 'Yellow', value: HIGHLIGHT_COLORS.yellow },
@@ -135,13 +136,13 @@ export const DrawerSettings: React.FC = () => {
       {/* General */}
       <div className="flex flex-col gap-2">
         <span className="text-text-secondary text-xs font-light">General</span>
-        <button
-          onClick={resetLogoPosition}
-          className={`${buttonClass} self-start`}
-          style={buttonStyle}
-        >
-          Reset position
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={resetLogoPosition} className={buttonClass} style={buttonStyle}>
+            Reset position
+          </button>
+          {/* Debug log (debug builds only) */}
+          {__DRAWER_DEBUG__ && <DebugLogControls buttonClass={buttonClass} buttonStyle={buttonStyle} />}
+        </div>
       </div>
 
       {/* Data */}

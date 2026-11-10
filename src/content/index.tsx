@@ -4,6 +4,9 @@ import ReactDOM from 'react-dom/client';
 import { ContentApp } from './ContentApp';
 import { createShadowRootUI } from './shadowRoot';
 import { useDrawerStore } from '@/store/drawerStore';
+import { initDebugLog } from '@/shared/debugLog';
+
+if (__DRAWER_DEBUG__) initDebugLog();
 
 // Cross-browser runtime API (Firefox exposes `browser`, Chrome exposes `chrome`)
 const runtime = (typeof browser !== 'undefined' ? browser : chrome).runtime;

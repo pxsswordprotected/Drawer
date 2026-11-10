@@ -82,12 +82,15 @@ export function downloadMarkdown(md: string): void {
   }, 100);
 }
 
-export function downloadJson(json: string): void {
+export function downloadJson(
+  json: string,
+  filename = `highlights-backup-${new Date().toISOString().slice(0, 10)}.json`
+): void {
   const blob = new Blob([json], { type: 'application/json' });
   const objUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = objUrl;
-  a.download = `highlights-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = filename;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
