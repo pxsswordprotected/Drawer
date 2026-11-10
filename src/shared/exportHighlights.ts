@@ -1,6 +1,6 @@
 import { Highlight } from './types';
 
-export interface ExportOptions {
+interface ExportOptions {
   includeNotes: boolean;
   includeTimestamps: boolean;
   includePageTitles: boolean;

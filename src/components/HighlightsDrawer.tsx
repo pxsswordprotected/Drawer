@@ -139,7 +139,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   const [exportExiting, setExportExiting] = useState(false);
   const [exportScope, setExportScope] = useState<ExportScope>('current');
   const [exportSelectedIds, setExportSelectedIds] = useState<Set<string>>(new Set());
-  const [exportScopeError, setExportScopeError] = useState<string | null>(null);
   const [exportIncludeNotes, setExportIncludeNotes] = useState(false);
   const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(false);
   const [exportIncludePageTitles, setExportIncludePageTitles] = useState(false);
@@ -177,12 +176,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
 
   const handleExportScopeChange = useCallback(
     (newScope: ExportScope) => {
-      setExportScopeError(null);
       if (newScope === 'current') {
-        if (currentPageHighlights.length === 0) {
-          setExportScopeError('No highlights on this page');
-          return;
-        }
         setExportSelectedIds(new Set(currentPageHighlights.map((h) => h.id)));
       } else if (newScope === 'all') {
         setExportSelectedIds(new Set(allHighlights.map((h) => h.id)));
@@ -230,7 +224,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     setExportScreen('select');
     setExportScope('current');
     setExportSelectedIds(new Set());
-    setExportScopeError(null);
     setExportSuccess(null);
     setExportExiting(false);
     setExportIncludeNotes(true);
@@ -283,9 +276,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     resetExportState,
   ]);
 
-  // Scroll intent tracking
-  const scrollIntentRef = useRef<'programmatic' | null>(null);
-  const scrollEndCleanup = useRef<(() => void) | null>(null);
   const hasOpenedBefore = useRef(false);
 
   // Sync visibility and stagger with isOpen + trigger intent
@@ -312,7 +302,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         setExportScreen('select');
         setExportScope('current');
         setExportSelectedIds(new Set());
-        setExportScopeError(null);
         setExportIncludeNotes(true);
         setExportIncludeTimestamps(true);
         setExportIncludePageTitles(true);
@@ -332,11 +321,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     const container = scrollContainerRef.current;
     if (!container || !el) return;
 
-    // Clean up any previous scroll-end listener
-    scrollEndCleanup.current?.();
-
-    scrollIntentRef.current = 'programmatic';
-
     const containerRect = container.getBoundingClientRect();
     const elRect = el.getBoundingClientRect();
     const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
@@ -346,18 +330,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         : elTopInScroll - 16;
 
     container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
-
-    // Clear intent when scroll finishes via scrollend event
-    const onScrollEnd = () => {
-      scrollIntentRef.current = null;
-      cleanup();
-    };
-    const cleanup = () => {
-      container.removeEventListener('scrollend', onScrollEnd);
-      scrollEndCleanup.current = null;
-    };
-    container.addEventListener('scrollend', onScrollEnd, { once: true });
-    scrollEndCleanup.current = cleanup;
   }, []);
 
   // Stable identity so memoized HighlightItemExpandable rows can skip re-renders
@@ -388,7 +360,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     const offset = drawerSide === 'right' ? gap : -drawerWidth - gap;
 
     // Store layout for DraggableLogo rAF writes
-    setDrawerLayout({ width: drawerWidth, height: drawerHeight, side: drawerSide, offset });
+    setDrawerLayout({ width: drawerWidth, height: drawerHeight, offset });
 
     // Compute numeric x/y clamped to viewport
     const x = Math.max(
@@ -435,21 +407,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }
   }, [isOpen, isLoading]);
 
-  // Click outside handler (temporarily disabled)
-  // useEffect(() => {
-  //   if (!isOpen) return;
-  //
-  //   const handleClickOutside = (e: MouseEvent) => {
-  //     if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
-  //       closeDrawer();
-  //     }
-  //   };
-  //
-  //   const root = (drawerRef.current?.getRootNode() as ShadowRoot) || document;
-  //   root.addEventListener('mousedown', handleClickOutside);
-  //   return () => root.removeEventListener('mousedown', handleClickOutside);
-  // }, [isOpen, closeDrawer]);
-
   // ESC key handler
   useEffect(() => {
     if (!isOpen) return;
@@ -465,12 +422,10 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     return () => root.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeDrawer]);
 
-  // Initialize current index and reset scroll intent when drawer opens
+  // Initialize current index when drawer opens
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
-      scrollIntentRef.current = null;
-      scrollEndCleanup.current?.();
     }
   }, [isOpen]);
 
@@ -512,26 +467,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     if (!el) return;
     scrollTo(el, 'center');
   }, [currentIndex, scrollTo]);
-
-  // Wheel + pointerdown: immediately override programmatic intent
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!isOpen || !container) return;
-
-    const clearProgrammatic = () => {
-      if (scrollIntentRef.current === 'programmatic') {
-        scrollIntentRef.current = null;
-        scrollEndCleanup.current?.();
-      }
-    };
-
-    container.addEventListener('wheel', clearProgrammatic, { passive: true });
-    container.addEventListener('pointerdown', clearProgrammatic);
-    return () => {
-      container.removeEventListener('wheel', clearProgrammatic);
-      container.removeEventListener('pointerdown', clearProgrammatic);
-    };
-  }, [isOpen]);
 
   // Clamp currentIndex when list shrinks
   useEffect(() => {
@@ -624,13 +559,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
       if (sectionEl) scrollTo(sectionEl);
     });
   }, [isOpen, isVisible, isLoading, pageGroups.length, scrollTo]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      scrollEndCleanup.current?.();
-    };
-  }, []);
 
   // Unregister drawer element and layout on unmount
   useEffect(() => {
@@ -912,11 +840,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                           index={globalIdx}
                                           onScrollToItem={handleScrollToItem}
                                           isStaggering={isStaggering}
-                                          onStaggerEnd={
-                                            isLastInGroup && !isCollapsed
-                                              ? handleStaggerEnd
-                                              : undefined
-                                          }
                                           hideActions={exportMode}
                                         />
                                       </div>
@@ -997,9 +920,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                   : `Selected (${exportSelectedIds.size})`}
                             </span>
                           </button>
-                          {exportScopeError && (
-                            <p className="text-error text-xs font-light">{exportScopeError}</p>
-                          )}
                           {/* Next button */}
                           <button
                             onClick={() => setExportScreen('options')}

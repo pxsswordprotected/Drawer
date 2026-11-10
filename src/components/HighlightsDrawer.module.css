@@ -206,12 +206,10 @@
 /* Dim non-expanded page headers when a group is expanded */
 .highlightList[data-group-expanded] [data-page-header] {
   opacity: 0.4;
-  animation: none;
 }
 
 .highlightList[data-group-expanded] [data-item-expanded] [data-page-header] {
   opacity: 1;
-  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

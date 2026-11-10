@@ -9,7 +9,6 @@ interface HighlightItemExpandableProps {
   highlight: Highlight;
   index: number;
   isStaggering?: boolean;
-  onStaggerEnd?: () => void;
   onScrollToItem: (index: number) => void;
   hideActions?: boolean;
   checkboxSlot?: React.ReactNode;
@@ -21,7 +20,6 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
   highlight,
   index,
   isStaggering = false,
-  onStaggerEnd,
   onScrollToItem,
   hideActions = false,
   checkboxSlot,
@@ -69,15 +67,6 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
     e.stopPropagation();
   }, []);
 
-  const handleAnimationEnd = useCallback(
-    (e: React.AnimationEvent) => {
-      if (e.animationName === 'itemStaggerEnter') {
-        onStaggerEnd?.();
-      }
-    },
-    [onStaggerEnd]
-  );
-
   const staggerDelay = 20 + index * 35; // matches STAGGER_BASE + index * STAGGER_PER_ITEM
 
   return (
@@ -85,7 +74,6 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
       className={`${styles.expandableItem} ${isStaggering ? styles.staggerEntry : ''}`}
       data-expanded={isExpanded ? 'true' : 'false'}
       onClick={handleClick}
-      onAnimationEnd={isStaggering ? handleAnimationEnd : undefined}
       style={isStaggering ? { animationDelay: `${staggerDelay}ms` } : undefined}
     >
       <div className={styles.highlightVisual} style={{ position: 'relative' }}>
@@ -123,7 +111,6 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
                 <NoteInput
                   highlightId={highlight.id}
                   hasNotes={sortedNotes.length > 0}
-                  onNoteAdded={() => {}}
                 />
               </div>
 

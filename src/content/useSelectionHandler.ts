@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Highlight } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 import { useDrawerStore } from '@/store/drawerStore';
@@ -25,9 +25,6 @@ export function useSelectionHandler() {
   const [selectionState, setSelectionState] = useState<SelectionState>(HIDDEN_SELECTION);
   const defaultColor = useDrawerStore((state) => state.defaultColor);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [isDismissing, setIsDismissing] = useState(false);
-  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Handle mouse up - fires once when selection is done
   const handleMouseUp = useCallback((event: MouseEvent) => {
@@ -63,8 +60,8 @@ export function useSelectionHandler() {
             ? (container as Element)
             : container.parentElement;
 
-        // Check if selection is inside drawer (look for parent with data-drawer attribute or specific class)
-        if (element?.closest('[data-drawer]') || element?.closest('.fixed.bg-bg-main')) {
+        // Ignore selections inside the drawer
+        if (element?.closest('[data-drawer]')) {
           setSelectionState(HIDDEN_SELECTION);
           return;
         }
@@ -91,18 +88,11 @@ export function useSelectionHandler() {
 
   // Hide icon on scroll (prevents "ghost" icon floating in wrong position)
   const handleScroll = useCallback(() => {
-    if (isSaved) return; // Don't dismiss checkmark animation on scroll
     if (selectionState.visible) {
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-        hideTimeoutRef.current = null;
-      }
       setIsSaving(false);
-      setIsSaved(false);
-      setIsDismissing(false);
       setSelectionState(HIDDEN_SELECTION);
     }
-  }, [selectionState.visible, isSaved]);
+  }, [selectionState.visible]);
 
   // Save highlight when plus icon is clicked
   const handleSaveHighlight = useCallback(async () => {
@@ -147,17 +137,14 @@ export function useSelectionHandler() {
         useDrawerStore.getState().addHighlight(highlight);
       }
 
-      // Clear the selection, trigger morph animation, then hide after 500ms
+      // Clear the selection and hide the plus icon
       window.getSelection()?.removeAllRanges();
       setSelectionState(HIDDEN_SELECTION);
       setIsSaving(false);
-      setIsSaved(false);
-      setIsDismissing(false);
     } catch (error) {
       console.error('Failed to save highlight:', error);
       setSelectionState(HIDDEN_SELECTION);
       setIsSaving(false);
-      setIsSaved(false);
     }
   }, [selectionState.selectedText, isSaving]);
 
@@ -183,7 +170,5 @@ export function useSelectionHandler() {
     selectionState,
     handleSaveHighlight,
     isSaving,
-    isSaved,
-    isDismissing,
   };
 }

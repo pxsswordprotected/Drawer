@@ -24,13 +24,6 @@ function mulberry32(seed: number): () => number {
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-// Module-level state to track hold-deleted IDs (The Handoff)
-const highlightsDeletedViaHold = new Set<string>();
-
-/**
- * Attaches pointer and click handlers directly to a <mark> element.
- * Direct attachment avoids host pages with stopPropagation() blocking events.
- */
 /**
  * Attaches pointer and click handlers directly to a <mark> element.
  * Direct attachment avoids host pages with stopPropagation() blocking events.
@@ -110,15 +103,10 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
       mark.releasePointerCapture(activePointerId);
     }
 
-    highlightsDeletedViaHold.add(highlightId);
-
     //Immediately destroy the DOM elements!
     removeHighlightMarks(highlightId, { skipAnimation: true });
 
-    const store = useDrawerStore.getState();
-    if (store.deleteHighlight) {
-      store.deleteHighlight(highlightId);
-    }
+    useDrawerStore.getState().deleteHighlight(highlightId);
 
     activeFragments = [];
     activePointerId = null;
@@ -420,11 +408,7 @@ export function removeHighlightMarks(
   highlightId: string,
   options?: { skipAnimation?: boolean }
 ): void {
-  const skipAnimation = options?.skipAnimation || highlightsDeletedViaHold.has(highlightId);
-
-  if (skipAnimation) {
-    highlightsDeletedViaHold.delete(highlightId);
-  }
+  const skipAnimation = options?.skipAnimation;
 
   const marks = document.querySelectorAll<HTMLElement>(`mark[data-highlight-id="${highlightId}"]`);
 

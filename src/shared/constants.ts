@@ -8,16 +8,7 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULT_SETTINGS: Settings = {
-  drawerPosition: {
-    x: typeof window !== 'undefined' ? window.innerWidth - 420 : 0,
-    y: typeof window !== 'undefined' ? window.innerHeight - 600 : 0,
-  },
-  drawerVisible: true,
   defaultColor: '#ffff02', // Yellow highlight
-  highlightShortcut: 'Ctrl+Shift+H',
-  drawerShortcut: 'Ctrl+Shift+D',
-  autoSync: false,
-  syncEndpoint: undefined,
 };
 
 export const HIGHLIGHT_COLORS = {
@@ -30,10 +21,6 @@ export const HIGHLIGHT_COLORS = {
 } as const;
 
 export const DRAWER_CONFIG = {
-  DEFAULT_WIDTH: 400,
-  DEFAULT_HEIGHT: 600,
-  MIN_WIDTH: 300,
-  MIN_HEIGHT: 400,
   SHADOW_DOM_ID: 'drawer-extension-root',
   Z_INDEX: 2147483647, // Max z-index to ensure drawer is always on top
   EDGE_MARGIN: 24, // Margin from viewport edges for logo and drawer

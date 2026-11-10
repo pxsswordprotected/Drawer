@@ -2,14 +2,13 @@
 
 import { DRAWER_CONFIG } from '@/shared/constants';
 
-export interface ShadowRootUI {
+interface ShadowRootUI {
   shadowRoot: ShadowRoot;
   reactRoot: HTMLDivElement;
-  container: HTMLDivElement;
 }
 
 /**
- * Creates a Shadow DOM conta iner for the extension UI
+ * Creates a Shadow DOM container for the extension UI
  * This isolates our CSS from the host page and prevents conflicts
  */
 export function createShadowRootUI(): ShadowRootUI {
@@ -51,5 +50,5 @@ export function createShadowRootUI(): ShadowRootUI {
   `;
   shadowRoot.appendChild(baseStyles);
 
-  return { shadowRoot, reactRoot, container };
+  return { shadowRoot, reactRoot };
 }

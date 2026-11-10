@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 
-export interface NoteInputProps {
+interface NoteInputProps {
   highlightId: string;
   hasNotes: boolean;
-  onNoteAdded: () => void;
 }
 
-export const NoteInput: React.FC<NoteInputProps> = ({ highlightId, hasNotes, onNoteAdded }) => {
+export const NoteInput: React.FC<NoteInputProps> = ({ highlightId, hasNotes }) => {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const addNote = useDrawerStore((s) => s.addNote);
@@ -19,8 +18,7 @@ export const NoteInput: React.FC<NoteInputProps> = ({ highlightId, hasNotes, onN
 
     await addNote(highlightId, trimmed);
     setValue('');
-    onNoteAdded();
-  }, [value, highlightId, addNote, onNoteAdded]);
+  }, [value, highlightId, addNote]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -58,7 +56,7 @@ export const NoteInput: React.FC<NoteInputProps> = ({ highlightId, hasNotes, onN
   );
 };
 
-export interface NoteItemProps {
+interface NoteItemProps {
   noteId: string;
   highlightId: string;
   text: string;

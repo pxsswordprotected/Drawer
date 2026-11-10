@@ -42,33 +42,7 @@ export interface HighlightPosition {
 }
 
 export interface Settings {
-  drawerPosition: { x: number; y: number };
-  drawerVisible: boolean; // Last visibility state
   defaultColor: string;
-  highlightShortcut: string; // User-configurable shortcut
-  drawerShortcut: string; // Toggle drawer shortcut
-  autoSync: boolean; // Future: sync to external API
-  syncEndpoint?: string; // Future: API endpoint
 }
 
 export type ExportScope = 'current' | 'all' | 'selected';
-
-// Message types for extension communication
-export enum MessageType {
-  SAVE_HIGHLIGHT = 'SAVE_HIGHLIGHT',
-  DELETE_HIGHLIGHT = 'DELETE_HIGHLIGHT',
-  UPDATE_HIGHLIGHT = 'UPDATE_HIGHLIGHT',
-  TOGGLE_DRAWER = 'TOGGLE_DRAWER',
-  GET_HIGHLIGHTS = 'GET_HIGHLIGHTS',
-  UPDATE_SETTINGS = 'UPDATE_SETTINGS',
-}
-
-export interface Message {
-  type: MessageType;
-  payload?: any;
-}
-
-export interface HighlightMessage extends Message {
-  type: MessageType.SAVE_HIGHLIGHT | MessageType.DELETE_HIGHLIGHT | MessageType.UPDATE_HIGHLIGHT;
-  payload: Highlight | string; // Highlight object or ID
-}

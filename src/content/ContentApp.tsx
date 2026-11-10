@@ -7,8 +7,7 @@ import { useDrawerStore } from '@/store/drawerStore';
 import { removeHighlightMarks, restoreHighlights } from './pageHighlighter';
 
 export const ContentApp: React.FC = () => {
-  const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } =
-    useSelectionHandler();
+  const { selectionState, handleSaveHighlight, isSaving } = useSelectionHandler();
 
   // React layer for page marks: restore saved highlights on load, remove marks of deleted ones
   const allHighlights = useDrawerStore((s) => s.allHighlights);
@@ -35,8 +34,6 @@ export const ContentApp: React.FC = () => {
         y={selectionState.y}
         onClick={handleSaveHighlight}
         disabled={isSaving}
-        isSuccess={isSaved}
-        isDismissing={isDismissing}
       />
     </>
   );

@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react';
 import { Highlight, Note } from '@/shared/types';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
-import { useSelectionHandler as useSelectionHandlerCore } from '@/content/useSelectionHandler';
 
-export function useSelectionHandler() {
+// Dev page only: seeds sample highlights (current page + other pages) on first load
+export function useSeedTestData() {
   const hasSeeded = useRef(false);
 
   // Seed a test highlight with 3 notes on first load
@@ -142,6 +142,4 @@ export function useSelectionHandler() {
 
     seedTestData();
   }, []);
-
-  return useSelectionHandlerCore();
 }

@@ -8,10 +8,9 @@ export function getDrawerElement() {
   return drawerEl;
 }
 
-export interface DrawerLayout {
+interface DrawerLayout {
   width: number;
   height: number;
-  side: 'left' | 'right';
   offset: number; // horizontal offset from logo center to drawer left edge
 }
 

@@ -54,7 +54,6 @@ export const DrawerSettings: React.FC = () => {
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startDelete = () => {
-    if (isDeleted) return;
     setIsHolding(true);
     holdTimerRef.current = setTimeout(() => {
       setIsHolding(false);

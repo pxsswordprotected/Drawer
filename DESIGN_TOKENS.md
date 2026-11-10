@@ -147,7 +147,7 @@ Motion lives in the CSS modules (per `CLAUDE.md`). Every animation has a `prefer
 | 60–100ms | Press feedback (`scale(0.95)`; quicker on press than release) |
 | 150ms | Drawer open/close (scale 0.95 ↔ 1 + fade, pivoting from the logo), hovers, toggles, checkboxes, notes collapse |
 | 160ms | Toolbar icon entry (scale 0.85 → 1) |
-| 200ms | Notes fade-in, list dimming, plus-icon morph |
+| 200ms | Notes fade-in, list dimming |
 | 250ms | Staggered item/divider entry (translateY 10px → 0 + fade), notes expand |
 | 1000ms (linear) | "Delete all" hold-to-confirm fill |
 

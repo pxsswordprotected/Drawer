@@ -1,28 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { DraggableLogo } from '../components/DraggableLogo';
-import { HighlightsDrawer } from '../components/HighlightsDrawer';
-import { SelectionPlusIcon } from '../components/SelectionPlusIcon';
-import { useSelectionHandler } from './useSelectionHandler';
-import { useDrawerStore } from '@/store/drawerStore';
-import { removeHighlightMarks, restoreHighlights } from '../content/pageHighlighter';
+import React from 'react';
+import { ContentApp } from '../content/ContentApp';
+import { useSeedTestData } from './useSeedTestData';
 
 export const TestApp: React.FC = () => {
-  const { selectionState, handleSaveHighlight, isSaving, isSaved, isDismissing } =
-    useSelectionHandler();
-
-  const allHighlights = useDrawerStore((s) => s.allHighlights);
-  const prevIdsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    const currentIds = new Set(allHighlights.map((h) => h.id));
-    for (const id of prevIdsRef.current) {
-      if (!currentIds.has(id)) {
-        removeHighlightMarks(id);
-      }
-    }
-    prevIdsRef.current = currentIds;
-    restoreHighlights(allHighlights);
-  }, [allHighlights]);
+  useSeedTestData();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden">
@@ -104,17 +85,7 @@ export const TestApp: React.FC = () => {
           </p>
         </article>
       </div>
-      <DraggableLogo />
-      <HighlightsDrawer />
-      <SelectionPlusIcon
-        visible={selectionState.visible}
-        x={selectionState.x}
-        y={selectionState.y}
-        onClick={handleSaveHighlight}
-        disabled={isSaving}
-        isSuccess={isSaved}
-        isDismissing={isDismissing}
-      />
+      <ContentApp />
     </div>
   );
 };

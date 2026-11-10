@@ -13,7 +13,7 @@ const isExtensionContext = (): boolean => {
   }
 };
 
-export class StorageService {
+class StorageService {
   private isExtension = isExtensionContext();
 
   /**
@@ -90,27 +90,6 @@ export class StorageService {
   }
 
   /**
-   * Get a single highlight by ID
-   */
-  async getHighlightById(id: string): Promise<Highlight | null> {
-    const highlights = await this.getHighlights();
-    return highlights.find((h) => h.id === id) || null;
-  }
-
-  /**
-   * Update an existing highlight
-   */
-  async updateHighlight(id: string, updates: Partial<Highlight>): Promise<void> {
-    const highlights = await this.getHighlights();
-    const index = highlights.findIndex((h) => h.id === id);
-
-    if (index !== -1) {
-      highlights[index] = { ...highlights[index], ...updates };
-      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
-    }
-  }
-
-  /**
    * Delete a highlight by ID
    */
   async deleteHighlight(id: string): Promise<void> {
@@ -171,7 +150,7 @@ export class StorageService {
   }
 
   /**
-   * Get user settings (uses browser.storage.sync for cross-device sync)
+   * Get user settings, with defaults for any unset keys
    */
   async getSettings(): Promise<Settings> {
     const savedSettings = (await this.getFromStorage(STORAGE_KEYS.SETTINGS)) || {};
@@ -185,46 +164,6 @@ export class StorageService {
     const currentSettings = await this.getSettings();
     const newSettings = { ...currentSettings, ...updates };
     await this.setInStorage(STORAGE_KEYS.SETTINGS, newSettings);
-  }
-
-  /**
-   * Listen for changes to highlights
-   */
-  onHighlightsChanged(callback: (highlights: Highlight[]) => void): void {
-    if (!this.isExtension) {
-      console.warn('Storage change listeners are only available in extension context');
-      return;
-    }
-
-    // Only available in extension context
-    import('webextension-polyfill').then(({ default: browser }) => {
-      browser.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'local' && changes[STORAGE_KEYS.HIGHLIGHTS]) {
-          const newValue = changes[STORAGE_KEYS.HIGHLIGHTS].newValue || [];
-          callback(newValue);
-        }
-      });
-    });
-  }
-
-  /**
-   * Listen for changes to settings
-   */
-  onSettingsChanged(callback: (settings: Settings) => void): void {
-    if (!this.isExtension) {
-      console.warn('Storage change listeners are only available in extension context');
-      return;
-    }
-
-    // Only available in extension context
-    import('webextension-polyfill').then(({ default: browser }) => {
-      browser.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName === 'sync' && changes[STORAGE_KEYS.SETTINGS]) {
-          const newValue = changes[STORAGE_KEYS.SETTINGS].newValue || DEFAULT_SETTINGS;
-          callback(newValue);
-        }
-      });
-    });
   }
 
   /**

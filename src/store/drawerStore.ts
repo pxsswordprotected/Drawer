@@ -3,7 +3,7 @@ import { Highlight, Note } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 
-export type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
+type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
 
 interface DrawerState {
   isOpen: boolean;
@@ -98,8 +98,6 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     set((state) => ({
       allHighlights: state.allHighlights.filter((h) => h.id !== id),
       selectedHighlightId: state.selectedHighlightId === id ? null : state.selectedHighlightId,
-      pendingScrollHighlight:
-        state.pendingScrollHighlightId === id ? null : state.pendingScrollHighlightId,
     }));
   },
 
