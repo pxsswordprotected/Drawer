@@ -98,6 +98,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     set((state) => ({
       allHighlights: state.allHighlights.filter((h) => h.id !== id),
       selectedHighlightId: state.selectedHighlightId === id ? null : state.selectedHighlightId,
+      pendingScrollHighlightId:
+        state.pendingScrollHighlightId === id ? null : state.pendingScrollHighlightId,
     }));
   },
 
