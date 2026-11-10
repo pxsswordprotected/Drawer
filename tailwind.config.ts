@@ -21,13 +21,10 @@ export default {
         error: '#CC2424',
         success: '#14C935', // Also for "on/good-to-go" states
 
-        // Highlight colors (for text highlighting feature)
-        highlight: {
-          yellow: '#ffff02',
-          green: '#4CAF50',
-          blue: '#2196F3',
-          pink: '#E91E63',
-          purple: '#9C27B0',
+        // Raised controls: buttons, toggle track, loading skeletons
+        button: {
+          DEFAULT: '#373737',
+          hover: '#444444',
         },
       },
 
@@ -62,6 +59,11 @@ export default {
       boxShadow: {
         drawer: '0 -4px 24px rgba(0, 0, 0, 0.4)',
         card: '0 2px 8px rgba(0, 0, 0, 0.3)',
+        // Soft top-left inner highlight shared by buttons, toggle, toolbar, logo
+        bevel: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
+        // Bevel + small drop shadow for floating controls (toolbar, logo)
+        'bevel-raised':
+          'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65), 0 2px 5px -1px rgba(0, 0, 0, 0.35)',
       },
 
       // Simple border radius

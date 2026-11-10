@@ -730,23 +730,23 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                   {isLoading ? (
                     <>
                       <div
-                        className="bg-[#373737] rounded-md animate-pulse"
+                        className="bg-button rounded-md animate-pulse"
                         style={{ height: '64px' }}
                       />
                       <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
                       <div
-                        className="bg-[#373737] rounded-md animate-pulse"
+                        className="bg-button rounded-md animate-pulse"
                         style={{ height: '48px' }}
                       />
                       <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
                       <div
-                        className="bg-[#373737] rounded-md animate-pulse"
+                        className="bg-button rounded-md animate-pulse"
                         style={{ height: '56px' }}
                       />
                     </>
                   ) : allHighlights.length === 0 ? (
                     <div className="flex flex-col gap-2 items-center justify-center h-full">
-                      <p className={`text-center text-md transition-all duration-300 ${exportEmptyMessage ? 'font-normal text-red-300' : 'font-light text-text-main'}`}>
+                      <p className={`text-center text-md transition-all duration-300 ${exportEmptyMessage ? 'font-normal text-error' : 'font-light text-text-main'}`}>
                         No highlights saved.
                         <br />
                         Select text on the page to start highlighting.
@@ -998,14 +998,14 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                             </span>
                           </button>
                           {exportScopeError && (
-                            <p className="text-red-400 text-xs font-light">{exportScopeError}</p>
+                            <p className="text-error text-xs font-light">{exportScopeError}</p>
                           )}
                           {/* Next button */}
                           <button
                             onClick={() => setExportScreen('options')}
                             disabled={exportSelectedIds.size === 0}
-                            className="px-3 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
-                            style={{ borderRadius: '8px', height: '32px', paddingTop: '1px', boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)' }}
+                            className="px-3 text-sm font-light bg-button text-text-main hover:bg-button-hover shadow-bevel transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center tabular-nums"
+                            style={{ borderRadius: '8px', height: '32px', paddingTop: '1px' }}
                           >
                             Next
                           </button>
@@ -1058,13 +1058,12 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                             <button
                               onClick={() => setExportScreen('select')}
                               disabled={exportSuccess !== null}
-                              className="flex items-center justify-center bg-[#373737] text-text-secondary hover:text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                              className="flex items-center justify-center bg-button text-text-secondary hover:text-text-main hover:bg-button-hover shadow-bevel transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
                               style={{
                                 borderRadius: '8px',
                                 height: '32px',
                                 width: '32px',
                                 flexShrink: 0,
-                                boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
                               }}
                             >
                               &larr;
@@ -1072,12 +1071,11 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                             <div style={{ flex: '2 1 0', minWidth: 0 }}>
                               {exportSuccess === 'copy' ? (
                                 <div
-                                  className="w-full flex items-center justify-center"
+                                  className="w-full flex items-center justify-center shadow-bevel"
                                   style={{
                                     borderRadius: '8px',
                                     height: '32px',
                                     background: '#2a3a2a',
-                                    boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
                                   }}
                                 >
                                   <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
@@ -1094,8 +1092,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                 <button
                                   onClick={handleExportCopy}
                                   disabled={exportSuccess !== null}
-                                  className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                                  style={{ borderRadius: '8px', height: '32px', boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)' }}
+                                  className="w-full text-sm font-light bg-button text-text-main hover:bg-button-hover shadow-bevel transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                                  style={{ borderRadius: '8px', height: '32px' }}
                                 >
                                   Copy
                                 </button>
@@ -1104,12 +1102,11 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                             <div style={{ flex: '3 1 0', minWidth: 0 }}>
                               {exportSuccess === 'download' ? (
                                 <div
-                                  className="w-full flex items-center justify-center"
+                                  className="w-full flex items-center justify-center shadow-bevel"
                                   style={{
                                     borderRadius: '8px',
                                     height: '32px',
                                     background: '#2a3a2a',
-                                    boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
                                   }}
                                 >
                                   <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
@@ -1126,8 +1123,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                 <button
                                   onClick={handleExportDownload}
                                   disabled={exportSuccess !== null}
-                                  className="w-full text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
-                                  style={{ borderRadius: '8px', height: '32px', boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)' }}
+                                  className="w-full text-sm font-light bg-button text-text-main hover:bg-button-hover shadow-bevel transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center"
+                                  style={{ borderRadius: '8px', height: '32px' }}
                                 >
                                   Download
                                 </button>

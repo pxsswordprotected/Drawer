@@ -9,7 +9,7 @@
     "build:extension": "vite build --mode extension",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
   },
   "keywords": [
     "browser-extension",

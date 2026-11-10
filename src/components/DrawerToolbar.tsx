@@ -25,8 +25,6 @@ const toolbarStyle = {
   gap: `${GAP}px`,
   backgroundColor: '#1a1a1a',
   borderRadius: '8px',
-  boxShadow:
-    'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65), 0 2px 5px -1px rgba(0, 0, 0, 0.35)',
 } as const;
 
 const iconButtonStyle = {
@@ -53,7 +51,7 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
 
   return (
   <div
-    className="fixed flex flex-col items-center"
+    className="fixed flex flex-col items-center shadow-bevel-raised"
     style={{
       left: logoPosition.x - TOOLBAR_WIDTH / 2,
       top,

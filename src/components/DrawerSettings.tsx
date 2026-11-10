@@ -29,12 +29,11 @@ const highlighterStyle = (color: string, isSelected: boolean) => ({
 });
 
 const buttonClass =
-  'px-4 text-sm font-light bg-[#373737] text-text-main hover:bg-[#444] transition-colors cursor-pointer flex items-center justify-center';
+  'px-4 text-sm font-light bg-button text-text-main hover:bg-button-hover shadow-bevel transition-colors cursor-pointer flex items-center justify-center';
 
 const buttonStyle = {
   borderRadius: '8px',
   height: '32px',
-  boxShadow: 'inset 1px 1px 2.8px -1px rgba(255, 255, 255, 0.65)',
 } as const;
 
 export const DrawerSettings: React.FC = () => {
@@ -231,7 +230,7 @@ export const DrawerSettings: React.FC = () => {
             className="hidden"
           />
         </div>
-        {restoreError && <p className="text-red-400 text-xs font-light">{restoreError}</p>}
+        {restoreError && <p className="text-error text-xs font-light">{restoreError}</p>}
       </div>
     </div>
   );
