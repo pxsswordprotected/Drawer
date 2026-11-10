@@ -204,6 +204,12 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     }
   });
 
+  // A click on a highlight opens it, so double/triple-click must not also select the
+  // word/paragraph. Only multi-click presses are blocked; drag-selection still works.
+  mark.addEventListener('mousedown', (e) => {
+    if (e.detail >= 2) e.preventDefault();
+  });
+
   mark.addEventListener('click', (e) => {
     e.stopPropagation();
 
@@ -215,6 +221,9 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
       isHoldInteraction = false;
       return;
     }
+
+    // Second/third click of a double/triple-click: the first click already opened the drawer
+    if (e.detail >= 2) return;
 
     const store = useDrawerStore.getState();
 

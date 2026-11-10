@@ -50,6 +50,19 @@ export function useSelectionHandler() {
         return;
       }
 
+      // Hide icon if the selection is entirely inside one existing highlight (its marks
+      // cover contiguous text, so matching start and end means nothing new is selected)
+      const selRange = selection.getRangeAt(0);
+      const highlightIdAt = (node: Node) =>
+        (node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement)
+          ?.closest('mark[data-highlight-id]')
+          ?.getAttribute('data-highlight-id');
+      const startHighlightId = highlightIdAt(selRange.startContainer);
+      if (startHighlightId && startHighlightId === highlightIdAt(selRange.endContainer)) {
+        setSelectionState(HIDDEN_SELECTION);
+        return;
+      }
+
       // Check if drawer is open and selection is inside the drawer
       const isOpen = useDrawerStore.getState().isOpen;
       if (isOpen) {
