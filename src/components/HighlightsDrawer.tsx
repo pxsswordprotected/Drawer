@@ -133,6 +133,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   const [isClosing, setIsClosing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isStaggering, setIsStaggering] = useState(false);
+  // Highlight whose notes expand without animation (drawer opened from its page mark)
+  const [instantExpandId, setInstantExpandId] = useState<string | null>(null);
   const [exportMode, setExportMode] = useState(false);
   const [exportScreen, setExportScreen] = useState<'select' | 'options'>('select');
   const [exportSuccess, setExportSuccess] = useState<'copy' | 'download' | null>(null);
@@ -317,20 +319,25 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   }, []);
 
   // ─── Unified scroll controller ───
-  const scrollTo = useCallback((el: HTMLElement, alignment: 'top' | 'center' = 'top') => {
-    const container = scrollContainerRef.current;
-    if (!container || !el) return;
+  const scrollTo = useCallback(
+    (el: HTMLElement, alignment: 'top' | 'center' = 'top', behavior: ScrollBehavior = 'smooth') => {
+      const container = scrollContainerRef.current;
+      if (!container || !el) return;
 
-    const containerRect = container.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
-    const target =
-      alignment === 'center'
-        ? elTopInScroll - containerRect.height / 2 + elRect.height / 2
-        : elTopInScroll - 16;
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      // Rects include the open animation's scale; divide it out to get scroll-space pixels
+      const scale = containerRect.height / container.offsetHeight || 1;
+      const elTopInScroll = (elRect.top - containerRect.top) / scale + container.scrollTop;
+      const target =
+        alignment === 'center'
+          ? elTopInScroll - container.clientHeight / 2 + elRect.height / scale / 2
+          : elTopInScroll - 16;
 
-    container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
-  }, []);
+      container.scrollTo({ top: Math.max(0, target), behavior });
+    },
+    []
+  );
 
   // Stable identity so memoized HighlightItemExpandable rows can skip re-renders
   const handleScrollToItem = useCallback(
@@ -514,8 +521,17 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }
   }, [pendingScrollHighlightId, settingsMode]);
 
-  // Scroll to highlight when triggered from page mark click
-  useEffect(() => {
+  // Scroll to highlight when triggered from page mark click. If the drawer was hidden when
+  // the mark was clicked, jump there before the first painted frame; if it was already
+  // showing, animate the scroll.
+  const lastPendingIdRef = useRef<string | null>(null);
+  const pendingScrollInstantRef = useRef(false);
+
+  useLayoutEffect(() => {
+    if (pendingScrollHighlightId !== lastPendingIdRef.current) {
+      lastPendingIdRef.current = pendingScrollHighlightId;
+      pendingScrollInstantRef.current = !isVisible;
+    }
     if (!pendingScrollHighlightId || isLoading) return;
 
     const index = highlightGlobalIndices.map.get(pendingScrollHighlightId);
@@ -526,6 +542,20 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
 
     selectHighlight(pendingScrollHighlightId);
 
+    if (pendingScrollInstantRef.current) {
+      // Expand its notes without animation so the jump is measured on the final layout
+      setInstantExpandId(pendingScrollHighlightId);
+      // Contents can't be measured until the render that makes the drawer visible
+      if (!isVisible) return;
+      const el = itemRefs.current[index];
+      if (!el) return;
+      scrollTo(el, 'top', 'instant');
+      // Later expands animate again; the notes are already fully open, so nothing moves
+      setInstantExpandId(null);
+      clearPendingScrollHighlight();
+      return;
+    }
+
     // Wait for React to mount refs and CSS to apply after group expansion
     const timeoutId = setTimeout(() => {
       const el = itemRefs.current[index];
@@ -534,7 +564,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }, 50);
 
     return () => clearTimeout(timeoutId);
-  }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, scrollTo]);
+  }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, isVisible, scrollTo]);
 
   // Auto-scroll to current page section (once per drawer open)
   const hasScrolledOnOpen = useRef(false);
@@ -552,13 +582,15 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
 
     const firstGroup = pageGroups[0];
     if (firstGroup?.isCurrentPage) return;
+    // Opened from a page mark: the pending-scroll effect positions the list instead
+    if (drawerTrigger === 'mark') return;
 
     hasScrolledOnOpen.current = true;
 
     requestAnimationFrame(() => {
       if (sectionEl) scrollTo(sectionEl);
     });
-  }, [isOpen, isVisible, isLoading, pageGroups.length, scrollTo]);
+  }, [isOpen, isVisible, isLoading, pageGroups.length, scrollTo, drawerTrigger]);
 
   // Unregister drawer element and layout on unmount
   useEffect(() => {
@@ -583,8 +615,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
 
   return (
     <div style={{ contentVisibility: isVisible ? 'visible' : 'hidden' }}>
-      {/* Toolbar — fixed above draggable logo */}
-      {logoPosition && !isClosing && (
+      {/* Toolbar — fixed above draggable logo; mounted only while the drawer is showing */}
+      {logoPosition && isVisible && !isClosing && (
         <DrawerToolbar
           logoPosition={logoPosition}
           isExportActive={exportMode}
@@ -840,6 +872,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                           index={globalIdx}
                                           onScrollToItem={handleScrollToItem}
                                           isStaggering={isStaggering}
+                                          expandInstantly={instantExpandId === highlight.id}
                                           hideActions={exportMode}
                                         />
                                       </div>

@@ -83,6 +83,13 @@
   transition: grid-template-rows 250ms cubic-bezier(0.19, 1, 0.22, 1);
 }
 
+/* Expanded without animation: drawer opened from a page mark lands on the full layout */
+.notesOuterExpandedInstant {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: none;
+}
+
 .notesOuterInstant {
   display: grid;
   grid-template-rows: 0fr;

@@ -11,6 +11,7 @@ interface HighlightItemExpandableProps {
   isStaggering?: boolean;
   onScrollToItem: (index: number) => void;
   hideActions?: boolean;
+  expandInstantly?: boolean;
   checkboxSlot?: React.ReactNode;
 }
 
@@ -22,6 +23,7 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
   isStaggering = false,
   onScrollToItem,
   hideActions = false,
+  expandInstantly = false,
   checkboxSlot,
 }: HighlightItemExpandableProps) {
   const isExpanded = useDrawerStore((s) => s.selectedHighlightId === highlight.id);
@@ -93,7 +95,9 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
       <div
         className={
           isExpanded
-            ? styles.notesOuterExpanded
+            ? expandInstantly
+              ? styles.notesOuterExpandedInstant
+              : styles.notesOuterExpanded
             : isSwitchCollapse
               ? styles.notesOuterInstant
               : styles.notesOuter
