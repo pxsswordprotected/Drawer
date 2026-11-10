@@ -24,6 +24,12 @@ function mulberry32(seed: number): () => number {
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+// Mark press timing. Releasing before CLICK_GRACE_MS is a click (opens the drawer);
+// holding until HOLD_DELETE_MS deletes the highlight.
+const FEEDBACK_DELAY_MS = 150; // press length before the delete feedback (shrink) starts
+const CLICK_GRACE_MS = 250; // shorter releases still count as a click, even after feedback started
+const HOLD_DELETE_MS = 900; // total press length that deletes
+
 /**
  * Attaches pointer and click handlers directly to a <mark> element.
  * Direct attachment avoids host pages with stopPropagation() blocking events.
@@ -33,8 +39,10 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let isLongPressCompleted = false;
 
-  // NEW: Tracks if the user intentionally held longer than 65ms
+  // True when the last press must not open the drawer: released after CLICK_GRACE_MS,
+  // released off the highlight, or cancelled
   let isHoldInteraction = false;
+  let pressStartTime = 0;
 
   let activeFragments: HTMLElement[] = [];
   let activePointerId: number | null = null;
@@ -62,6 +70,7 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   const abortHold = (e?: PointerEvent) => {
     if (activePointerId === null) return;
     if (e && e.pointerId !== activePointerId) return;
+    removeReleaseListeners();
 
     if (pendingStartTimer) {
       clearTimeout(pendingStartTimer);
@@ -96,6 +105,7 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
 
   const finalizeHoldDelete = () => {
     isLongPressCompleted = true;
+    removeReleaseListeners();
 
     restoreSelectionState();
 
@@ -112,25 +122,46 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     activePointerId = null;
   };
 
+  // Release is tracked on window: before pointer capture starts, the pointer can leave
+  // the mark and be released elsewhere, which the mark itself would never see
+  const onRelease = (e: PointerEvent) => {
+    if (e.pointerId !== activePointerId) return;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const releasedOnHighlight = !!hit?.closest(`mark[data-highlight-id="${highlightId}"]`);
+    isHoldInteraction =
+      !releasedOnHighlight || performance.now() - pressStartTime >= CLICK_GRACE_MS;
+    abortHold(e);
+  };
+
+  const onCancel = (e: PointerEvent) => {
+    if (e.pointerId !== activePointerId) return;
+    isHoldInteraction = true;
+    abortHold(e);
+  };
+
+  const removeReleaseListeners = () => {
+    window.removeEventListener('pointerup', onRelease, true);
+    window.removeEventListener('pointercancel', onCancel, true);
+  };
+
   mark.addEventListener('pointerdown', (e) => {
     if (!e.isPrimary) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
 
     activePointerId = e.pointerId;
+    pressStartTime = performance.now();
     isLongPressCompleted = false;
-
-    // RESET the flag on every new press
     isHoldInteraction = false;
+    window.addEventListener('pointerup', onRelease, true);
+    window.addEventListener('pointercancel', onCancel, true);
 
     activeFragments = Array.from(
       document.querySelectorAll(`mark[data-highlight-id="${highlightId}"]`)
     ) as HTMLElement[];
 
+    // Delete feedback starts after FEEDBACK_DELAY_MS so quick clicks don't flicker
     pendingStartTimer = setTimeout(() => {
       pendingStartTimer = null;
-
-      // The 65ms threshold passed. This is now officially a hold.
-      isHoldInteraction = true;
 
       isSelectionLocked = true;
       originalUserSelect = document.body.style.userSelect;
@@ -145,15 +176,19 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
       }
 
       activeFragments.forEach((frag) => {
-        frag.style.setProperty('transition', 'background-size 0.75s linear', 'important');
+        frag.style.setProperty(
+          'transition',
+          `background-size ${HOLD_DELETE_MS - FEEDBACK_DELAY_MS}ms linear`,
+          'important'
+        );
         frag.style.setProperty('background-size', '0% 100%', 'important');
       });
 
       pressTimer = setTimeout(() => {
         pressTimer = null;
         finalizeHoldDelete();
-      }, 750);
-    }, 75);
+      }, HOLD_DELETE_MS - FEEDBACK_DELAY_MS);
+    }, FEEDBACK_DELAY_MS);
   });
 
   mark.addEventListener('pointermove', (e) => {
@@ -164,17 +199,15 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
     const isOverHighlight = hit?.closest(`mark[data-highlight-id="${highlightId}"]`);
 
     if (!isOverHighlight) {
+      isHoldInteraction = true; // dragged off: neither a click nor a delete
       abortHold(e);
     }
   });
 
-  mark.addEventListener('pointerup', abortHold as EventListener);
-  mark.addEventListener('pointercancel', abortHold as EventListener);
-
   mark.addEventListener('click', (e) => {
     e.stopPropagation();
 
-    // Block the click if the interaction lasted longer than 65ms OR was deleted
+    // Block the click after a hold, drag-off, cancel, or delete
     if (isHoldInteraction || isLongPressCompleted) {
       e.preventDefault();
 
