@@ -94,7 +94,17 @@ const LOGO_STATE = `(() => {
 type Logo = { x: number; y: number; drawerOpen: boolean };
 
 async function freshPage(page: Page, fixture: string): Promise<Logo> {
-  await page.goto(`${ORIGIN}/${fixture}`, { waitUntil: 'load' });
+  // Some Chromium builds (Helium) abort the very first navigation of a fresh browser;
+  // retry a few times so the run measures gestures, not browser startup
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await page.goto(`${ORIGIN}/${fixture}`, { waitUntil: 'load' });
+      break;
+    } catch (error) {
+      if (attempt >= 3 || !String(error).includes('ERR_ABORTED')) throw error;
+      await sleep(300);
+    }
+  }
   await page.evaluate(STUB_CHROME);
   await page.evaluate(() => localStorage.clear());
   await page.addScriptTag({ content: CONTENT_JS });
