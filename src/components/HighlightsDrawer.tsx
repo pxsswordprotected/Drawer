@@ -10,6 +10,7 @@ import { TrashIcon } from '@/shared/TrashIcon';
 import { DrawerToolbar } from './DrawerToolbar';
 import { generateMarkdown, downloadMarkdown, copyMarkdown } from '@/shared/exportHighlights';
 import { DrawerSettings } from './DrawerSettings';
+import { pageUrl } from '@/shared/pageUrl';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -74,7 +75,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }))
   );
 
-  const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const currentUrl = typeof window !== 'undefined' ? pageUrl() : '';
 
   // ─── Grouping logic ───
   const pageGroups = useMemo<PageGroup[]>(() => {

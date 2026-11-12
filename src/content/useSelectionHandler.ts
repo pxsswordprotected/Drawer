@@ -5,6 +5,7 @@ import { debugLog, describeRangeEnds, errorInfo, excerpt, snippetOf } from '@/sh
 import { useDrawerStore } from '@/store/drawerStore';
 import { applyHighlightToRange, trackHighlight } from './pageHighlighter';
 import { describeRange, trimRangeToText } from './anchoring';
+import { pageUrl } from '@/shared/pageUrl';
 
 interface SelectionState {
   visible: boolean;
@@ -139,7 +140,7 @@ export function useSelectionHandler() {
     const highlight: Highlight = {
       id: crypto.randomUUID(),
       text: selectionState.selectedText,
-      url: window.location.href,
+      url: pageUrl(),
       pageTitle: document.title,
       notes: [],
       color: defaultColor,

@@ -2,6 +2,7 @@ import { useDrawerStore } from '@/store/drawerStore';
 import type { Highlight } from '@/shared/types';
 import { debugLog, excerpt, pageTextIncludes, snippetOf } from '@/shared/debugLog';
 import { nodeAtXPath, resolveHighlight } from './anchoring';
+import { pageUrl } from '@/shared/pageUrl';
 
 // --- Seeded PRNG utilities ---
 
@@ -261,7 +262,7 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
       return;
     }
 
-    store.setExpandedGroupUrl(window.location.href);
+    store.setExpandedGroupUrl(pageUrl());
     store.openDrawer('mark');
     store.setPendingScrollHighlight(highlightId);
   });
@@ -560,6 +561,8 @@ const RESTORE_DEBOUNCE_MS = 200; // wait for a burst of page mutations to settle
 const RESTORE_MAX_WAIT_MS = 1000; // …but never longer than this on pages that never settle
 const RESTORE_MAX_BACKOFF_MS = 10000; // spacing between searches for text that isn't there
 const RESTORE_MAX_APPLICATIONS = 25; // stop re-marking a highlight the page keeps wiping
+const SETTLE_QUIET_MS = 400; // page must be loaded and mutation-free this long…
+const SETTLE_DEADLINE_MS = 3000; // …or this much time since navigation start has passed
 
 interface RestoreState {
   highlight: Highlight;
@@ -572,6 +575,8 @@ const tracked = new Map<string, RestoreState>();
 let restoreObserver: MutationObserver | null = null;
 let restoreTimer: ReturnType<typeof setTimeout> | null = null;
 let firstPendingAt = 0;
+let restoreReady = false; // set by the settle gate; nothing is restored before it
+let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
 const hasMarks = (id: string) => !!document.querySelector(`mark[data-highlight-id="${id}"]`);
 
@@ -600,8 +605,33 @@ export function restoreHighlights(highlights: Highlight[]): void {
 
 function watchPageChanges(): void {
   if (restoreObserver) return;
-  restoreObserver = new MutationObserver(scheduleRestore);
+  restoreObserver = new MutationObserver(() => (restoreReady ? scheduleRestore() : armSettleGate()));
   restoreObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+  window.addEventListener('load', armSettleGate, { once: true });
+  // Retry when the user comes back to a tab that changed while hidden
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && restoreReady) scheduleRestore();
+  });
+  armSettleGate();
+}
+
+// Settle gate: marks applied while the page is still hydrating are thrown away a moment
+// later and then re-applied, which shows as highlights flashing on, off, and on again.
+// So the first restore waits until the page has finished loading and gone quiet; the
+// deadline (counted from navigation start) keeps pages that never settle, like X, working.
+function armSettleGate(): void {
+  if (restoreReady) return;
+  clearTimeout(settleTimer ?? undefined);
+  const untilDeadline = Math.max(0, SETTLE_DEADLINE_MS - performance.now());
+  settleTimer = setTimeout(
+    () => {
+      const loaded = document.readyState === 'complete';
+      if (!loaded && performance.now() < SETTLE_DEADLINE_MS) return; // the load event re-arms
+      restoreReady = true;
+      restorePending();
+    },
+    Math.min(SETTLE_QUIET_MS, untilDeadline)
+  );
 }
 
 function scheduleRestore(): void {
@@ -617,8 +647,8 @@ function scheduleRestore(): void {
 }
 
 function restorePending(): void {
-  if (document.hidden) return;
-  const url = window.location.href;
+  if (!restoreReady || document.hidden) return;
+  const url = pageUrl();
   const now = performance.now();
   for (const state of tracked.values()) {
     const h = state.highlight;

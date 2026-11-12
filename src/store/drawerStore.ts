@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Highlight, Note } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
+import { pageUrl } from '@/shared/pageUrl';
 
 type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
 
@@ -54,7 +55,7 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   selectedHighlightId: null,
   lastAddedHighlightId: null,
   pendingScrollHighlightId: null,
-  expandedGroupUrl: typeof window !== 'undefined' ? window.location.href : null,
+  expandedGroupUrl: typeof window !== 'undefined' ? pageUrl() : null,
   drawerTrigger: null,
   logoResetCount: 0,
   defaultColor: DEFAULT_SETTINGS.defaultColor,

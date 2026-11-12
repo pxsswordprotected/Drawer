@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Highlight, Note } from '@/shared/types';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { storageService } from '@/shared/storage';
+import { pageUrl } from '@/shared/pageUrl';
 
 // Dev page only: seeds sample highlights (current page + other pages) on first load
 export function useSeedTestData() {
@@ -13,7 +14,7 @@ export function useSeedTestData() {
     hasSeeded.current = true;
 
     const seedTestData = async () => {
-      const existing = await storageService.getHighlights(window.location.href);
+      const existing = await storageService.getHighlights(pageUrl());
       if (existing.length > 0) return; // Don't seed if highlights already exist
 
       const emptyPos = {
@@ -46,7 +47,7 @@ export function useSeedTestData() {
       const testHighlight: Highlight = {
         id: crypto.randomUUID(),
         text: 'Being open to your own body, being embodied, is a precondition for vibing. Which is why nerds can\'t vibe.',
-        url: window.location.href,
+        url: pageUrl(),
         pageTitle: document.title,
         notes: testNotes,
         color: DEFAULT_SETTINGS.defaultColor,
@@ -111,7 +112,7 @@ export function useSeedTestData() {
         {
           id: crypto.randomUUID(),
           text: 'Attention is not a resource to be spent but a way of relating to the world. When we treat it as currency, we lose the ability to be genuinely present.',
-          url: 'https://www.robinsloan.com/lab/attention/',
+          url: 'https://www.robinsloan.com/lab/attention',
           pageTitle: 'Attention is not a resource — Robin Sloan',
           notes: [{
             id: crypto.randomUUID(),
