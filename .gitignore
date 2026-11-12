@@ -44,3 +44,6 @@ EXPORT_PLAN.md
 .claude/settings.local.json
 
 logs/
+
+# Drag benchmark build output
+bench/drag/.ext/

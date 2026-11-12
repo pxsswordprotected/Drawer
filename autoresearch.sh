@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Benchmark: % of saved highlights re-located exactly after a page reload or edit.
-# Primary metric: anchor_accuracy (higher is better). See bench/anchoring/run.ts.
+# Benchmark: how often dragging the Drawer logo selects page text in the background.
+# Primary metric: selection_trials (lower is better). See bench/drag/run.ts.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -8,5 +8,9 @@ cd "$(dirname "$0")"
 npx tsc --noEmit
 npx eslint src --ext .ts,.tsx --quiet
 
-# Deterministic workload: seeded fixture pages + edits, jsdom, no network.
-bun bench/anchoring/run.ts
+# Build the real content script exactly as shipped (normal extension build).
+npx vite build --mode extension --outDir bench/drag/.ext --emptyOutDir --logLevel error
+
+# Deterministic workload: offline page fixtures, scripted mouse/trackpad gestures,
+# real Chrome (headless), fresh page per trial, no network.
+bun bench/drag/run.ts

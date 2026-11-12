@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plain article fixture</title>
+<style>
+  body { margin: 0; font: 18px/1.6 Georgia, serif; color: #222; background: #fff; }
+  main { columns: 3; column-gap: 32px; padding: 24px 32px; }
+  p { margin: 0 0 16px; }
+</style>
+</head>
+<body>
+<main id="text"></main>
+<script>
+  // Dense text covering the whole viewport, including under the bottom-right logo
+  const words = 'the quick brown fox jumps over a lazy dog while seven wizards box nimbly and calm waters reflect distant silver mountains beneath an amber sky'.split(' ');
+  let seed = 7;
+  const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const main = document.getElementById('text');
+  for (let p = 0; p < 60; p++) {
+    let s = '';
+    for (let w = 0; w < 60; w++) s += words[Math.floor(rand() * words.length)] + ' ';
+    const el = document.createElement('p');
+    el.textContent = s.trim() + '.';
+    main.appendChild(el);
+  }
+</script>
+</body>
+</html>
