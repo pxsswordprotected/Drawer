@@ -16,6 +16,8 @@ import { join } from 'node:path';
 
 const ROOT = join(import.meta.dir);
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+// FIREFOX_PATH set: run in Firefox (WebDriver BiDi) instead of Chromium
+const FIREFOX = process.env.FIREFOX_PATH;
 const VIEWPORT = { width: 1280, height: 800 };
 const FIXTURES = ['internalthenexternal.html', 'article.html'];
 
@@ -282,7 +284,8 @@ const GESTURES: Gesture[] = [
       await page.mouse.move(from.x, from.y);
       await page.mouse.down();
       await moveLinear(page, from, to, 15, 10);
-      await moveLinear(page, to, { x: -40, y: to.y }, 8, 10);
+      // Firefox's WebDriver rejects off-viewport moves; release at the left edge there
+      await moveLinear(page, to, { x: FIREFOX ? 0 : -40, y: to.y }, 8, 10);
       await page.mouse.up();
       await page.mouse.move(to.x, to.y);
     },
@@ -377,12 +380,16 @@ const TARGETS: { name: string; at: (v: typeof VIEWPORT) => Pt }[] = [
 ];
 
 // ─── Run ───
-const browser = await puppeteer.launch({
-  executablePath: CHROME,
-  headless: true,
-  args: [`--window-size=${VIEWPORT.width},${VIEWPORT.height}`, '--no-first-run', '--disable-gpu'],
-  defaultViewport: VIEWPORT,
-});
+const browser = await puppeteer.launch(
+  FIREFOX
+    ? { browser: 'firefox', executablePath: FIREFOX, headless: true, defaultViewport: VIEWPORT }
+    : {
+        executablePath: CHROME,
+        headless: true,
+        args: [`--window-size=${VIEWPORT.width},${VIEWPORT.height}`, '--no-first-run', '--disable-gpu'],
+        defaultViewport: VIEWPORT,
+      }
+);
 
 let selectionTrials = 0;
 let visibleTrials = 0;
@@ -391,6 +398,7 @@ let selectedChars = 0;
 let dragFailures = 0;
 let clickFailures = 0;
 let selectBlocked = 0;
+let drawerSelectBlocked = 0;
 let trials = 0;
 let drawerDragout = 0;
 const perGesture: Record<string, number> = {};
@@ -481,6 +489,37 @@ try {
       failures.push(`GUARD ${fixture}: no visible text found for selection check`);
       selectBlocked++;
     }
+
+    // Text inside the drawer must stay selectable (users copy highlights and notes)
+    const drawerLogo = await freshPage(page, fixture);
+    await openDrawer(page, drawerLogo);
+    const line = await page.evaluate(() => {
+      const root = document.getElementById('drawer-extension-root')?.shadowRoot;
+      const p = root && [...root.querySelectorAll('[data-drawer] p')].find((el) => el.textContent?.trim());
+      if (!p) return null;
+      const r = p.getBoundingClientRect();
+      return { x: r.left + 2, y: r.top + Math.min(10, r.height / 2), w: r.width };
+    });
+    let drawerChars = 0;
+    if (line) {
+      await page.mouse.move(line.x, line.y);
+      await page.mouse.down();
+      await moveLinear(page, line, { x: line.x + line.w - 4, y: line.y }, 8, 10);
+      // Read before release: releasing on drawer text is not a click, but keep it simple
+      drawerChars = await page.evaluate(() => {
+        const root = document.getElementById('drawer-extension-root')?.shadowRoot as
+          | (ShadowRoot & { getSelection?: () => Selection | null })
+          | undefined;
+        // Chromium exposes shadow-tree selections on the root; Firefox on the document
+        const sel = root?.getSelection?.() ?? document.getSelection();
+        return (sel?.toString() ?? '').replace(/\s+/g, '').length;
+      });
+      await page.mouse.up();
+    }
+    if (drawerChars === 0) {
+      drawerSelectBlocked++;
+      failures.push(`GUARD ${fixture}: drawer text could not be selected`);
+    }
   }
 } finally {
   await browser.close();
@@ -499,8 +538,9 @@ console.log(`METRIC trials=${trials}`);
 console.log(`METRIC drag_failures=${dragFailures}`);
 console.log(`METRIC click_failures=${clickFailures}`);
 console.log(`METRIC select_blocked=${selectBlocked}`);
+console.log(`METRIC drawer_select_blocked=${drawerSelectBlocked}`);
 
-if (dragFailures || clickFailures || selectBlocked) {
+if (dragFailures || clickFailures || selectBlocked || drawerSelectBlocked) {
   console.error('guard failure: dragging, clicking, or ordinary text selection broke');
   process.exit(1);
 }
