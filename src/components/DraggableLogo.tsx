@@ -190,7 +190,8 @@ export const DraggableLogo = React.memo(function DraggableLogo() {
             top: `${position.y}px`,
           }}
         >
-          <div className={styles.logoInner}>
+          {/* Same as the draggable logo below: a press must not start a page text selection */}
+          <div className={styles.logoInner} onMouseDown={(e) => e.preventDefault()}>
             <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />
           </div>
         </div>
