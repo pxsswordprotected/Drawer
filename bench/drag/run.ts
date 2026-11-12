@@ -45,9 +45,12 @@ const STUB_CHROME = `
   };
 `;
 
-// Samples selection; exposes window.__rec.{maxChars, visibleTrials, sample()}
+// Samples selection; exposes window.__rec.{maxChars, visible, sample()}. A selection
+// that already existed when the recorder was installed (the plus-icon gesture makes one
+// on purpose) doesn't count; only a different, non-empty selection does.
 const RECORDER = `(() => {
-  const rec = { maxChars: 0, visible: false, samples: 0, active: true };
+  const base = (document.getSelection() || '').toString();
+  const rec = { base, maxChars: 0, visible: false, samples: 0, active: true };
   const isVisible = (sel) => {
     const node = sel.anchorNode;
     const el = node && (node.nodeType === 1 ? node : node.parentElement);
@@ -59,7 +62,9 @@ const RECORDER = `(() => {
     rec.samples++;
     const sel = document.getSelection();
     if (!sel || sel.isCollapsed) return;
-    const chars = sel.toString().replace(/\\s+/g, '').length;
+    const text = sel.toString();
+    if (text === base) return;
+    const chars = text.replace(/\\s+/g, '').length;
     if (chars > rec.maxChars) rec.maxChars = chars;
     if (chars > 0 && isVisible(sel)) rec.visible = true;
   };
@@ -112,6 +117,7 @@ function sleep(ms: number): Promise<void> {
 
 // Shape of the in-page recorder installed by RECORDER
 interface Recorder {
+  base: string; // selection text when the recorder started (not counted)
   maxChars: number;
   visible: boolean;
   active: boolean;
@@ -122,9 +128,59 @@ interface Recorder {
 type Pt = { x: number; y: number };
 type Gesture = {
   name: string;
-  isDrag: boolean;
+  isDrag: boolean; // drags must move the logo; non-drag logo gestures must open the drawer
+  // 'ui': press-and-drag on other extension controls (no logo guards).
+  // 'info': reported separately as drawer_dragout_selection, not in the primary metric.
+  kind?: 'ui' | 'info';
+  prepare?: (page: Page, logo: Pt) => Promise<void>; // runs before the recorder starts
   run: (page: Page, from: Pt, to: Pt) => Promise<void>;
 };
+
+// Center of an element inside the extension's shadow root
+async function uiPoint(page: Page, selector: string): Promise<Pt> {
+  const pt = await page.evaluate((sel) => {
+    const root = document.getElementById('drawer-extension-root')?.shadowRoot;
+    const el = root?.querySelector(sel);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }, selector);
+  if (!pt) throw new Error(`extension element not found: ${selector}`);
+  return pt;
+}
+
+async function openDrawer(page: Page, logo: Pt) {
+  await page.mouse.click(logo.x, logo.y);
+  await sleep(500); // open animation + toolbar mount
+}
+
+async function pressDrag(page: Page, from: Pt, to: Pt) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await moveLinear(page, from, to, 15, 10);
+  await page.mouse.up();
+}
+
+// First line of plain paragraph text fully in view, away from the right edge (logo)
+async function paragraphText(page: Page): Promise<(Pt & { w: number }) | null> {
+  return page.evaluate(() => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if ((n.textContent ?? '').trim().length < 40) continue;
+      // Plain paragraph text only: dragging a link starts a link drag, not a selection
+      const parent = n.parentElement;
+      if (parent?.tagName !== 'P' || parent.closest('a, button, nav')) continue;
+      const range = document.createRange();
+      range.setStart(n, 0);
+      range.setEnd(n, 30);
+      const r = range.getBoundingClientRect();
+      if (r.width > 100 && r.top > 0 && r.bottom < innerHeight && r.left > 0 && r.right < innerWidth - 100) {
+        return { x: r.left + 2, y: r.top + r.height / 2, w: r.width };
+      }
+    }
+    return null;
+  });
+}
 
 async function moveLinear(page: Page, from: Pt, to: Pt, steps: number, gapMs: number) {
   for (let i = 1; i <= steps; i++) {
@@ -245,6 +301,64 @@ const GESTURES: Gesture[] = [
       await page.mouse.up();
     },
   },
+  {
+    // Drag the logo while the drawer is open (drag closes it)
+    name: 'drag-drawer-open',
+    isDrag: true,
+    prepare: openDrawer,
+    run: (page, from, to) => pressDrag(page, from, to),
+  },
+  {
+    // Press the toolbar's Settings button and drag off it across the page
+    name: 'toolbar-settings-press-drag',
+    isDrag: false,
+    kind: 'ui',
+    prepare: openDrawer,
+    run: async (page, _from, to) => pressDrag(page, await uiPoint(page, '[aria-label="Settings"]'), to),
+  },
+  {
+    name: 'toolbar-export-press-drag',
+    isDrag: false,
+    kind: 'ui',
+    prepare: openDrawer,
+    run: async (page, _from, to) =>
+      pressDrag(page, await uiPoint(page, '[aria-label="Toggle export mode"]'), to),
+  },
+  {
+    // Select page text so the "+" button appears, then press it and drag away (no save)
+    name: 'plus-icon-press-drag',
+    isDrag: false,
+    kind: 'ui',
+    prepare: async (page) => {
+      const t = await paragraphText(page);
+      if (!t) throw new Error('no paragraph text for plus-icon gesture');
+      await page.mouse.move(t.x, t.y);
+      await page.mouse.down();
+      await moveLinear(page, t, { x: t.x + t.w - 4, y: t.y }, 8, 10);
+      await page.mouse.up();
+      await sleep(150);
+    },
+    run: async (page, _from, to) => pressDrag(page, await uiPoint(page, '[data-selection-plus-icon]'), to),
+  },
+  {
+    // Press on the drawer's own text and drag out over the page (informational: selecting
+    // inside the drawer is allowed; spilling into page text is reported separately)
+    name: 'drawer-text-drag-out',
+    isDrag: false,
+    kind: 'info',
+    prepare: openDrawer,
+    run: async (page, _from, to) => {
+      const pt = await page.evaluate(() => {
+        const root = document.getElementById('drawer-extension-root')?.shadowRoot;
+        const p = root && [...root.querySelectorAll('[data-drawer] p')].find((el) => el.textContent?.trim());
+        if (!p) return null;
+        const r = p.getBoundingClientRect();
+        return { x: r.left + 4, y: r.top + Math.min(10, r.height / 2) };
+      });
+      if (!pt) throw new Error('no drawer text');
+      await pressDrag(page, pt, to);
+    },
+  },
 ];
 
 const TARGETS: { name: string; at: (v: typeof VIEWPORT) => Pt }[] = [
@@ -268,6 +382,7 @@ let dragFailures = 0;
 let clickFailures = 0;
 let selectBlocked = 0;
 let trials = 0;
+let drawerDragout = 0;
 const perGesture: Record<string, number> = {};
 const perFixture: Record<string, number> = {};
 const failures: string[] = [];
@@ -276,10 +391,11 @@ try {
   const page = await browser.newPage();
   for (const fixture of FIXTURES) {
     for (const gesture of GESTURES) {
-      const targets = gesture.isDrag ? TARGETS : TARGETS.slice(0, 1);
+      const targets = gesture.isDrag || gesture.kind ? TARGETS : TARGETS.slice(0, 1);
       for (const target of targets) {
         const label = `${fixture}/${gesture.name}/${target.name}`;
         const logo = await freshPage(page, fixture);
+        await gesture.prepare?.(page, logo);
         await page.evaluate(RECORDER);
         await gesture.run(page, logo, target.at(VIEWPORT));
         const atRelease = await page.evaluate(() => {
@@ -292,15 +408,23 @@ try {
           const r = (window as unknown as { __rec: Recorder }).__rec;
           r.sample();
           r.active = false;
-          const sel = document.getSelection();
+          const text = document.getSelection()?.toString() ?? '';
           return {
             maxChars: r.maxChars,
             visible: r.visible,
-            post: sel ? sel.toString().replace(/\s+/g, '').length : 0,
+            post: text === r.base ? 0 : text.replace(/\s+/g, '').length,
           };
         });
         const after = (await page.evaluate(LOGO_STATE)) as Logo;
         trials++;
+
+        if (gesture.kind === 'info') {
+          if (rec.maxChars > 0) {
+            drawerDragout++;
+            failures.push(`INFO ${label}: max=${rec.maxChars} post=${rec.post} visible=${rec.visible}`);
+          }
+          continue;
+        }
 
         if (rec.maxChars > 0) {
           selectionTrials++;
@@ -312,6 +436,7 @@ try {
         if (rec.visible) visibleTrials++;
         if (rec.post > 0) postReleaseTrials++;
 
+        if (gesture.kind) continue; // other UI controls: no logo guards
         if (gesture.isDrag) {
           const moved = Math.hypot(after.x - logo.x, after.y - logo.y);
           if (moved < 50) {
@@ -330,23 +455,7 @@ try {
     await GESTURES[0].run(page, logo, TARGETS[0].at(VIEWPORT));
     await sleep(200);
     await page.evaluate(() => document.getSelection()?.removeAllRanges());
-    const textPt = await page.evaluate(() => {
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        if ((n.textContent ?? '').trim().length < 40) continue;
-        // Plain paragraph text only: dragging a link starts a link drag, not a selection
-        const parent = n.parentElement;
-        if (parent?.tagName !== 'P' || parent.closest('a, button, nav')) continue;
-        const range = document.createRange();
-        range.setStart(n, 0);
-        range.setEnd(n, 30);
-        const r = range.getBoundingClientRect();
-        if (r.width > 100 && r.top > 0 && r.bottom < innerHeight && r.left > 0 && r.right < innerWidth - 100) {
-          return { x: r.left + 2, y: r.top + r.height / 2, w: r.width };
-        }
-      }
-      return null;
-    });
+    const textPt = await paragraphText(page);
     if (textPt) {
       await page.mouse.move(textPt.x, textPt.y);
       await page.mouse.down();
@@ -375,6 +484,7 @@ console.log(`METRIC selection_trials=${selectionTrials}`);
 console.log(`METRIC visible_selection_trials=${visibleTrials}`);
 console.log(`METRIC post_release_selection_trials=${postReleaseTrials}`);
 console.log(`METRIC selected_chars=${selectedChars}`);
+console.log(`METRIC drawer_dragout_selection=${drawerDragout}`);
 console.log(`METRIC trials=${trials}`);
 console.log(`METRIC drag_failures=${dragFailures}`);
 console.log(`METRIC click_failures=${clickFailures}`);
