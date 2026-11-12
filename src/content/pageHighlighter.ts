@@ -494,9 +494,12 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
 
     chunk.forEach((node) => mark.appendChild(node));
 
-    requestAnimationFrame(() => {
-      mark.style.backgroundSize = '100% 100%';
-    });
+    // Compute the 0% start style now, then grow to 100% so the transition always runs.
+    // A requestAnimationFrame alone races: its callback runs before the browser has ever
+    // computed this new element's style, so 0% -> 100% often collapsed to "no change" and
+    // the mark appeared without animating (always, when restored from a timer).
+    void getComputedStyle(mark).backgroundSize;
+    mark.style.backgroundSize = '100% 100%';
 
     attachMarkClickHandler(mark, highlightId);
   }

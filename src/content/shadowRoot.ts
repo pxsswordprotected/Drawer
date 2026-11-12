@@ -63,8 +63,10 @@ type ComposedSelection = Selection & {
 /**
  * A selection that starts on the extension UI (drawer text) must stay inside it.
  * Firefox lets such a drag extend into the host page behind the drawer; Chromium keeps it
- * in the shadow tree. While a press that began on the UI is held, any selection that
- * reaches outside the shadow root is put back to the last one that was fully inside.
+ * in the shadow tree. While a press that began on the UI is held, a selection with one end
+ * inside the shadow root and the other outside is put back to the last one that was fully
+ * inside. A selection entirely in the page is left alone: pressing the "+" button must not
+ * clear the page text the user is about to save.
  */
 function keepUiSelectionsInside(shadowRoot: ShadowRoot, reactRoot: HTMLElement): void {
   reactRoot.addEventListener(
@@ -78,10 +80,13 @@ function keepUiSelectionsInside(shadowRoot: ShadowRoot, reactRoot: HTMLElement):
         if (!selection?.getComposedRanges || selection.rangeCount === 0) return;
         const [range] = selection.getComposedRanges({ shadowRoots: [shadowRoot] });
         if (!range) return;
-        if (shadowRoot.contains(range.startContainer) && shadowRoot.contains(range.endContainer)) {
+        const startInside = shadowRoot.contains(range.startContainer);
+        const endInside = shadowRoot.contains(range.endContainer);
+        if (startInside && endInside) {
           lastInside = range;
           return;
         }
+        if (!startInside && !endInside) return; // page selection: not ours to change
         if (lastInside) {
           const { startContainer, startOffset, endContainer, endOffset } = lastInside;
           selection.setBaseAndExtent(startContainer, startOffset, endContainer, endOffset);
