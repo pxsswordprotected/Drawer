@@ -52,7 +52,7 @@ const STUB_CHROME = `
 // on purpose) doesn't count; only a different, non-empty selection does.
 const RECORDER = `(() => {
   const base = (document.getSelection() || '').toString();
-  const rec = { base, maxChars: 0, visible: false, samples: 0, active: true };
+  const rec = { base, maxChars: 0, last: 0, visible: false, samples: 0, active: true };
   const isVisible = (sel) => {
     const node = sel.anchorNode;
     const el = node && (node.nodeType === 1 ? node : node.parentElement);
@@ -62,11 +62,20 @@ const RECORDER = `(() => {
   };
   rec.sample = () => {
     rec.samples++;
+    rec.last = 0; // stays 0 unless this sample finds counted page text
     const sel = document.getSelection();
     if (!sel || sel.isCollapsed) return;
     const text = sel.toString();
     if (text === base) return;
+    // Text selected entirely inside the extension UI (drawer) isn't page text. Firefox
+    // reports shadow-tree selections on the document; Chromium doesn't.
+    const ui = document.getElementById('drawer-extension-root')?.shadowRoot;
+    if (ui && sel.getComposedRanges) {
+      const [r] = sel.getComposedRanges({ shadowRoots: [ui] });
+      if (r && ui.contains(r.startContainer) && ui.contains(r.endContainer)) return;
+    }
     const chars = text.replace(/\\s+/g, '').length;
+    rec.last = chars;
     if (chars > rec.maxChars) rec.maxChars = chars;
     if (chars > 0 && isVisible(sel)) rec.visible = true;
   };
@@ -131,6 +140,7 @@ function sleep(ms: number): Promise<void> {
 interface Recorder {
   base: string; // selection text when the recorder started (not counted)
   maxChars: number;
+  last: number; // counted chars at the most recent sample
   visible: boolean;
   active: boolean;
   sample: () => void;
@@ -426,11 +436,10 @@ try {
           const r = (window as unknown as { __rec: Recorder }).__rec;
           r.sample();
           r.active = false;
-          const text = document.getSelection()?.toString() ?? '';
           return {
             maxChars: r.maxChars,
             visible: r.visible,
-            post: text === r.base ? 0 : text.replace(/\s+/g, '').length,
+            post: r.last,
           };
         });
         const after = (await page.evaluate(LOGO_STATE)) as Logo;
