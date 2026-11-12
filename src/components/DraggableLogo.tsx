@@ -216,7 +216,10 @@ export const DraggableLogo = React.memo(function DraggableLogo() {
           className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-pointer'} ${isOpen ? styles.logoDrawerOpen : ''}`}
           style={{ width: `${LOGO_SIZE}px`, height: `${LOGO_SIZE}px` }}
         >
-          <div className={styles.logoInner}>
+          {/* preventDefault on mousedown stops the browser from starting a text selection
+              that the drag would extend across the page. Draggable overrides the outer
+              div's onMouseDown, so it goes on this child (the event still bubbles up). */}
+          <div className={styles.logoInner} onMouseDown={(e) => e.preventDefault()}>
             <GalleryVerticalEnd size={24} strokeWidth={1.5} className="text-text-main" />
           </div>
         </div>
