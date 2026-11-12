@@ -20,6 +20,19 @@ npm install
 npm run dev
 ```
 
+### Drawer content regression
+
+Page-group headers remain available even when all saved highlights belong to one other page.
+The offline browser check covers that case, empty storage, expanding/collapsing groups,
+settings/export round trips, deletion, and reopening before/after the exit animation finishes.
+
+```bash
+npx vite build --mode extension --outDir bench/drag/.ext
+bun bench/drawer/run.ts
+# Helium instead of Chrome:
+CHROME_PATH="/Applications/Helium.app/Contents/MacOS/Helium" bun bench/drawer/run.ts
+```
+
 ### Debug build (real-site testing)
 
 ```bash

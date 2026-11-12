@@ -744,8 +744,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                 />
                               )}
                             <div ref={group.isCurrentPage ? currentPageSectionRef : undefined}>
-                              {/* Section header — only when multiple page groups exist */}
-                              {(pageGroups.length > 1 || group.isCurrentPage) && (
+                              {/* Keep every group reachable, including a lone group from another page. */}
                                 <div
                                   data-item-expanded={!isCollapsed ? '' : undefined}
                                   data-export-selected={
@@ -830,7 +829,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                     )}
                                   </div>
                                 </div>
-                              )}
 
                               {/* Highlights within this group */}
                               {!isCollapsed &&
