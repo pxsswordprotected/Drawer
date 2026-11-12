@@ -14,10 +14,6 @@ const LOGO_SIZE = 44;
 // onDrag on any 1px move, so without this, click jitter swallows the click.
 const DRAG_THRESHOLD = 4;
 
-// Module scope: add/removeEventListener must receive the same function identity,
-// and handleDrag/handleDragStop run in different renders.
-const blockSelect = (e: Event) => e.preventDefault();
-
 type Pos = { x: number; y: number };
 type Bounds = { left: number; top: number; right: number; bottom: number };
 
@@ -130,7 +126,6 @@ export const DraggableLogo = React.memo(function DraggableLogo() {
 
       wasDragged.current = true;
       setIsDragging(true);
-      document.addEventListener('selectstart', blockSelect);
       const drawer = getDrawerElement();
       if (drawer) drawer.style.willChange = 'translate';
       if (isOpen) closeDrawer();
@@ -150,7 +145,6 @@ export const DraggableLogo = React.memo(function DraggableLogo() {
     // Sub-threshold press: let the click handler toggle; controlled position snaps back
     if (!wasDragged.current) return;
     setIsDragging(false);
-    document.removeEventListener('selectstart', blockSelect);
     const drawer = getDrawerElement();
     if (drawer) drawer.style.willChange = 'auto';
     setTimeout(() => {
@@ -208,6 +202,10 @@ export const DraggableLogo = React.memo(function DraggableLogo() {
         onStart={handleDragStart}
         onDrag={handleDrag}
         onStop={handleDragStop}
+        // Selection never starts (mousedown is cancelled below), so react-draggable's
+        // user-select hack is unneeded; it would also add a <style> to the host page and
+        // clear the user's page selection after every drag
+        enableUserSelectHack={false}
         bounds={bounds}
       >
         <div
