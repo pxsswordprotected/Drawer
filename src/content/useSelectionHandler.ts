@@ -23,6 +23,15 @@ const HIDDEN_SELECTION: SelectionState = Object.freeze({
   selectedText: '',
 });
 
+/** True when focus is in a text <input> or <textarea> (looking through open shadow roots) */
+function isTextFieldFocused(): boolean {
+  let active: Element | null = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  if (active instanceof HTMLTextAreaElement) return true;
+  // selectionStart is null for non-text inputs (checkbox, button, range...)
+  return active instanceof HTMLInputElement && active.selectionStart !== null;
+}
+
 export function useSelectionHandler() {
   const [selectionState, setSelectionState] = useState<SelectionState>(HIDDEN_SELECTION);
   const defaultColor = useDrawerStore((state) => state.defaultColor);
@@ -51,6 +60,13 @@ export function useSelectionHandler() {
 
       // Hide icon if no text is selected
       if (!selectedText || selectedText.length === 0) {
+        setSelectionState(HIDDEN_SELECTION);
+        return;
+      }
+
+      // Hide icon for text selected inside an <input>/<textarea>: a field's value isn't
+      // part of the page's text nodes, so there's nothing to mark or re-find later
+      if (isTextFieldFocused()) {
         setSelectionState(HIDDEN_SELECTION);
         return;
       }
