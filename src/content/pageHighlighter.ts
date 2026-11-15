@@ -292,6 +292,10 @@ function isLayoutWhitespace(node: Text): boolean {
   return !(isInlineLevel(node.previousSibling) && isInlineLevel(node.nextSibling));
 }
 
+// white-space values that render a "\n" in text as a line break (not collapsed to a space)
+const KEEPS_LINE_BREAKS = /^(pre|pre-wrap|pre-line|break-spaces)$/;
+const LINE_BREAK_RUN = /[\r\n]+/;
+
 /**
  * Wraps the selected text in <mark> elements on the host page DOM.
  * Handles multi-node selections via TreeWalker, processing in reverse
@@ -364,6 +368,37 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     }
     exactNodes.unshift(targetNode);
   }
+
+  // 1b. In text that keeps its line breaks (pre / pre-wrap / pre-line), a "\n" is a real
+  // line break inside the same text node. If a mark wraps it, every blank line gets its own
+  // padded, highlighted fragment: an empty box with nothing in it (X/Twitter posts are one
+  // text node like this). Cut the text at each line break and mark only the text between.
+  const lineNodes: Text[] = [];
+  for (const node of exactNodes) {
+    if (!KEEPS_LINE_BREAKS.test(getComputedStyle(node.parentElement ?? document.body).whiteSpace)) {
+      lineNodes.push(node);
+      continue;
+    }
+    let rest: Text | null = node;
+    while (rest) {
+      const breakAt: number = rest.data.search(LINE_BREAK_RUN);
+      if (breakAt === -1) {
+        lineNodes.push(rest);
+        break;
+      }
+      if (breakAt > 0) {
+        const lineBreak: Text = rest.splitText(breakAt);
+        lineNodes.push(rest);
+        rest = lineBreak;
+      }
+      // rest now starts with the line break(s): leave them outside any mark
+      const run: number = rest.data.match(LINE_BREAK_RUN)![0].length;
+      skippedWhitespaceNodes++;
+      rest = run < rest.length ? rest.splitText(run) : null;
+    }
+  }
+  exactNodes.length = 0;
+  exactNodes.push(...lineNodes);
 
   // 2. Group adjacent text nodes that share the same parent
   const chunks: Text[][] = [];
