@@ -5,6 +5,7 @@ import { Settings } from './types';
 export const STORAGE_KEYS = {
   HIGHLIGHTS: 'highlights',
   SETTINGS: 'settings',
+  PAGE_TITLES: 'pageTitles',
 } as const;
 
 export const DEFAULT_SETTINGS: Settings = {

@@ -10,6 +10,7 @@ import { TrashIcon } from '@/shared/TrashIcon';
 import { DrawerToolbar } from './DrawerToolbar';
 import { generateMarkdown, downloadMarkdown, copyMarkdown } from '@/shared/exportHighlights';
 import { DrawerSettings } from './DrawerSettings';
+import { PageTitle } from './PageTitle';
 import { pageUrl } from '@/shared/pageUrl';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
@@ -51,6 +52,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     pendingScrollHighlightId,
     clearPendingScrollHighlight,
     deletePageGroup,
+    pageTitles,
   } = useDrawerStore(
     useShallow((s) => ({
       isOpen: s.isOpen,
@@ -72,6 +74,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
       pendingScrollHighlightId: s.pendingScrollHighlightId,
       clearPendingScrollHighlight: s.clearPendingScrollHighlight,
       deletePageGroup: s.deletePageGroup,
+      pageTitles: s.pageTitles,
     }))
   );
 
@@ -87,7 +90,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
       if (!group) {
         group = {
           url: h.url,
-          pageTitle: h.pageTitle,
+          pageTitle: pageTitles[h.url] || h.pageTitle,
           highlights: [],
           isCurrentPage: h.url === currentUrl,
           mostRecentTimestamp: 0,
@@ -106,7 +109,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     groups.sort((a, b) => b.mostRecentTimestamp - a.mostRecentTimestamp);
 
     return groups;
-  }, [allHighlights, currentUrl]);
+  }, [allHighlights, pageTitles, currentUrl]);
 
   // Global highlight index map (headers excluded) for itemRefs and stagger
   const highlightGlobalIndices = useMemo(() => {
@@ -236,11 +239,15 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   }, []);
 
   const handleExportCopy = useCallback(async () => {
-    const md = generateMarkdown(highlightsToExport, {
-      includeNotes: exportIncludeNotes,
-      includeTimestamps: exportIncludeTimestamps,
-      includePageTitles: exportIncludePageTitles,
-    });
+    const md = generateMarkdown(
+      highlightsToExport,
+      {
+        includeNotes: exportIncludeNotes,
+        includeTimestamps: exportIncludeTimestamps,
+        includePageTitles: exportIncludePageTitles,
+      },
+      pageTitles
+    );
     try {
       await copyMarkdown(md);
       setExportSuccess('copy');
@@ -253,6 +260,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }
   }, [
     highlightsToExport,
+    pageTitles,
     exportIncludeNotes,
     exportIncludeTimestamps,
     exportIncludePageTitles,
@@ -260,11 +268,15 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   ]);
 
   const handleExportDownload = useCallback(() => {
-    const md = generateMarkdown(highlightsToExport, {
-      includeNotes: exportIncludeNotes,
-      includeTimestamps: exportIncludeTimestamps,
-      includePageTitles: exportIncludePageTitles,
-    });
+    const md = generateMarkdown(
+      highlightsToExport,
+      {
+        includeNotes: exportIncludeNotes,
+        includeTimestamps: exportIncludeTimestamps,
+        includePageTitles: exportIncludePageTitles,
+      },
+      pageTitles
+    );
     downloadMarkdown(md);
     setExportSuccess('download');
     setTimeout(() => {
@@ -273,6 +285,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }, 1000);
   }, [
     highlightsToExport,
+    pageTitles,
     exportIncludeNotes,
     exportIncludeTimestamps,
     exportIncludePageTitles,
@@ -811,11 +824,12 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                           />
                                         );
                                       })()}
-                                    <p
-                                      className={`text-base ${styles.pageTitle} ${isCollapsed ? 'font-light text-text-main' : 'font-medium text-text-main'}`}
-                                    >
-                                      {group.pageTitle || group.url}
-                                    </p>
+                                    <PageTitle
+                                      url={group.url}
+                                      title={group.pageTitle || group.url}
+                                      isCollapsed={isCollapsed}
+                                      editable={!exportMode}
+                                    />
                                     {!exportMode && (
                                       <div
                                         className={styles.pageTrashIcon}

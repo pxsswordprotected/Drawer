@@ -45,4 +45,7 @@ export interface Settings {
   defaultColor: string;
 }
 
+/** User-chosen page titles, keyed by page URL. A page with no entry shows its saved title. */
+export type PageTitles = Record<string, string>;
+
 export type ExportScope = 'current' | 'all' | 'selected';

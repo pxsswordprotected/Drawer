@@ -1,7 +1,7 @@
 // Storage abstraction layer for browser.storage operations
 // This enables seamless migration to database backend in the future
 
-import { Highlight, Note, Settings } from './types';
+import { Highlight, Note, PageTitles, Settings } from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 
 // Detect if we're in a browser extension context
@@ -105,6 +105,28 @@ class StorageService {
     const highlights = await this.getHighlights();
     const filtered = highlights.filter((h) => h.url !== url);
     await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, filtered);
+    await this.setPageTitle(url, '');
+  }
+
+  /**
+   * Get the user's custom page titles (url -> title)
+   */
+  async getPageTitles(): Promise<PageTitles> {
+    return (await this.getFromStorage(STORAGE_KEYS.PAGE_TITLES)) || {};
+  }
+
+  /**
+   * Rename a page. An empty title removes the custom title, so the page shows its saved one.
+   * Writes only the pageTitles key: never the highlights array, so a rename can't overwrite
+   * a highlight or note saved at the same moment.
+   */
+  async setPageTitle(url: string, title: string): Promise<void> {
+    const titles = await this.getPageTitles();
+    const trimmed = title.trim();
+    if (trimmed) titles[url] = trimmed;
+    else if (url in titles) delete titles[url];
+    else return;
+    await this.setInStorage(STORAGE_KEYS.PAGE_TITLES, titles);
   }
 
   /**
@@ -171,10 +193,12 @@ class StorageService {
    */
   async exportHighlights(): Promise<string> {
     const highlights = await this.getHighlights();
+    const pageTitles = await this.getPageTitles();
     const exportData = {
       version: '1.0',
       exportDate: new Date().toISOString(),
       highlights,
+      pageTitles,
       metadata: {
         totalCount: highlights.length,
         pageCount: new Set(highlights.map((h) => h.url)).size,
@@ -202,6 +226,7 @@ class StorageService {
         return true;
       });
       await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, unique);
+      await this.importPageTitles(data.pageTitles);
     } catch (error) {
       console.error('Failed to import highlights:', error);
       throw new Error('Invalid JSON format');
@@ -209,10 +234,26 @@ class StorageService {
   }
 
   /**
-   * Clear all highlights (use with caution)
+   * Merge backed-up page titles into storage. Titles already set here win, like highlights
+   * with the same ID. Older backups have no pageTitles; malformed entries are skipped.
+   */
+  private async importPageTitles(imported: unknown): Promise<void> {
+    if (!imported || typeof imported !== 'object' || Array.isArray(imported)) return;
+    const valid: PageTitles = {};
+    for (const [url, title] of Object.entries(imported)) {
+      if (typeof title === 'string' && title.trim()) valid[url] = title.trim();
+    }
+    if (Object.keys(valid).length === 0) return;
+    const existing = await this.getPageTitles();
+    await this.setInStorage(STORAGE_KEYS.PAGE_TITLES, { ...valid, ...existing });
+  }
+
+  /**
+   * Clear all highlights and custom page titles (use with caution)
    */
   async clearAllHighlights(): Promise<void> {
     await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, []);
+    await this.setInStorage(STORAGE_KEYS.PAGE_TITLES, {});
   }
 }
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Highlight, Note } from '@/shared/types';
+import { Highlight, Note, PageTitles } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { pageUrl } from '@/shared/pageUrl';
@@ -9,6 +9,7 @@ type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
 export interface DrawerState {
   isOpen: boolean;
   allHighlights: Highlight[];
+  pageTitles: PageTitles; // Custom page titles by URL; a page without one shows its saved title
   isLoading: boolean; // True only until the first load completes; refreshes are silent
   logoPosition: { x: number; y: number } | null;
   selectedHighlightId: string | null;
@@ -34,6 +35,7 @@ export interface DrawerState {
   setExpandedGroupUrl: (url: string | null) => void;
   deleteHighlight: (id: string) => Promise<void>;
   deletePageGroup: (url: string) => Promise<void>;
+  setPageTitle: (url: string, title: string) => Promise<void>;
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
@@ -50,6 +52,7 @@ const loadingPromises = new Map<string, Promise<void>>();
 export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: false,
   allHighlights: [],
+  pageTitles: {},
   isLoading: true,
   logoPosition: null,
   selectedHighlightId: null,
@@ -106,14 +109,27 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   deletePageGroup: async (url: string) => {
     await storageService.deleteHighlightsByUrl(url);
-    set((state) => ({
-      allHighlights: state.allHighlights.filter((h) => h.url !== url),
-      expandedGroupUrl: state.expandedGroupUrl === url ? null : state.expandedGroupUrl,
-      selectedHighlightId:
-        state.allHighlights.find((h) => h.id === state.selectedHighlightId)?.url === url
-          ? null
-          : state.selectedHighlightId,
-    }));
+    set((state) => {
+      const { [url]: _removed, ...pageTitles } = state.pageTitles;
+      return {
+        allHighlights: state.allHighlights.filter((h) => h.url !== url),
+        pageTitles,
+        expandedGroupUrl: state.expandedGroupUrl === url ? null : state.expandedGroupUrl,
+        selectedHighlightId:
+          state.allHighlights.find((h) => h.id === state.selectedHighlightId)?.url === url
+            ? null
+            : state.selectedHighlightId,
+      };
+    });
+  },
+
+  setPageTitle: async (url: string, title: string) => {
+    await storageService.setPageTitle(url, title);
+    const trimmed = title.trim();
+    set((state) => {
+      const { [url]: _previous, ...rest } = state.pageTitles;
+      return { pageTitles: trimmed ? { ...rest, [url]: trimmed } : rest };
+    });
   },
 
   addNote: async (highlightId: string, text: string) => {
@@ -176,13 +192,16 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   deleteAllHighlights: async () => {
     await storageService.clearAllHighlights();
-    set({ allHighlights: [], selectedHighlightId: null, expandedGroupUrl: null });
+    set({ allHighlights: [], pageTitles: {}, selectedHighlightId: null, expandedGroupUrl: null });
   },
 
   importBackup: async (jsonString: string) => {
     await storageService.importHighlights(jsonString);
-    const highlights = await storageService.getHighlights();
-    set({ allHighlights: highlights });
+    const [highlights, pageTitles] = await Promise.all([
+      storageService.getHighlights(),
+      storageService.getPageTitles(),
+    ]);
+    set({ allHighlights: highlights, pageTitles });
   },
 
   loadAllHighlights: async () => {
@@ -194,14 +213,23 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
       // No isLoading toggle here: swapping the list for the skeleton on every
       // refresh resets scroll position and detaches the current-page section.
       try {
-        const highlights = await storageService.getHighlights();
-        // Storage returns fresh copies every read. Keep the current array when the
+        const [highlights, pageTitles] = await Promise.all([
+          storageService.getHighlights(),
+          storageService.getPageTitles(),
+        ]);
+        // Storage returns fresh copies every read. Keep the current values when the
         // content is identical so a drawer open doesn't re-render every row.
-        const unchanged = JSON.stringify(highlights) === JSON.stringify(get().allHighlights);
-        set(unchanged ? { isLoading: false } : { allHighlights: highlights, isLoading: false });
+        const state = get();
+        set({
+          isLoading: false,
+          ...(JSON.stringify(highlights) === JSON.stringify(state.allHighlights)
+            ? {}
+            : { allHighlights: highlights }),
+          ...(JSON.stringify(pageTitles) === JSON.stringify(state.pageTitles) ? {} : { pageTitles }),
+        });
       } catch (error) {
         console.error('Failed to load highlights:', error);
-        set({ allHighlights: [], isLoading: false });
+        set({ allHighlights: [], pageTitles: {}, isLoading: false });
       } finally {
         loadingPromises.delete('__all__');
       }

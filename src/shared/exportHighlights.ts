@@ -1,4 +1,4 @@
-import { Highlight } from './types';
+import { Highlight, PageTitles } from './types';
 
 interface ExportOptions {
   includeNotes: boolean;
@@ -8,7 +8,11 @@ interface ExportOptions {
 
 const escapeMd = (s: string) => s.replace(/([#>*_`\-[\]\\|~])/g, '\\$1');
 
-export function generateMarkdown(highlights: Highlight[], options: ExportOptions): string {
+export function generateMarkdown(
+  highlights: Highlight[],
+  options: ExportOptions,
+  pageTitles: PageTitles
+): string {
   if (highlights.length === 0) return '';
 
   const groups = new Map<string, Highlight[]>();
@@ -31,7 +35,7 @@ export function generateMarkdown(highlights: Highlight[], options: ExportOptions
     const group = sortedGroups[gi];
 
     if (options.includePageTitles) {
-      const pageTitle = group.highlights[0].pageTitle || group.url;
+      const pageTitle = pageTitles[group.url] || group.highlights[0].pageTitle || group.url;
       md += `## ${escapeMd(pageTitle)}\n\n`;
       md += `[Source](${group.url})\n\n`;
     }
