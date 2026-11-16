@@ -824,7 +824,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                           deletePageGroup(group.url);
                                         }}
                                       >
-                                        <TrashIcon size={14} className="text-error" />
+                                        <TrashIcon size={14} />
                                       </div>
                                     )}
                                   </div>

@@ -16,7 +16,7 @@ export const TrashIcon: React.FC<TrashIconProps> = ({ size = 16, className, onCl
     strokeWidth="1"
     strokeLinecap="round"
     strokeLinejoin="round"
-    className={className}
+    className={className ? `text-error ${className}` : 'text-error'}
     onClick={onClick}
   >
     <circle cx="12" cy="12" r="10" />

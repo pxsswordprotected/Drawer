@@ -90,7 +90,7 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
         </p>
         {!hideActions && (
           <div className={styles.trashIcon}>
-            <TrashIcon size={14} className="text-text-secondary" onClick={handleDelete} />
+            <TrashIcon size={14} onClick={handleDelete} />
           </div>
         )}
       </div>
