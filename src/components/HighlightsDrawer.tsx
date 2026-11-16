@@ -582,31 +582,27 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     return () => clearTimeout(timeoutId);
   }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, isVisible, scrollTo]);
 
-  // Auto-scroll to current page section (once per drawer open)
+  // Put the current page's group at the list's top edge each time the drawer opens, instead of
+  // keeping wherever the list was last scrolled. Runs before the first painted frame, and only
+  // once that group is the expanded one so the measured offset is the final layout. Marks do
+  // their own positioning above.
   const hasScrolledOnOpen = useRef(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen) {
       hasScrolledOnOpen.current = false;
       return;
     }
-    if (!isVisible || isLoading || hasScrolledOnOpen.current || !scrollContainerRef.current) return;
-    if (pageGroups.length === 0) return;
-
-    const sectionEl = currentPageSectionRef.current;
-    if (!sectionEl) return;
-
-    const firstGroup = pageGroups[0];
-    if (firstGroup?.isCurrentPage) return;
-    // Opened from a page mark: the pending-scroll effect positions the list instead
+    if (!isVisible || isLoading || hasScrolledOnOpen.current) return;
     if (drawerTrigger === 'mark') return;
 
-    hasScrolledOnOpen.current = true;
+    const currentGroup = pageGroups.find((g) => g.isCurrentPage);
+    const sectionEl = currentPageSectionRef.current;
+    if (!currentGroup || !sectionEl || expandedGroupUrl !== currentGroup.url) return;
 
-    requestAnimationFrame(() => {
-      if (sectionEl) scrollTo(sectionEl);
-    });
-  }, [isOpen, isVisible, isLoading, pageGroups.length, scrollTo, drawerTrigger]);
+    hasScrolledOnOpen.current = true;
+    scrollTo(sectionEl, 'top', 'instant');
+  }, [isOpen, isVisible, isLoading, pageGroups, expandedGroupUrl, drawerTrigger, scrollTo]);
 
   // Unregister drawer element and layout on unmount
   useEffect(() => {
