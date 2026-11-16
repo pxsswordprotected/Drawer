@@ -6,7 +6,7 @@ import { pageUrl } from '@/shared/pageUrl';
 
 type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
 
-interface DrawerState {
+export interface DrawerState {
   isOpen: boolean;
   allHighlights: Highlight[];
   isLoading: boolean; // True only until the first load completes; refreshes are silent
