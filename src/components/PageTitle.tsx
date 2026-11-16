@@ -87,7 +87,11 @@ export const PageTitle: React.FC<PageTitleProps> = ({ url, title, isCollapsed, e
           className={`relative block w-full resize-none rounded-sm bg-edge text-base text-text-main ring-4 ring-edge outline-none ${weight}`}
         />
       ) : (
-        <p className={`text-base ${styles.pageTitle} ${weight} text-text-main`}>{title}</p>
+        <p
+          className={`text-base ${styles.pageTitle} ${isCollapsed ? styles.pageTitleClamped : ''} ${weight} text-text-main`}
+        >
+          {title}
+        </p>
       )}
     </>
   );
