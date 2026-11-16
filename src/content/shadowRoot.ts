@@ -61,6 +61,20 @@ type ComposedSelection = Selection & {
 };
 
 /**
+ * True when either end of the selection is inside the extension's own UI (drawer text,
+ * notes). Chromium reports a selection made inside a shadow root as sitting on the host's
+ * parent (<body>), so DOM checks like `closest('[data-drawer]')` on the selection's range
+ * can never see it; getComposedRanges looks through the shadow root. Where that API is
+ * missing this returns false.
+ */
+export function selectionTouchesExtensionUi(selection: Selection): boolean {
+  const ui = document.getElementById(DRAWER_CONFIG.SHADOW_DOM_ID)?.shadowRoot;
+  if (!ui) return false;
+  const [range] = (selection as ComposedSelection).getComposedRanges?.({ shadowRoots: [ui] }) ?? [];
+  return !!range && (ui.contains(range.startContainer) || ui.contains(range.endContainer));
+}
+
+/**
  * A selection that starts on the extension UI (drawer text) must stay inside it.
  * Firefox lets such a drag extend into the host page behind the drawer; Chromium keeps it
  * in the shadow tree. While a press that began on the UI is held, a selection with one end

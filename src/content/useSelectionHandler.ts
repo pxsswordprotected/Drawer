@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { selectionTouchesExtensionUi } from './shadowRoot';
 import { Highlight } from '@/shared/types';
 import { storageService } from '@/shared/storage';
 import { debugLog, describeRangeEnds, errorInfo, excerpt, snippetOf } from '@/shared/debugLog';
@@ -67,6 +68,13 @@ export function useSelectionHandler() {
       // Hide icon for text selected inside an <input>/<textarea>: a field's value isn't
       // part of the page's text nodes, so there's nothing to mark or re-find later
       if (isTextFieldFocused()) {
+        setSelectionState(HIDDEN_SELECTION);
+        return;
+      }
+
+      // Hide icon when the selection is inside the extension's own UI (drawer text, notes).
+      // Covers the real extension, where the drawer is in a shadow root.
+      if (selectionTouchesExtensionUi(selection)) {
         setSelectionState(HIDDEN_SELECTION);
         return;
       }
