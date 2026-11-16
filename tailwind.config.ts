@@ -16,6 +16,7 @@ export default {
         },
         divider: '#484848', // Dividers/borders
         edge: 'rgba(255, 255, 255, 0.1)', // Faint outline: visible on dark pages, invisible on light ones
+        selected: '#B3D7FE', // Text selection fill (paired with text-bg-main): the browser's default light blue
 
         // Semantic colors
         error: '#CC2424',

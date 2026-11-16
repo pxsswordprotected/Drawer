@@ -626,7 +626,10 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   }
 
   return (
-    <div style={{ contentVisibility: isVisible ? 'visible' : 'hidden' }}>
+    <div
+      className="selection:bg-selected selection:text-bg-main"
+      style={{ contentVisibility: isVisible ? 'visible' : 'hidden' }}
+    >
       {/* Toolbar — fixed above draggable logo; mounted only while the drawer is showing */}
       {logoPosition && isVisible && !isClosing && (
         <DrawerToolbar

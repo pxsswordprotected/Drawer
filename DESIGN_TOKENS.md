@@ -36,6 +36,7 @@ Source of truth: `tailwind.config.ts` (Tailwind tokens) and `src/shared/constant
 |---|---|---|
 | `bg-bg-main` | #1A1A1A | Logo, toolbar, selection plus icon |
 | `bg-bg-elevated` | #1A1A1A | Drawer panel (same value as `bg-main`: drawer and toolbar match) |
+| `bg-selected` | #B3D7FE | Text selection fill across the drawer (`selection:bg-selected selection:text-bg-main` on the root); the browser's default light blue, since CSS can't read the OS value |
 
 ### Text
 
