@@ -236,6 +236,13 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     setExportBarHeight(undefined);
   }, []);
 
+  // Leave export mode in place: only the export UI goes away (after its 200ms exit), so the
+  // list keeps its scroll position and whichever pages are expanded or collapsed
+  const exitExportMode = useCallback(() => {
+    setExportExiting(true);
+    setTimeout(() => resetExportState(), 200);
+  }, [resetExportState]);
+
   const handleExportCopy = useCallback(async () => {
     const md = generateMarkdown(
       highlightsToExport,
@@ -434,13 +441,20 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     // Shadow roots and documents are both EventTargets; type the handler as Event so one
     // listener signature fits either root.
     const handleEscape = (e: Event) => {
-      if ((e as KeyboardEvent).key === 'Escape') closeDrawer();
+      if ((e as KeyboardEvent).key !== 'Escape') return;
+      // In export mode Escape leaves it (and does nothing while it is already leaving);
+      // the drawer closes on the next press
+      if (exportMode) {
+        if (!exportExiting) exitExportMode();
+        return;
+      }
+      closeDrawer();
     };
 
     const root: EventTarget = drawerRef.current?.getRootNode() ?? document;
     root.addEventListener('keydown', handleEscape);
     return () => root.removeEventListener('keydown', handleEscape);
-  }, [isOpen, closeDrawer]);
+  }, [isOpen, closeDrawer, exportMode, exportExiting, exitExportMode]);
 
   // Initialize current index when drawer opens
   useEffect(() => {
@@ -635,8 +649,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
           isSettingsActive={settingsMode}
           onExportToggle={() => {
             if (exportMode) {
-              setExportExiting(true);
-              setTimeout(() => resetExportState(), 200);
+              exitExportMode();
             } else if (allHighlights.length === 0) {
               setSettingsMode(false);
               setExportEmptyMessage(true);
