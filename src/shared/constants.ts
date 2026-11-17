@@ -9,6 +9,9 @@ export const STORAGE_KEYS = {
   SETTINGS: 'settings',
 } as const;
 
+// Message a tab sends the background script to change stored data: { type, op: WriteOp }
+export const WRITE_MESSAGE = 'STORAGE_WRITE';
+
 export const DEFAULT_SETTINGS: Settings = {
   defaultColor: '#ffff02', // Yellow highlight
 };

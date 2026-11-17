@@ -33,6 +33,27 @@ bun bench/drawer/run.ts
 CHROME_PATH="/Applications/Helium.app/Contents/MacOS/Helium" bun bench/drawer/run.ts
 ```
 
+### Cross-tab storage
+
+Each highlight and custom page title is stored under its own key (`h:<id>`, `t:<url>`), and every
+tab's drawer follows storage change events, so a change in one tab shows in the others without
+reopening the drawer. Tabs never write storage themselves: each change is a message to the
+background script (`src/background/index.ts`), which applies changes one at a time, so two tabs
+can't overwrite each other. The background is an event page, so a write after it unloaded wakes it
+first (about 50 ms instead of a few). `bench/storage` replays a seeded workload of concurrent
+writes from several simulated tabs against the real storage and background code and counts writes
+that were lost.
+
+```bash
+bash autoresearch.sh                 # builds and runs the storage bench (METRIC lost_updates=…)
+bun bench/storage/run.ts --serial    # same actions one at a time: must report 0
+npm run build:extension && bun bench/storage/smoke.ts   # real extension, two tabs, in Helium
+bash bench/checks.sh                 # drawer, drag and anchoring regression guards
+```
+
+Saved data from builds before this layout (one `highlights` array) is not read. Bring it back
+with Settings → Restore backup.
+
 ### Debug build (real-site testing)
 
 ```bash

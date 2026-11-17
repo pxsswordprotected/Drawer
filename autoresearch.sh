@@ -10,11 +10,13 @@ npx tsc --noEmit
 npx tsc --noEmit -p bench/storage/tsconfig.json
 npx eslint src --ext .ts,.tsx --quiet
 
-# Seed data (30 sites, 130 highlights; deterministic) and the bench's two browser bundles:
-# the app's real storage layer + store for each simulated tab, and the simulator itself.
+# Seed data (30 sites, 130 highlights; deterministic) and the bench's browser bundles: the
+# app's real storage layer + store for each simulated tab, the real background script (the
+# single writer), and the simulator itself.
 bun bench/seed/make-seed.ts > /dev/null
 npx vite build -c bench/storage/vite.config.ts --mode tab --logLevel error
 npx vite build -c bench/storage/vite.config.ts --mode host --logLevel error
+npx vite build --mode background --outDir bench/storage/.build/background --emptyOutDir --logLevel error
 
 # Deterministic workload: 8 seeded rounds x 90 write actions from 5 simulated tabs sharing one
 # fake extension storage, on a virtual clock with seeded latencies. Offline, headless Chrome.

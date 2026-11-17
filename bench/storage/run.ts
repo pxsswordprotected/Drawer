@@ -33,7 +33,7 @@ const SERIAL_GAP_MS = 400;
 const seed = (await Bun.file(join(root, 'bench/seed/seed-30-sites.json')).json()) as SeedBackup;
 const tabCode = await Bun.file(join(import.meta.dir, '.build/tab.js')).text();
 const hostCode = await Bun.file(join(import.meta.dir, '.build/host.js')).text();
-const backgroundCode = await Bun.file(join(root, 'public/background.js')).text();
+const backgroundCode = await Bun.file(join(import.meta.dir, '.build/background/background.js')).text();
 
 // A real http origin: a secure context (crypto.randomUUID), nothing else is fetched
 const server = Bun.serve({

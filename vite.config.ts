@@ -8,6 +8,31 @@ export default defineConfig(({ mode }) => {
   // `build:extension:debug`; the normal extension build drops it entirely.
   const define = { __DRAWER_DEBUG__: JSON.stringify(mode !== 'extension') };
 
+  // Background script: its own bundle (an IIFE build takes one entry), written next to the
+  // content script by `build:extension`
+  if (mode === 'background') {
+    return {
+      define: { __DRAWER_DEBUG__: 'false' }, // only tabs record the debug log
+      publicDir: false as const,
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, './src'),
+        },
+      },
+      build: {
+        emptyOutDir: false,
+        rollupOptions: {
+          input: path.resolve(__dirname, 'src/background/index.ts'),
+          output: {
+            format: 'iife' as const,
+            entryFileNames: 'background.js',
+            inlineDynamicImports: true,
+          },
+        },
+      },
+    };
+  }
+
   if (mode === 'extension' || mode === 'extension-debug') {
     return {
       plugins,

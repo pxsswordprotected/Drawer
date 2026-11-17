@@ -5,12 +5,14 @@
 //   settings         → Settings
 //
 // Extension storage has no transactions: reading a value and writing it back are two steps,
-// and another tab can write in between. Every change is therefore a WriteOp, and writes run
-// one at a time (`runWrite`). Tabs read directly and learn of changes, their own included,
-// through `subscribe`.
+// and another tab can write in between. So tabs never write. Every change is a WriteOp sent
+// to one writer (the background script; on the dev page, the page itself), which applies
+// them one at a time with `runWrite`, and each op ends in a single set or remove of the keys
+// it touches. Tabs read directly and learn of changes, their own included, through
+// `subscribe`.
 
 import type { Highlight, PageTitles, Settings, StoredChange, StoredData, WriteOp } from './types';
-import { STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, WRITE_MESSAGE } from './constants';
 
 // Detect if we're in a browser extension context
 export const isExtensionContext = (): boolean => {
@@ -237,16 +239,14 @@ async function applyWrite(op: WriteOp): Promise<void> {
   }
 }
 
-// One write at a time, in arrival order
+// The writer's queue: one write at a time, in arrival order
 let lastWrite: Promise<unknown> = Promise.resolve();
-function enqueue(task: () => Promise<void>): Promise<void> {
-  const result = lastWrite.then(task);
+
+/** Applies `op` after every write already queued. Only the writer calls this. */
+export function runWrite(op: WriteOp): Promise<void> {
+  const result = lastWrite.then(() => applyWrite(op));
   lastWrite = result.catch(() => undefined); // a failed write must not block the next one
   return result;
-}
-
-export function runWrite(op: WriteOp): Promise<void> {
-  return enqueue(() => applyWrite(op));
 }
 
 // ─── What tabs use ───
@@ -266,9 +266,11 @@ export const storageService = {
   },
 
   /** Resolves once the change is in storage; rejects when it could not be written */
-  write(op: WriteOp): Promise<void> {
-    // EXPERIMENT S1: tabs write directly (no single writer yet)
-    return isExtensionContext() ? applyWrite(op) : runWrite(op);
+  async write(op: WriteOp): Promise<void> {
+    if (!isExtensionContext()) return runWrite(op);
+    const api = await extensionApi();
+    const reply: unknown = await api.runtime.sendMessage({ type: WRITE_MESSAGE, op });
+    if (reply && typeof reply === 'object' && 'error' in reply) throw new Error(String(reply.error));
   },
 
   /** `listener` hears every change to stored data, from this tab or any other */

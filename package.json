@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite --mode test",
     "build": "vite build",
-    "build:extension": "vite build --mode extension",
-    "build:extension:debug": "vite build --mode extension-debug",
+    "build:extension": "vite build --mode extension && vite build --mode background",
+    "build:extension:debug": "vite build --mode extension-debug && vite build --mode background",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\""
