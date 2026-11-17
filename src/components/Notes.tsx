@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
+import { Note } from '@/shared/types';
 
 interface NoteInputProps {
   highlightId: string;
@@ -121,5 +122,40 @@ export const NoteItem: React.FC<NoteItemProps> = ({ noteId, highlightId, text })
       }}
       rows={1}
     />
+  );
+};
+
+interface NotesSectionProps {
+  highlightId: string;
+  notes: Note[];
+}
+
+/** "Notes" label, add-note input and the note list; shared by drawer rows and the hover tooltip */
+export const NotesSection: React.FC<NotesSectionProps> = ({ highlightId, notes }) => {
+  const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.timestamp - a.timestamp), [notes]);
+
+  return (
+    <>
+      <p className="text-text-secondary text-xs mb-1" style={{ marginTop: '12px' }}>
+        Notes
+      </p>
+
+      <div className="space-y-0">
+        <div className="py-3 flex items-center">
+          <NoteInput highlightId={highlightId} hasNotes={sortedNotes.length > 0} />
+        </div>
+
+        {sortedNotes.length > 0 && <div className="border-t border-divider" />}
+
+        {sortedNotes.map((note, i) => (
+          <div
+            key={note.id}
+            className={`py-3 flex items-center ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}
+          >
+            <NoteItem noteId={note.id} highlightId={highlightId} text={note.text} />
+          </div>
+        ))}
+      </div>
+    </>
   );
 };

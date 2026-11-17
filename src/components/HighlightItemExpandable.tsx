@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { Highlight } from '@/shared/types';
 import { useDrawerStore } from '@/store/drawerStore';
 import { TrashIcon } from '@/shared/TrashIcon';
-import { NoteInput, NoteItem } from './Notes';
+import { NotesSection } from './Notes';
 import styles from './HighlightItemExpandable.module.css';
 
 interface HighlightItemExpandableProps {
@@ -44,11 +44,6 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
     prevExpandedRef.current &&
     !isExpanded &&
     (useDrawerStore.getState().selectedHighlightId != null || !useDrawerStore.getState().isOpen);
-
-  const sortedNotes = useMemo(
-    () => [...highlight.notes].sort((a, b) => b.timestamp - a.timestamp),
-    [highlight.notes]
-  );
 
   const handleClick = useCallback(() => {
     if (isExpanded) {
@@ -109,29 +104,7 @@ export const HighlightItemExpandable = React.memo(function HighlightItemExpandab
       >
         <div className={styles.notesInner} onClick={handleNotesClick}>
           <div className={`${isExpanded ? styles.notesFadeInActive : styles.notesFadeIn}`}>
-            <p className="text-text-secondary text-xs mb-1" style={{ marginTop: '12px' }}>
-              Notes
-            </p>
-
-            <div className="space-y-0">
-              <div className="py-3 flex items-center">
-                <NoteInput
-                  highlightId={highlight.id}
-                  hasNotes={sortedNotes.length > 0}
-                />
-              </div>
-
-              {sortedNotes.length > 0 && <div className="border-t border-divider" />}
-
-              {sortedNotes.map((note, i) => (
-                <div
-                  key={note.id}
-                  className={`py-3 flex items-center ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}
-                >
-                  <NoteItem noteId={note.id} highlightId={highlight.id} text={note.text} />
-                </div>
-              ))}
-            </div>
+            <NotesSection highlightId={highlight.id} notes={highlight.notes} />
           </div>
         </div>
       </div>

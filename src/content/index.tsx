@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { ContentApp } from './ContentApp';
 import { createShadowRootUI } from './shadowRoot';
 import { initMarkDimming } from './pageHighlighter';
+import { initHighlightHover } from './highlightHover';
 import { useDrawerStore } from '@/store/drawerStore';
 import { initDebugLog } from '@/shared/debugLog';
 
@@ -15,6 +16,7 @@ const runtime = (typeof browser !== 'undefined' ? browser : chrome).runtime;
 
 // Create shadow DOM and mount React
 const { shadowRoot, reactRoot } = createShadowRootUI();
+initHighlightHover(shadowRoot);
 
 // Inject built CSS into shadow root
 const cssUrl = runtime.getURL('content.css');

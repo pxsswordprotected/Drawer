@@ -42,4 +42,8 @@ bun bench/anchoring/run.ts > "$out" 2>&1 || true
 expect anchor_accuracy 99.81
 expect resolve_errors 0
 
+echo "== tooltip"
+bun bench/tooltip/run.ts > "$out" 2>&1 || true
+expect tooltip_failures 0
+
 exit "$fail"

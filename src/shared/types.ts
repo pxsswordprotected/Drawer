@@ -75,4 +75,11 @@ export interface StoredChange {
   settings?: Settings;
 }
 
+/** Where a highlight's hover tooltip is anchored, in viewport pixels */
+export interface TooltipTarget {
+  highlightId: string;
+  pointerX: number; // cursor x when the tooltip opened
+  line: { left: number; right: number; top: number; bottom: number }; // the highlight's line box under the cursor
+}
+
 export type ExportScope = 'current' | 'all' | 'selected';

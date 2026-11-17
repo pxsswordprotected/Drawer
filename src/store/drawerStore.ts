@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import { Highlight, Note, PageTitles, StoredChange, StoredData } from '@/shared/types';
+import {
+  Highlight,
+  Note,
+  PageTitles,
+  StoredChange,
+  StoredData,
+  TooltipTarget,
+} from '@/shared/types';
 import { oldestFirst, storageService } from '@/shared/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { pageUrl } from '@/shared/pageUrl';
@@ -21,7 +28,10 @@ export interface DrawerState {
   drawerTrigger: DrawerTrigger;
   logoResetCount: number;
   defaultColor: string;
+  tooltip: TooltipTarget | null; // Hover tooltip over a highlight; never set while the drawer is open
 
+  showTooltip: (target: TooltipTarget) => void;
+  hideTooltip: () => void;
   openDrawer: (trigger: DrawerTrigger) => void;
   closeDrawer: () => void;
   toggleDrawer: (trigger?: DrawerTrigger) => void;
@@ -73,6 +83,9 @@ function applyChange(state: DrawerState, change: StoredChange): Partial<DrawerSt
     if (state.pendingScrollHighlightId && !highlights.has(state.pendingScrollHighlightId)) {
       next.pendingScrollHighlightId = null;
     }
+    if (state.tooltip && !highlights.has(state.tooltip.highlightId)) {
+      next.tooltip = null;
+    }
   }
 
   const pageTitles = { ...state.pageTitles };
@@ -120,8 +133,9 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   drawerTrigger: null,
   logoResetCount: 0,
   defaultColor: DEFAULT_SETTINGS.defaultColor,
+  tooltip: null,
 
-  openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger }),
+  openDrawer: (trigger: DrawerTrigger) => set({ isOpen: true, drawerTrigger: trigger, tooltip: null }),
   // Closing keeps selectedHighlightId so the drawer's contents stay still during the exit
   // animation; HighlightsDrawer clears it once the drawer is hidden.
   closeDrawer: () =>
@@ -134,7 +148,15 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     set((state) => ({
       isOpen: !state.isOpen,
       drawerTrigger: !state.isOpen ? trigger : null,
+      ...(!state.isOpen && { tooltip: null }),
     })),
+  // The open drawer always wins: a tooltip never coexists with it
+  showTooltip: (target) => {
+    if (!get().isOpen) set({ tooltip: target });
+  },
+  hideTooltip: () => {
+    if (get().tooltip) set({ tooltip: null });
+  },
   setLogoPosition: (position) => set({ logoPosition: position }),
 
   selectHighlight: (id: string) => set({ selectedHighlightId: id }),

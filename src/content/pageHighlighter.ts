@@ -592,9 +592,10 @@ export function removeHighlightMarks(
 }
 
 /**
- * While a highlight is focused in the open drawer, fade the colour of every other mark on
- * this page. `html:has(<focused mark>)` keeps the rule off when the focused highlight has no
- * marks here (another page's highlight, or not restored), so a whole page is never dimmed.
+ * While a highlight is focused in the open drawer, or hovered with its notes tooltip open, fade
+ * the colour of every other mark on this page. `html:has(<focused mark>)` keeps the rule off
+ * when the focused highlight has no marks here (another page's highlight, or not restored), so
+ * a whole page is never dimmed.
  */
 export function initMarkDimming(): void {
   const style = document.createElement('style');
@@ -603,17 +604,22 @@ export function initMarkDimming(): void {
   // Registered so the variable can transition (unregistered, it still works but snaps)
   const registration = `@property ${DIM_VAR} { syntax: '<number>'; inherits: false; initial-value: 1; }`;
   const render = (s: DrawerState) => {
-    if (!s.isOpen || !s.selectedHighlightId) {
+    const focusedId = s.isOpen ? s.selectedHighlightId : (s.tooltip?.highlightId ?? null);
+    if (!focusedId) {
       style.textContent = registration;
       return;
     }
-    const focused = `[data-highlight-id="${CSS.escape(s.selectedHighlightId)}"]`;
+    const focused = `[data-highlight-id="${CSS.escape(focusedId)}"]`;
     style.textContent = `${registration}
 html:has(mark${focused}) mark[data-highlight-id]:not(${focused}) { ${DIM_VAR}: ${DIM_LEVEL} !important; }`;
   };
   render(useDrawerStore.getState());
   useDrawerStore.subscribe((s, prev) => {
-    if (s.isOpen !== prev.isOpen || s.selectedHighlightId !== prev.selectedHighlightId) {
+    if (
+      s.isOpen !== prev.isOpen ||
+      s.selectedHighlightId !== prev.selectedHighlightId ||
+      s.tooltip?.highlightId !== prev.tooltip?.highlightId
+    ) {
       render(s);
     }
   });

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, useMe
 import { useDrawerStore } from '@/store/drawerStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Highlight, ExportScope } from '@/shared/types';
-import { DRAWER_CONFIG } from '@/shared/constants';
+import { DRAWER_CONFIG, PANEL_SURFACE_CLASS } from '@/shared/constants';
 import styles from './HighlightsDrawer.module.css';
 import { setDrawerElement, setDrawerLayout } from '@/shared/drawerDom';
 import { HighlightItemExpandable } from './HighlightItemExpandable';
@@ -373,8 +373,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   useEffect(() => {
     if (!logoPosition) return;
 
-    const drawerWidth = 376;
-    const drawerHeight = 270;
+    const drawerWidth = DRAWER_CONFIG.WIDTH;
+    const drawerHeight = DRAWER_CONFIG.HEIGHT;
     const LOGO_SIZE = 40; // Logo width/height (should match DraggableLogo.tsx)
     const LOGO_RADIUS = LOGO_SIZE / 2; // Half the logo size (20px)
     const DESIRED_GAP = 10; // Actual spacing between logo and drawer
@@ -683,8 +683,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         data-drawer
         className="fixed top-0 left-0"
         style={{
-          width: '376px',
-          height: '270px',
+          width: `${DRAWER_CONFIG.WIDTH}px`,
+          height: `${DRAWER_CONFIG.HEIGHT}px`,
           zIndex: 1000,
           ...drawerStyle,
         }}
@@ -693,7 +693,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         <div
           ref={innerRef}
           tabIndex={0}
-          className={`relative w-full h-full bg-bg-elevated rounded-lg overflow-hidden shadow-[0_2px_5px_-1px_rgba(0,0,0,0.35)] ring-1 ring-edge ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
+          className={`${PANEL_SURFACE_CLASS} ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
           style={{
             contain: 'paint',
             outline: 'none',
