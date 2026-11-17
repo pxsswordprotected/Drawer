@@ -917,10 +917,9 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                 allHighlights.length > 0 &&
                 !(exportExiting && !exportSuccess) && (
                   <div
-                    className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg pl-[6px] pr-3.5 py-2.5 ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
+                    className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg pl-[6px] pr-3.5 py-2.5 shadow-[0_-2px_8px_rgba(0,0,0,0.3)] ring-1 ring-edge ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
                     style={{
                       zIndex: 10,
-                      boxShadow: '0 -2px 8px rgba(0,0,0,0.3)',
                       width: '236px',
                     }}
                   >
