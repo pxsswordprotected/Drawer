@@ -50,3 +50,6 @@ bench/drag/.ext/
 
 # Generated seed data for hand-testing (bun bench/seed/make-seed.ts)
 bench/seed/*.json
+
+# Storage bench build output
+bench/storage/.build/

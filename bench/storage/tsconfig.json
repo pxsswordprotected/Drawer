@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "lib": ["ES2022", "ES2024.Promise", "DOM", "DOM.Iterable"]
+  },
+  "include": ["tab.ts", "host.ts", "types.ts", "oracle.ts", "workload.ts", "../../src/global.d.ts"]
+}
