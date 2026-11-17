@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { selectionTouchesExtensionUi } from './shadowRoot';
 import { Highlight } from '@/shared/types';
-import { storageService } from '@/shared/storage';
 import { debugLog, describeRangeEnds, errorInfo, excerpt, snippetOf } from '@/shared/debugLog';
 import { useDrawerStore } from '@/store/drawerStore';
 import { applyHighlightToRange, trackHighlight } from './pageHighlighter';
@@ -190,7 +189,7 @@ export function useSelectionHandler() {
         skippedWhitespaceNodes = applyHighlightToRange(range, highlight.id, highlight.color);
       }
 
-      await storageService.saveHighlight(highlight);
+      await useDrawerStore.getState().saveHighlight(highlight);
       // Keep it marked if the host page rebuilds its DOM (see restoreHighlights)
       trackHighlight(highlight);
 
@@ -215,11 +214,6 @@ export function useSelectionHandler() {
           },
           ...(markCount === 0 ? { snippet: snippetOf(ancestor) } : {}),
         });
-      }
-
-      // Live-update drawer if it's open
-      if (useDrawerStore.getState().isOpen) {
-        useDrawerStore.getState().addHighlight(highlight);
       }
 
       // Clear the selection and hide the plus icon

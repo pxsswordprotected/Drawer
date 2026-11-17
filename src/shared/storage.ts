@@ -1,7 +1,15 @@
-// Storage abstraction layer for browser.storage operations
-// This enables seamless migration to database backend in the future
+// Storage layer. Data lives in extension storage (browser.storage.local), one key per item
+// (see STORAGE_KEYS; the dev page keeps it in localStorage instead):
+//   h:<highlight id> → Highlight (with its notes)
+//   t:<page URL>     → custom page title
+//   settings         → Settings
+//
+// Extension storage has no transactions: reading a value and writing it back are two steps,
+// and another tab can write in between. Every change is therefore a WriteOp, and writes run
+// one at a time (`runWrite`). Tabs read directly and learn of changes, their own included,
+// through `subscribe`.
 
-import { Highlight, Note, PageTitles, Settings } from './types';
+import type { Highlight, PageTitles, Settings, StoredChange, StoredData, WriteOp } from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 
 // Detect if we're in a browser extension context
@@ -13,187 +21,264 @@ export const isExtensionContext = (): boolean => {
   }
 };
 
-class StorageService {
-  private isExtension = isExtensionContext();
+// Dynamic import: webextension-polyfill throws when loaded outside an extension (the dev
+// page), so it is only imported once extension context is confirmed
+const extensionApi = async () => (await import('webextension-polyfill')).default;
 
-  /**
-   * Get data from storage (browser.storage or localStorage)
-   */
-  private async getFromStorage(key: string): Promise<any> {
-    if (this.isExtension) {
-      const browser = (await import('webextension-polyfill')).default;
-      const result = await browser.storage.local.get(key);
-      return result[key];
-    } else {
-      // Use localStorage for test environment
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : undefined;
+type Items = Record<string, unknown>;
+
+/**
+ * A key-value store with extension storage's guarantees: each call is applied whole, and
+ * nothing holds across two calls.
+ */
+interface Backend {
+  /** `null` reads every item */
+  get(keys: string[] | null): Promise<Items>;
+  set(items: Items): Promise<void>;
+  remove(keys: string[]): Promise<void>;
+  /** Calls `listener` with the new value of each key any tab changed (undefined: removed) */
+  onChange(listener: (changed: Items) => void): void;
+}
+
+const extensionBackend: Backend = {
+  get: async (keys) => (await extensionApi()).storage.local.get(keys),
+  set: async (items) => (await extensionApi()).storage.local.set(items),
+  remove: async (keys) => (await extensionApi()).storage.local.remove(keys),
+  onChange(listener) {
+    void extensionApi().then((api) =>
+      api.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        listener(Object.fromEntries(Object.entries(changes).map(([key, change]) => [key, change.newValue])));
+      })
+    );
+  },
+};
+
+const isDataKey = (key: string) =>
+  key.startsWith(STORAGE_KEYS.HIGHLIGHT_PREFIX) || key.startsWith(STORAGE_KEYS.PAGE_TITLE_PREFIX);
+const highlightKey = (id: string) => `${STORAGE_KEYS.HIGHLIGHT_PREFIX}${id}`;
+const pageTitleKey = (url: string) => `${STORAGE_KEYS.PAGE_TITLE_PREFIX}${url}`;
+
+// Dev page (no extension): localStorage keeps the layout it has always had there, one
+// `highlights` array and one `pageTitles` map, which the browser benches seed and read. This
+// backend presents it as the same per-item keys. localStorage is synchronous, so each call
+// is applied whole, like an extension storage call. The page is its only reader and writer,
+// so it announces changes itself.
+const LOCAL_HIGHLIGHTS = 'highlights';
+const LOCAL_PAGE_TITLES = 'pageTitles';
+const localListeners: ((changed: Items) => void)[] = [];
+
+function readLocal(): Items {
+  const parse = (key: string): unknown => JSON.parse(localStorage.getItem(key) ?? 'null');
+  const items: Items = {};
+  for (const highlight of (parse(LOCAL_HIGHLIGHTS) as Highlight[] | null) ?? []) {
+    items[highlightKey(highlight.id)] = highlight;
+  }
+  for (const [url, title] of Object.entries((parse(LOCAL_PAGE_TITLES) as PageTitles | null) ?? {})) {
+    items[pageTitleKey(url)] = title;
+  }
+  const settings = parse(STORAGE_KEYS.SETTINGS);
+  if (settings !== null) items[STORAGE_KEYS.SETTINGS] = settings;
+  return items;
+}
+
+/** `changed`: new value per key, undefined to remove it */
+function changeLocal(changed: Items): void {
+  const items = readLocal();
+  for (const [key, value] of Object.entries(changed)) {
+    if (value === undefined) delete items[key];
+    else items[key] = value;
+  }
+  const { highlights, pageTitles } = toChange(items);
+  localStorage.setItem(LOCAL_HIGHLIGHTS, JSON.stringify(Object.values(highlights)));
+  localStorage.setItem(LOCAL_PAGE_TITLES, JSON.stringify(pageTitles));
+  if (STORAGE_KEYS.SETTINGS in items) {
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(items[STORAGE_KEYS.SETTINGS]));
+  }
+  for (const listener of localListeners) listener(changed);
+}
+
+const localBackend: Backend = {
+  async get(keys) {
+    const items = readLocal();
+    return keys ? Object.fromEntries(keys.filter((key) => key in items).map((key) => [key, items[key]])) : items;
+  },
+  async set(items) {
+    changeLocal(items);
+  },
+  async remove(keys) {
+    changeLocal(Object.fromEntries(keys.map((key) => [key, undefined])));
+  },
+  onChange(listener) {
+    localListeners.push(listener);
+  },
+};
+
+const backend = isExtensionContext() ? extensionBackend : localBackend;
+
+/** Sorts raw storage items into highlights, page titles and settings; other keys are ignored */
+function toChange(items: Items): StoredChange {
+  const change: StoredChange = { highlights: {}, pageTitles: {} };
+  for (const [key, value] of Object.entries(items)) {
+    if (key.startsWith(STORAGE_KEYS.HIGHLIGHT_PREFIX)) {
+      const id = key.slice(STORAGE_KEYS.HIGHLIGHT_PREFIX.length);
+      change.highlights[id] = (value as Highlight | undefined) ?? null;
+    } else if (key.startsWith(STORAGE_KEYS.PAGE_TITLE_PREFIX)) {
+      const url = key.slice(STORAGE_KEYS.PAGE_TITLE_PREFIX.length);
+      change.pageTitles[url] = (value as string | undefined) ?? null;
+    } else if (key === STORAGE_KEYS.SETTINGS) {
+      change.settings = { ...DEFAULT_SETTINGS, ...(value as Partial<Settings> | undefined) };
     }
   }
+  return change;
+}
 
-  /**
-   * Set data in storage (browser.storage or localStorage)
-   */
-  private async setInStorage(key: string, value: any): Promise<void> {
-    if (this.isExtension) {
-      const browser = (await import('webextension-polyfill')).default;
-      await browser.storage.local.set({ [key]: value });
-    } else {
-      // Use localStorage for test environment
-      localStorage.setItem(key, JSON.stringify(value));
+/** Storage keeps no order; everything that lists highlights uses this one (ties: by id) */
+export const oldestFirst = (a: Highlight, b: Highlight) =>
+  a.timestamp - b.timestamp || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+// ─── Backups ───
+
+/** A highlight as early builds saved it: one optional `note` string instead of `notes` */
+type SavedHighlight = Highlight | (Omit<Highlight, 'notes'> & { note?: string });
+
+function withNotes(saved: SavedHighlight): Highlight {
+  if ('notes' in saved) return saved;
+  const { note, ...rest } = saved;
+  return {
+    ...rest,
+    notes: note ? [{ id: crypto.randomUUID(), text: note, timestamp: saved.timestamp }] : [],
+  };
+}
+
+/** What a backup holds */
+type Backup = Pick<StoredData, 'highlights' | 'pageTitles'>;
+
+/**
+ * Reads backup data: a `highlights` array, plus `pageTitles` (missing in older backups;
+ * entries that aren't non-blank text are skipped).
+ */
+function readBackup(data: unknown): Backup {
+  if (!data || typeof data !== 'object' || !('highlights' in data) || !Array.isArray(data.highlights)) {
+    throw new Error('Invalid backup format: missing highlights array');
+  }
+  const saved: SavedHighlight[] = data.highlights;
+  const pageTitles: PageTitles = {};
+  const titles = 'pageTitles' in data ? data.pageTitles : null;
+  if (titles && typeof titles === 'object' && !Array.isArray(titles)) {
+    for (const [url, title] of Object.entries(titles)) {
+      if (typeof title === 'string' && title.trim()) pageTitles[url] = title.trim();
     }
   }
+  return { highlights: saved.map(withNotes), pageTitles };
+}
 
-  /**
-   * Save a new highlight to storage
-   */
-  async saveHighlight(highlight: Highlight): Promise<void> {
-    const highlights = await this.getHighlights();
-    highlights.push(highlight);
-    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
-  }
+// ─── Writing ───
 
-  /**
-   * Migrate highlights from old note?: string field to notes: Note[] array
-   */
-  private migrateHighlights(highlights: any[]): { migrated: Highlight[]; didMigrate: boolean } {
-    let didMigrate = false;
-    const migrated = highlights.map((h) => {
-      if (h.notes !== undefined) return h as Highlight;
-      didMigrate = true;
-      const notes: Note[] = [];
-      if (h.note) {
-        notes.push({ id: crypto.randomUUID(), text: h.note, timestamp: h.timestamp });
-      }
-      const { note, ...rest } = h;
-      return { ...rest, notes } as Highlight;
-    });
-    return { migrated, didMigrate };
-  }
+/** Rewrites one stored highlight; does nothing when it no longer exists */
+async function updateHighlight(id: string, change: (highlight: Highlight) => Highlight): Promise<void> {
+  const key = highlightKey(id);
+  const highlight = (await backend.get([key]))[key] as Highlight | undefined;
+  if (!highlight) return;
+  const next = change(highlight);
+  if (next !== highlight) await backend.set({ [key]: next });
+}
 
-  /**
-   * Get all highlights, optionally filtered by URL
-   */
-  async getHighlights(url?: string): Promise<Highlight[]> {
-    const raw: any[] = (await this.getFromStorage(STORAGE_KEYS.HIGHLIGHTS)) || [];
-    const { migrated: highlights, didMigrate } = this.migrateHighlights(raw);
-
-    if (didMigrate) {
-      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
+/** Applies one write. Each case ends in a single set or remove, so it lands whole or not at all. */
+async function applyWrite(op: WriteOp): Promise<void> {
+  switch (op.type) {
+    case 'saveHighlight':
+      return backend.set({ [highlightKey(op.highlight.id)]: op.highlight });
+    case 'deleteHighlight':
+      return backend.remove([highlightKey(op.id)]);
+    case 'deletePage': {
+      const { highlights } = toChange(await backend.get(null));
+      const ids = Object.keys(highlights).filter((id) => highlights[id]?.url === op.url);
+      return backend.remove([...ids.map(highlightKey), pageTitleKey(op.url)]);
     }
-
-    if (url) {
-      return highlights.filter((h) => h.url === url);
+    case 'addNote':
+      return updateHighlight(op.highlightId, (h) => ({ ...h, notes: [...h.notes, op.note] }));
+    case 'updateNote':
+      return updateHighlight(op.highlightId, (h) =>
+        h.notes.some((n) => n.id === op.noteId)
+          ? { ...h, notes: h.notes.map((n) => (n.id === op.noteId ? { ...n, text: op.text } : n)) }
+          : h
+      );
+    case 'deleteNote':
+      return updateHighlight(op.highlightId, (h) =>
+        h.notes.some((n) => n.id === op.noteId)
+          ? { ...h, notes: h.notes.filter((n) => n.id !== op.noteId) }
+          : h
+      );
+    case 'setPageTitle': {
+      // Touches the title's own key only, never highlight data
+      const title = op.title.trim();
+      return title
+        ? backend.set({ [pageTitleKey(op.url)]: title })
+        : backend.remove([pageTitleKey(op.url)]);
     }
-
-    return highlights;
-  }
-
-  /**
-   * Delete a highlight by ID
-   */
-  async deleteHighlight(id: string): Promise<void> {
-    const highlights = await this.getHighlights();
-    const filtered = highlights.filter((h) => h.id !== id);
-    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, filtered);
-  }
-
-  /**
-   * Delete all highlights for a specific URL
-   */
-  async deleteHighlightsByUrl(url: string): Promise<void> {
-    const highlights = await this.getHighlights();
-    const filtered = highlights.filter((h) => h.url !== url);
-    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, filtered);
-    await this.setPageTitle(url, '');
-  }
-
-  /**
-   * Get the user's custom page titles (url -> title)
-   */
-  async getPageTitles(): Promise<PageTitles> {
-    return (await this.getFromStorage(STORAGE_KEYS.PAGE_TITLES)) || {};
-  }
-
-  /**
-   * Rename a page. An empty title removes the custom title, so the page shows its saved one.
-   * Writes only the pageTitles key: never the highlights array, so a rename can't overwrite
-   * a highlight or note saved at the same moment.
-   */
-  async setPageTitle(url: string, title: string): Promise<void> {
-    const titles = await this.getPageTitles();
-    const trimmed = title.trim();
-    if (trimmed) titles[url] = trimmed;
-    else if (url in titles) delete titles[url];
-    else return;
-    await this.setInStorage(STORAGE_KEYS.PAGE_TITLES, titles);
-  }
-
-  /**
-   * Add a note to a highlight
-   */
-  async addNoteToHighlight(highlightId: string, note: Note): Promise<void> {
-    const highlights = await this.getHighlights();
-    const index = highlights.findIndex((h) => h.id === highlightId);
-
-    if (index !== -1) {
-      highlights[index].notes.push(note);
-      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
+    case 'importBackup': {
+      const stored = await backend.get(null);
+      const items: Items = {};
+      const addMissing = (key: string, value: unknown) => {
+        if (!(key in stored) && !(key in items)) items[key] = value;
+      };
+      for (const highlight of op.highlights) addMissing(highlightKey(highlight.id), highlight);
+      for (const [url, title] of Object.entries(op.pageTitles)) addMissing(pageTitleKey(url), title);
+      if (Object.keys(items).length > 0) await backend.set(items);
+      return;
+    }
+    case 'deleteAll':
+      return backend.remove(Object.keys(await backend.get(null)).filter(isDataKey));
+    case 'updateSettings': {
+      const { settings = DEFAULT_SETTINGS } = toChange(await backend.get([STORAGE_KEYS.SETTINGS]));
+      return backend.set({ [STORAGE_KEYS.SETTINGS]: { ...settings, ...op.updates } });
     }
   }
+}
 
-  /**
-   * Update a note's text in a highlight
-   */
-  async updateNoteInHighlight(highlightId: string, noteId: string, text: string): Promise<void> {
-    const highlights = await this.getHighlights();
-    const index = highlights.findIndex((h) => h.id === highlightId);
+// One write at a time, in arrival order
+let lastWrite: Promise<unknown> = Promise.resolve();
+function enqueue(task: () => Promise<void>): Promise<void> {
+  const result = lastWrite.then(task);
+  lastWrite = result.catch(() => undefined); // a failed write must not block the next one
+  return result;
+}
 
-    if (index !== -1) {
-      const noteIndex = highlights[index].notes.findIndex((n) => n.id === noteId);
-      if (noteIndex !== -1) {
-        highlights[index].notes[noteIndex].text = text;
-        await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
-      }
-    }
-  }
+export function runWrite(op: WriteOp): Promise<void> {
+  return enqueue(() => applyWrite(op));
+}
 
-  /**
-   * Delete a note from a highlight
-   */
-  async deleteNoteFromHighlight(highlightId: string, noteId: string): Promise<void> {
-    const highlights = await this.getHighlights();
-    const index = highlights.findIndex((h) => h.id === highlightId);
+// ─── What tabs use ───
 
-    if (index !== -1) {
-      highlights[index].notes = highlights[index].notes.filter((n) => n.id !== noteId);
-      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, highlights);
-    }
-  }
+export const storageService = {
+  async load(): Promise<StoredData> {
+    const stored = toChange(await backend.get(null));
+    const pageTitles: PageTitles = {};
+    for (const [url, title] of Object.entries(stored.pageTitles)) if (title !== null) pageTitles[url] = title;
+    return {
+      highlights: Object.values(stored.highlights)
+        .filter((h) => h !== null)
+        .sort(oldestFirst),
+      pageTitles,
+      settings: stored.settings ?? DEFAULT_SETTINGS,
+    };
+  },
 
-  /**
-   * Get user settings, with defaults for any unset keys
-   */
-  async getSettings(): Promise<Settings> {
-    const savedSettings = (await this.getFromStorage(STORAGE_KEYS.SETTINGS)) || {};
-    return { ...DEFAULT_SETTINGS, ...savedSettings };
-  }
+  /** Resolves once the change is in storage; rejects when it could not be written */
+  write(op: WriteOp): Promise<void> {
+    // EXPERIMENT S1: tabs write directly (no single writer yet)
+    return isExtensionContext() ? applyWrite(op) : runWrite(op);
+  },
 
-  /**
-   * Update user settings
-   */
-  async updateSettings(updates: Partial<Settings>): Promise<void> {
-    const currentSettings = await this.getSettings();
-    const newSettings = { ...currentSettings, ...updates };
-    await this.setInStorage(STORAGE_KEYS.SETTINGS, newSettings);
-  }
+  /** `listener` hears every change to stored data, from this tab or any other */
+  subscribe(listener: (change: StoredChange) => void): void {
+    backend.onChange((changed) => listener(toChange(changed)));
+  },
 
-  /**
-   * Export all highlights as JSON
-   */
+  /** Export all highlights and custom page titles as JSON */
   async exportHighlights(): Promise<string> {
-    const highlights = await this.getHighlights();
-    const pageTitles = await this.getPageTitles();
+    const { highlights, pageTitles } = await this.load();
     const exportData = {
       version: '1.0',
       exportDate: new Date().toISOString(),
@@ -205,57 +290,17 @@ class StorageService {
       },
     };
     return JSON.stringify(exportData, null, 2);
-  }
+  },
 
-  /**
-   * Import highlights from JSON
-   */
+  /** Merge a backup into storage. Stored highlights and titles win over the backup's. */
   async importHighlights(jsonString: string): Promise<void> {
+    let backup: Backup;
     try {
-      const data = JSON.parse(jsonString);
-      if (!data.highlights || !Array.isArray(data.highlights)) {
-        throw new Error('Invalid backup format: missing highlights array');
-      }
-      const existingHighlights = await this.getHighlights();
-      const merged = [...existingHighlights, ...data.highlights];
-      // Remove duplicates by ID (first occurrence wins); Set lookup keeps this O(n)
-      const seen = new Set<string>();
-      const unique = merged.filter((highlight) => {
-        if (seen.has(highlight.id)) return false;
-        seen.add(highlight.id);
-        return true;
-      });
-      await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, unique);
-      await this.importPageTitles(data.pageTitles);
+      backup = readBackup(JSON.parse(jsonString));
     } catch (error) {
       console.error('Failed to import highlights:', error);
       throw new Error('Invalid JSON format');
     }
-  }
-
-  /**
-   * Merge backed-up page titles into storage. Titles already set here win, like highlights
-   * with the same ID. Older backups have no pageTitles; malformed entries are skipped.
-   */
-  private async importPageTitles(imported: unknown): Promise<void> {
-    if (!imported || typeof imported !== 'object' || Array.isArray(imported)) return;
-    const valid: PageTitles = {};
-    for (const [url, title] of Object.entries(imported)) {
-      if (typeof title === 'string' && title.trim()) valid[url] = title.trim();
-    }
-    if (Object.keys(valid).length === 0) return;
-    const existing = await this.getPageTitles();
-    await this.setInStorage(STORAGE_KEYS.PAGE_TITLES, { ...valid, ...existing });
-  }
-
-  /**
-   * Clear all highlights and custom page titles (use with caution)
-   */
-  async clearAllHighlights(): Promise<void> {
-    await this.setInStorage(STORAGE_KEYS.HIGHLIGHTS, []);
-    await this.setInStorage(STORAGE_KEYS.PAGE_TITLES, {});
-  }
-}
-
-// Export singleton instance
-export const storageService = new StorageService();
+    await this.write({ type: 'importBackup', ...backup });
+  },
+};

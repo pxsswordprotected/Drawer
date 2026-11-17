@@ -2,10 +2,11 @@
 
 import { Settings } from './types';
 
+// Extension storage: one key per item, so a write touches only what it changes
 export const STORAGE_KEYS = {
-  HIGHLIGHTS: 'highlights',
+  HIGHLIGHT_PREFIX: 'h:', // + highlight id → Highlight (with its notes)
+  PAGE_TITLE_PREFIX: 't:', // + page URL → custom page title
   SETTINGS: 'settings',
-  PAGE_TITLES: 'pageTitles',
 } as const;
 
 export const DEFAULT_SETTINGS: Settings = {

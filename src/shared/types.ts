@@ -48,4 +48,31 @@ export interface Settings {
 /** User-chosen page titles, keyed by page URL. A page with no entry shows its saved title. */
 export type PageTitles = Record<string, string>;
 
+/** Everything the extension keeps in storage */
+export interface StoredData {
+  highlights: Highlight[];
+  pageTitles: PageTitles;
+  settings: Settings;
+}
+
+/** One change to stored data. Tabs never write storage themselves: see shared/storage.ts. */
+export type WriteOp =
+  | { type: 'saveHighlight'; highlight: Highlight }
+  | { type: 'deleteHighlight'; id: string }
+  | { type: 'deletePage'; url: string } // every highlight of the page, and its custom title
+  | { type: 'addNote'; highlightId: string; note: Note }
+  | { type: 'updateNote'; highlightId: string; noteId: string; text: string }
+  | { type: 'deleteNote'; highlightId: string; noteId: string }
+  | { type: 'setPageTitle'; url: string; title: string } // empty title: back to the saved one
+  | { type: 'importBackup'; highlights: Highlight[]; pageTitles: PageTitles } // stored items win
+  | { type: 'deleteAll' } // highlights and page titles; settings stay
+  | { type: 'updateSettings'; updates: Partial<Settings> };
+
+/** What a write changed in storage, as every tab hears it. `null` means deleted. */
+export interface StoredChange {
+  highlights: Record<string, Highlight | null>; // by highlight id
+  pageTitles: Record<string, string | null>; // by page URL
+  settings?: Settings;
+}
+
 export type ExportScope = 'current' | 'all' | 'selected';

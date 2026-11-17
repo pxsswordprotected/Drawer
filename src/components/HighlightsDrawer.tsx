@@ -40,7 +40,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     closeDrawer,
     drawerTrigger,
     loadAllHighlights,
-    loadSettings,
     selectedHighlightId,
     lastAddedHighlightId,
     clearLastAdded,
@@ -62,7 +61,6 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
       closeDrawer: s.closeDrawer,
       drawerTrigger: s.drawerTrigger,
       loadAllHighlights: s.loadAllHighlights,
-      loadSettings: s.loadSettings,
       selectedHighlightId: s.selectedHighlightId,
       lastAddedHighlightId: s.lastAddedHighlightId,
       clearLastAdded: s.clearLastAdded,
@@ -408,14 +406,13 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     });
   }, [logoPosition]);
 
-  // Load data eagerly on mount
+  // Load stored data (highlights, page titles, settings) eagerly on mount
   useEffect(() => {
     loadAllHighlights();
-    loadSettings();
   }, []);
 
-  // Refresh highlights on open (could have been added from page while closed)
-  // Settings stay cached — user can only change them from within the drawer
+  // Changes from this tab and others arrive on their own; reloading on open covers any this
+  // tab missed while it was in the background
   useEffect(() => {
     if (isOpen) {
       loadAllHighlights();

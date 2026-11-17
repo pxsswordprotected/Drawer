@@ -14,8 +14,8 @@ export function useSeedTestData() {
     hasSeeded.current = true;
 
     const seedTestData = async () => {
-      const existing = await storageService.getHighlights(pageUrl());
-      if (existing.length > 0) return; // Don't seed if highlights already exist
+      const { highlights } = await storageService.load();
+      if (highlights.some((h) => h.url === pageUrl())) return; // Don't seed if highlights already exist
 
       const emptyPos = {
         startXPath: '',
@@ -135,9 +135,8 @@ export function useSeedTestData() {
         },
       ];
 
-      await storageService.saveHighlight(testHighlight);
-      for (const h of otherPageHighlights) {
-        await storageService.saveHighlight(h);
+      for (const highlight of [testHighlight, ...otherPageHighlights]) {
+        await storageService.write({ type: 'saveHighlight', highlight });
       }
     };
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Highlight, Note, PageTitles } from '@/shared/types';
-import { storageService } from '@/shared/storage';
+import { Highlight, Note, PageTitles, StoredChange, StoredData } from '@/shared/types';
+import { oldestFirst, storageService } from '@/shared/storage';
 import { DEFAULT_SETTINGS } from '@/shared/constants';
 import { pageUrl } from '@/shared/pageUrl';
 
@@ -8,7 +8,9 @@ type DrawerTrigger = 'logo' | 'mark' | 'keyboard' | null;
 
 export interface DrawerState {
   isOpen: boolean;
-  allHighlights: Highlight[];
+  // Stored data (allHighlights, pageTitles, defaultColor) mirrors storage: it only changes
+  // through `applyChange`, fed by storage's change events, so every tab shows the same thing
+  allHighlights: Highlight[]; // oldest first
   pageTitles: PageTitles; // Custom page titles by URL; a page without one shows its saved title
   isLoading: boolean; // True only until the first load completes; refreshes are silent
   logoPosition: { x: number; y: number } | null;
@@ -27,7 +29,7 @@ export interface DrawerState {
   loadAllHighlights: () => Promise<void>;
   selectHighlight: (id: string) => void;
   clearSelectedHighlight: () => void;
-  addHighlight: (highlight: Highlight) => void;
+  saveHighlight: (highlight: Highlight) => Promise<void>;
   clearLastAdded: () => void;
   setPendingScrollHighlight: (id: string) => void;
   clearPendingScrollHighlight: () => void;
@@ -40,14 +42,70 @@ export interface DrawerState {
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
   resetLogoPosition: () => void;
-  setDefaultColor: (color: string) => void;
-  loadSettings: () => Promise<void>;
+  setDefaultColor: (color: string) => Promise<void>;
   importBackup: (jsonString: string) => Promise<void>;
   deleteAllHighlights: () => Promise<void>;
 }
 
-// Request deduplication map - prevents duplicate concurrent requests
-const loadingPromises = new Map<string, Promise<void>>();
+/**
+ * State after a change to stored data. Items equal to what the store already holds keep their
+ * identity (and an all-equal change returns nothing), so rows that didn't change don't re-render.
+ */
+function applyChange(state: DrawerState, change: StoredChange): Partial<DrawerState> {
+  const next: Partial<DrawerState> = {};
+
+  const highlights = new Map(state.allHighlights.map((h) => [h.id, h]));
+  let highlightsChanged = false;
+  for (const [id, highlight] of Object.entries(change.highlights)) {
+    if (highlight === null) {
+      if (highlights.delete(id)) highlightsChanged = true;
+    } else if (JSON.stringify(highlights.get(id)) !== JSON.stringify(highlight)) {
+      highlights.set(id, highlight);
+      highlightsChanged = true;
+    }
+  }
+  if (highlightsChanged) {
+    next.allHighlights = [...highlights.values()].sort(oldestFirst);
+    // A deleted highlight (here or in another tab) can't stay selected or awaited
+    if (state.selectedHighlightId && !highlights.has(state.selectedHighlightId)) {
+      next.selectedHighlightId = null;
+    }
+    if (state.pendingScrollHighlightId && !highlights.has(state.pendingScrollHighlightId)) {
+      next.pendingScrollHighlightId = null;
+    }
+  }
+
+  const pageTitles = { ...state.pageTitles };
+  let titlesChanged = false;
+  for (const [url, title] of Object.entries(change.pageTitles)) {
+    if ((pageTitles[url] ?? null) === title) continue;
+    if (title === null) delete pageTitles[url];
+    else pageTitles[url] = title;
+    titlesChanged = true;
+  }
+  if (titlesChanged) next.pageTitles = pageTitles;
+
+  if (change.settings && change.settings.defaultColor !== state.defaultColor) {
+    next.defaultColor = change.settings.defaultColor;
+  }
+  return next;
+}
+
+/** The change that turns what the store holds into `data`: everything in it, minus the rest */
+function changeTo(state: DrawerState, data: StoredData): StoredChange {
+  const change: StoredChange = { highlights: {}, pageTitles: {}, settings: data.settings };
+  for (const h of state.allHighlights) change.highlights[h.id] = null;
+  for (const h of data.highlights) change.highlights[h.id] = h;
+  for (const url of Object.keys(state.pageTitles)) change.pageTitles[url] = null;
+  Object.assign(change.pageTitles, data.pageTitles);
+  return change;
+}
+
+// The load in flight, shared by concurrent callers
+let loading: Promise<void> | null = null;
+// Changes heard while a load is reading storage. The snapshot it returns may predate them,
+// so they are applied again on top of it.
+let heardWhileLoading: StoredChange[] | null = null;
 
 export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: false,
@@ -82,11 +140,11 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   selectHighlight: (id: string) => set({ selectedHighlightId: id }),
   clearSelectedHighlight: () => set({ selectedHighlightId: null }),
 
-  addHighlight: (highlight: Highlight) =>
-    set((state) => ({
-      allHighlights: [...state.allHighlights, highlight],
-      lastAddedHighlightId: highlight.id,
-    })),
+  saveHighlight: async (highlight: Highlight) => {
+    await storageService.write({ type: 'saveHighlight', highlight });
+    // An open drawer selects the new highlight and scrolls to it
+    if (get().isOpen) set({ lastAddedHighlightId: highlight.id });
+  },
   clearLastAdded: () => set({ lastAddedHighlightId: null }),
   setPendingScrollHighlight: (id: string) => set({ pendingScrollHighlightId: id }),
   clearPendingScrollHighlight: () => set({ pendingScrollHighlightId: null }),
@@ -97,145 +155,82 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     })),
   setExpandedGroupUrl: (url: string | null) => set({ expandedGroupUrl: url }),
 
-  deleteHighlight: async (id: string) => {
-    await storageService.deleteHighlight(id);
+  deleteHighlight: (id: string) => storageService.write({ type: 'deleteHighlight', id }),
+
+  deletePageGroup: async (url: string) => {
+    await storageService.write({ type: 'deletePage', url });
     set((state) => ({
-      allHighlights: state.allHighlights.filter((h) => h.id !== id),
-      selectedHighlightId: state.selectedHighlightId === id ? null : state.selectedHighlightId,
-      pendingScrollHighlightId:
-        state.pendingScrollHighlightId === id ? null : state.pendingScrollHighlightId,
+      expandedGroupUrl: state.expandedGroupUrl === url ? null : state.expandedGroupUrl,
     }));
   },
 
-  deletePageGroup: async (url: string) => {
-    await storageService.deleteHighlightsByUrl(url);
-    set((state) => {
-      const { [url]: _removed, ...pageTitles } = state.pageTitles;
-      return {
-        allHighlights: state.allHighlights.filter((h) => h.url !== url),
-        pageTitles,
-        expandedGroupUrl: state.expandedGroupUrl === url ? null : state.expandedGroupUrl,
-        selectedHighlightId:
-          state.allHighlights.find((h) => h.id === state.selectedHighlightId)?.url === url
-            ? null
-            : state.selectedHighlightId,
-      };
-    });
-  },
+  setPageTitle: (url: string, title: string) =>
+    storageService.write({ type: 'setPageTitle', url, title }),
 
-  setPageTitle: async (url: string, title: string) => {
-    await storageService.setPageTitle(url, title);
-    const trimmed = title.trim();
-    set((state) => {
-      const { [url]: _previous, ...rest } = state.pageTitles;
-      return { pageTitles: trimmed ? { ...rest, [url]: trimmed } : rest };
-    });
-  },
-
-  addNote: async (highlightId: string, text: string) => {
+  addNote: (highlightId: string, text: string) => {
     const note: Note = {
       id: crypto.randomUUID(),
       text,
       timestamp: Date.now(),
     };
-
-    await storageService.addNoteToHighlight(highlightId, note);
-
-    set((state) => ({
-      allHighlights: state.allHighlights.map((h) =>
-        h.id === highlightId ? { ...h, notes: [...h.notes, note] } : h
-      ),
-    }));
+    return storageService.write({ type: 'addNote', highlightId, note });
   },
 
-  updateNote: async (highlightId: string, noteId: string, text: string) => {
-    await storageService.updateNoteInHighlight(highlightId, noteId, text);
+  updateNote: (highlightId: string, noteId: string, text: string) =>
+    storageService.write({ type: 'updateNote', highlightId, noteId, text }),
 
-    set((state) => ({
-      allHighlights: state.allHighlights.map((h) =>
-        h.id === highlightId
-          ? {
-              ...h,
-              notes: h.notes.map((n) => (n.id === noteId ? { ...n, text } : n)),
-            }
-          : h
-      ),
-    }));
-  },
-
-  deleteNote: async (highlightId: string, noteId: string) => {
-    await storageService.deleteNoteFromHighlight(highlightId, noteId);
-
-    set((state) => ({
-      allHighlights: state.allHighlights.map((h) =>
-        h.id === highlightId
-          ? {
-              ...h,
-              notes: h.notes.filter((n) => n.id !== noteId),
-            }
-          : h
-      ),
-    }));
-  },
+  deleteNote: (highlightId: string, noteId: string) =>
+    storageService.write({ type: 'deleteNote', highlightId, noteId }),
 
   resetLogoPosition: () => set((state) => ({ logoResetCount: state.logoResetCount + 1 })),
 
   setDefaultColor: (color: string) => {
-    set({ defaultColor: color });
-    storageService.updateSettings({ defaultColor: color });
-  },
-
-  loadSettings: async () => {
-    const settings = await storageService.getSettings();
-    set({ defaultColor: settings.defaultColor });
+    set({ defaultColor: color }); // shown at once; the stored value follows
+    return storageService.write({ type: 'updateSettings', updates: { defaultColor: color } });
   },
 
   deleteAllHighlights: async () => {
-    await storageService.clearAllHighlights();
-    set({ allHighlights: [], pageTitles: {}, selectedHighlightId: null, expandedGroupUrl: null });
+    await storageService.write({ type: 'deleteAll' });
+    set({ expandedGroupUrl: null });
   },
 
-  importBackup: async (jsonString: string) => {
-    await storageService.importHighlights(jsonString);
-    const [highlights, pageTitles] = await Promise.all([
-      storageService.getHighlights(),
-      storageService.getPageTitles(),
-    ]);
-    set({ allHighlights: highlights, pageTitles });
-  },
+  importBackup: (jsonString: string) => storageService.importHighlights(jsonString),
 
-  loadAllHighlights: async () => {
-    if (loadingPromises.has('__all__')) {
-      return loadingPromises.get('__all__');
-    }
+  // Reads everything from storage (highlights, page titles, settings). Changes arrive on
+  // their own afterwards; the drawer still reloads on open in case this tab missed any.
+  loadAllHighlights: () => {
+    if (loading) return loading;
 
-    const promise = (async () => {
+    loading = (async () => {
+      heardWhileLoading = [];
       // No isLoading toggle here: swapping the list for the skeleton on every
       // refresh resets scroll position and detaches the current-page section.
       try {
-        const [highlights, pageTitles] = await Promise.all([
-          storageService.getHighlights(),
-          storageService.getPageTitles(),
-        ]);
-        // Storage returns fresh copies every read. Keep the current values when the
-        // content is identical so a drawer open doesn't re-render every row.
-        const state = get();
-        set({
-          isLoading: false,
-          ...(JSON.stringify(highlights) === JSON.stringify(state.allHighlights)
-            ? {}
-            : { allHighlights: highlights }),
-          ...(JSON.stringify(pageTitles) === JSON.stringify(state.pageTitles) ? {} : { pageTitles }),
+        const data = await storageService.load();
+        const heard = heardWhileLoading ?? [];
+        set((state) => {
+          const change = changeTo(state, data);
+          for (const later of heard) {
+            Object.assign(change.highlights, later.highlights);
+            Object.assign(change.pageTitles, later.pageTitles);
+            change.settings = later.settings ?? change.settings;
+          }
+          return { ...applyChange(state, change), isLoading: false };
         });
       } catch (error) {
         console.error('Failed to load highlights:', error);
         set({ allHighlights: [], pageTitles: {}, isLoading: false });
       } finally {
-        loadingPromises.delete('__all__');
+        heardWhileLoading = null;
+        loading = null;
       }
     })();
 
-    loadingPromises.set('__all__', promise);
-    return promise;
+    return loading;
   },
 }));
+
+storageService.subscribe((change) => {
+  heardWhileLoading?.push(change);
+  useDrawerStore.setState((state) => applyChange(state, change));
+});

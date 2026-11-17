@@ -12,10 +12,8 @@ async function run(op: Op): Promise<void> {
   const actions = store.getState();
   switch (op.kind) {
     case 'save':
-      // Mirrors handleSaveHighlight in src/content/useSelectionHandler.ts
-      await storageService.saveHighlight(op.highlight);
-      if (store.getState().isOpen) store.getState().addHighlight(op.highlight);
-      return;
+      // What handleSaveHighlight in src/content/useSelectionHandler.ts does with storage
+      return actions.saveHighlight(op.highlight);
     case 'deleteHighlight':
       return actions.deleteHighlight(op.id);
     case 'deletePageGroup':
@@ -40,8 +38,8 @@ async function run(op: Op): Promise<void> {
 const bench = {
   run,
   /** What HighlightsDrawer does when it mounts (drawer still closed) */
-  async mount(): Promise<void> {
-    await Promise.all([store.getState().loadAllHighlights(), store.getState().loadSettings()]);
+  mount(): Promise<void> {
+    return store.getState().loadAllHighlights();
   },
   /** What opening the drawer does */
   async open(): Promise<void> {
@@ -55,11 +53,7 @@ const bench = {
   },
   /** What storage holds, read through the app's own read path */
   async read(): Promise<Snapshot> {
-    const [highlights, pageTitles, settings] = await Promise.all([
-      storageService.getHighlights(),
-      storageService.getPageTitles(),
-      storageService.getSettings(),
-    ]);
+    const { highlights, pageTitles, settings } = await storageService.load();
     return { highlights, pageTitles, defaultColor: settings.defaultColor };
   },
   /** Fills storage through the app's backup import, so the bench never assumes a key layout */
