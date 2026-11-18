@@ -6,8 +6,8 @@ interface FolderListProps {
 }
 
 /**
- * Folders above the page list: make one, open it to see its pages, take a page out or put one
- * in. A folder may be empty. Plain list for now; the page list below is unchanged.
+ * The folders view (toolbar folder button): make a folder, open it to see its pages, take a page
+ * out or put one in, delete it. A folder may be empty. Plain list for now.
  */
 export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   const folders = useDrawerStore((s) => s.folders);
@@ -29,7 +29,7 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   const unfiled = pages.filter((p) => !siteFolders[p.url]);
 
   return (
-    <div data-folder-list className="flex flex-col gap-2 px-[38px] pt-4">
+    <div data-folder-list className="flex flex-col gap-2 px-[38px] py-4">
       <div className="flex h-6 items-center justify-between">
         <span className="text-text-secondary text-xs">Folders</span>
         {creating ? (

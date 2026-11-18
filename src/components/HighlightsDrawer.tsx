@@ -20,6 +20,9 @@ const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 const STAGGER_BASE = 20;
 const STAGGER_PER_ITEM = 35;
 
+// A folder's name label sticks to the top of the list: 16 top padding + 20 line + 4 bottom (see .folderLabel)
+const FOLDER_LABEL_HEIGHT = 40;
+
 // ─── Page grouping types ───
 interface PageGroup {
   url: string;
@@ -27,6 +30,7 @@ interface PageGroup {
   highlights: Highlight[];
   isCurrentPage: boolean;
   mostRecentTimestamp: number;
+  folderId: string | null; // null: in no folder
 }
 
 // memo: no props, so parent re-renders (e.g. every host-page mouseup) never reach it
@@ -53,6 +57,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     clearPendingScrollHighlight,
     deletePageGroup,
     pageTitles,
+    folders,
+    siteFolders,
   } = useDrawerStore(
     useShallow((s) => ({
       isOpen: s.isOpen,
@@ -74,6 +80,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
       clearPendingScrollHighlight: s.clearPendingScrollHighlight,
       deletePageGroup: s.deletePageGroup,
       pageTitles: s.pageTitles,
+      folders: s.folders,
+      siteFolders: s.siteFolders,
     }))
   );
 
@@ -83,16 +91,19 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   const pageGroups = useMemo<PageGroup[]>(() => {
     if (allHighlights.length === 0) return [];
 
+    const folderIds = new Set(folders.map((f) => f.id));
     const groupMap = new Map<string, PageGroup>();
     for (const h of allHighlights) {
       let group = groupMap.get(h.url);
       if (!group) {
+        const folderId = siteFolders[h.url];
         group = {
           url: h.url,
           pageTitle: pageTitles[h.url] || h.pageTitle,
           highlights: [],
           isCurrentPage: h.url === currentUrl,
           mostRecentTimestamp: 0,
+          folderId: folderId && folderIds.has(folderId) ? folderId : null,
         };
         groupMap.set(h.url, group);
       }
@@ -104,11 +115,29 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
 
     const groups = Array.from(groupMap.values());
 
-    // Sort by most recent highlight descending
-    groups.sort((a, b) => b.mostRecentTimestamp - a.mostRecentTimestamp);
+    // Folders first, by folder name (`folders` is already by name); pages in no folder last.
+    // Within each, most recent highlight first.
+    const folderRank = new Map(folders.map((f, i) => [f.id, i]));
+    const rank = (g: PageGroup) => (g.folderId ? folderRank.get(g.folderId)! : folders.length);
+    groups.sort((a, b) => rank(a) - rank(b) || b.mostRecentTimestamp - a.mostRecentTimestamp);
 
     return groups;
-  }, [allHighlights, pageTitles, currentUrl]);
+  }, [allHighlights, pageTitles, folders, siteFolders, currentUrl]);
+
+  // Consecutive pages of one folder form a section; its name label sticks while they scroll
+  const sections = useMemo(() => {
+    const out: { folderId: string | null; name: string | null; groups: PageGroup[] }[] = [];
+    for (const group of pageGroups) {
+      const last = out[out.length - 1];
+      if (last && last.folderId === group.folderId) {
+        last.groups.push(group);
+      } else {
+        const name = folders.find((f) => f.id === group.folderId)?.name ?? null;
+        out.push({ folderId: group.folderId, name, groups: [group] });
+      }
+    }
+    return out;
+  }, [pageGroups, folders]);
 
   // Global highlight index map (headers excluded) for itemRefs and stagger
   const highlightGlobalIndices = useMemo(() => {
@@ -153,6 +182,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   const [exportIncludeTimestamps, setExportIncludeTimestamps] = useState(false);
   const [exportIncludePageTitles, setExportIncludePageTitles] = useState(false);
   const [settingsMode, setSettingsMode] = useState(false);
+  const [foldersMode, setFoldersMode] = useState(false);
   const [exportEmptyMessage, setExportEmptyMessage] = useState(false);
 
   const currentPageHighlights = useMemo(
@@ -334,6 +364,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         setExportIncludePageTitles(true);
         setExportBarHeight(undefined);
         setSettingsMode(false);
+        setFoldersMode(false);
         // Deselect only now that the drawer is hidden, so nothing moves during the exit
         clearSelectedHighlight();
       }
@@ -359,7 +390,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
       const target =
         alignment === 'center'
           ? elTopInScroll - container.clientHeight / 2 + elRect.height / scale / 2
-          : elTopInScroll - 16;
+          : elTopInScroll - 16 - (el.closest('[data-folder-section]') ? FOLDER_LABEL_HEIGHT : 0);
 
       container.scrollTo({ top: Math.max(0, target), behavior });
     },
@@ -549,10 +580,11 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
 
   // Exit settings when a mark is clicked on the page
   useEffect(() => {
-    if (pendingScrollHighlightId && settingsMode) {
+    if (pendingScrollHighlightId && (settingsMode || foldersMode)) {
       setSettingsMode(false);
+      setFoldersMode(false);
     }
-  }, [pendingScrollHighlightId, settingsMode]);
+  }, [pendingScrollHighlightId, settingsMode, foldersMode]);
 
   // Scroll to highlight when triggered from page mark click. If the drawer was hidden when
   // the mark was clicked, jump there before the first painted frame; if it was already
@@ -654,15 +686,18 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
           closing={isClosing}
           isExportActive={exportMode}
           isSettingsActive={settingsMode}
+          isFoldersActive={foldersMode}
           onExportToggle={() => {
             if (exportMode) {
               exitExportMode();
             } else if (allHighlights.length === 0) {
               setSettingsMode(false);
+              setFoldersMode(false);
               setExportEmptyMessage(true);
               setTimeout(() => setExportEmptyMessage(false), 3000);
             } else {
               setSettingsMode(false);
+              setFoldersMode(false);
               setExportMode(true);
               if (currentPageHighlights.length > 0) {
                 setExportScope('current');
@@ -677,7 +712,15 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
             if (!settingsMode && exportMode) {
               resetExportState();
             }
+            setFoldersMode(false);
             setSettingsMode((prev) => !prev);
+          }}
+          onFoldersClick={() => {
+            if (!foldersMode && exportMode) {
+              resetExportState();
+            }
+            setSettingsMode(false);
+            setFoldersMode((prev) => !prev);
           }}
         />
       )}
@@ -710,12 +753,14 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
           onKeyDown={handleKeyDown}
         >
           {settingsMode && <DrawerSettings />}
-            <div style={{ display: settingsMode ? 'none' : undefined }} className="h-full">
+          {foldersMode && (
+            <div className={`${styles.scrollContainer} h-full`}>
+              <FolderList pages={folderPages} />
+            </div>
+          )}
+            <div style={{ display: settingsMode || foldersMode ? 'none' : undefined }} className="h-full">
               {/* Single scroll container with expandable items */}
               <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
-                {!isLoading && allHighlights.length > 0 && !exportMode && (
-                  <FolderList pages={folderPages} />
-                )}
                 <div
                   className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${allHighlights.length === 0 && !isLoading ? 'h-full' : ''} ${styles.highlightList}`}
                   data-has-expanded={selectedHighlightId ? '' : undefined}
@@ -750,7 +795,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                   ) : (
                     (() => {
                       let hiddenHighlightsBefore = 0;
-                      return pageGroups.map((group, groupIndex) => {
+                      const renderGroup = (group: PageGroup, prevGroup: PageGroup | undefined) => {
                         const isCollapsed = expandedGroupUrl !== group.url;
                         const rawGlobalIndex =
                           highlightGlobalIndices.map.get(group.highlights[0]?.id) ?? 0;
@@ -761,8 +806,8 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                         }
                         return (
                           <React.Fragment key={group.url}>
-                            {groupIndex > 0 &&
-                              expandedGroupUrl !== pageGroups[groupIndex - 1]?.url && (
+                            {prevGroup &&
+                              expandedGroupUrl !== prevGroup.url && (
                                 <div
                                   className={`border-t border-divider mx-auto ${isStaggering ? styles.staggerDivider : ''}`}
                                   style={{
@@ -929,7 +974,20 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                             </div>
                           </React.Fragment>
                         );
-                      });
+                      };
+                      return sections.map((section) => (
+                        <div
+                          key={section.folderId ?? 'no-folder'}
+                          data-folder-section={section.folderId ? '' : undefined}
+                        >
+                          {section.name !== null && (
+                            <div className={`${styles.folderLabel} text-text-secondary text-xs`}>
+                              {section.name}
+                            </div>
+                          )}
+                          {section.groups.map((group, i) => renderGroup(group, section.groups[i - 1]))}
+                        </div>
+                      ));
                     })()
                   )}
                 </div>
