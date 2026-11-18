@@ -1,33 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
-import { HIGHLIGHT_COLORS } from '@/shared/constants';
+import { COLOR_OPTIONS, highlighterStyle } from './ColorSwatch';
 import { storageService } from '@/shared/storage';
 import { downloadJson } from '@/shared/exportHighlights';
 import { DebugLogControls } from './DebugLogControls';
-
-const COLOR_OPTIONS = [
-  { name: 'Yellow', value: HIGHLIGHT_COLORS.yellow },
-  { name: 'Green', value: HIGHLIGHT_COLORS.green },
-  { name: 'Orange', value: HIGHLIGHT_COLORS.orange },
-  { name: 'Blue', value: HIGHLIGHT_COLORS.blue },
-  { name: 'Pink', value: HIGHLIGHT_COLORS.pink },
-  { name: 'Purple', value: HIGHLIGHT_COLORS.purple },
-] as const;
-
-const highlighterStyle = (color: string, isSelected: boolean) => ({
-  width: '20px',
-  height: '20px',
-  backgroundColor: 'transparent',
-  backgroundImage: `linear-gradient(175deg, ${color} 20%, color-mix(in srgb, ${color}, white 30%) 50%, ${color} 80%), linear-gradient(83.4deg, ${color}, color-mix(in srgb, ${color}, white 20%) 4%, color-mix(in srgb, ${color}, white 10%) 96%, ${color})`,
-  backgroundSize: '100% 100%',
-  borderRadius: '0.1em 0.5em 0.15em 0.4em / 0.5em 0.1em 0.4em 0.15em',
-  boxShadow: `1px 1px 3px color-mix(in srgb, ${color}, transparent 85%)`,
-  outline: isSelected ? '2px solid #F5F5F5' : 'none',
-  outlineOffset: '2px',
-  opacity: 1,
-  border: 'none',
-  padding: 0,
-});
 
 const buttonClass =
   'px-4 text-sm font-light bg-button text-text-main hover:bg-button-hover shadow-bevel transition-colors cursor-pointer flex items-center justify-center';

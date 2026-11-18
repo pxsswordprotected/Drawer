@@ -36,3 +36,51 @@
 .list[data-fade-bottom] {
   --fade-bottom: 16px;
 }
+
+/* Color picker in the header: the current swatch is fixed; the others slide out to its left */
+.picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.swatch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  cursor: pointer;
+}
+
+.swatch:focus-visible {
+  outline: 2px solid rgba(245, 245, 245, 0.5) !important;
+  outline-offset: 2px;
+}
+
+.current {
+  z-index: 1;
+}
+
+.other {
+  --ease: cubic-bezier(0.19, 1, 0.22, 1);
+  transform: translateX(var(--slide));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 150ms var(--ease),
+    opacity 150ms var(--ease),
+    visibility 0s linear 150ms;
+}
+
+.picker[data-open] .other {
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .other {
+    transition: none;
+  }
+}

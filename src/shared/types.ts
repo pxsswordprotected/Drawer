@@ -63,6 +63,7 @@ export type WriteOp =
   | { type: 'addNote'; highlightId: string; note: Note }
   | { type: 'updateNote'; highlightId: string; noteId: string; text: string }
   | { type: 'deleteNote'; highlightId: string; noteId: string }
+  | { type: 'setHighlightColor'; highlightId: string; color: string }
   | { type: 'setPageTitle'; url: string; title: string } // empty title: back to the saved one
   | { type: 'importBackup'; highlights: Highlight[]; pageTitles: PageTitles } // stored items win
   | { type: 'deleteAll' } // highlights and page titles; settings stay

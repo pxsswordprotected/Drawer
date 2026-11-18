@@ -53,6 +53,7 @@ export interface DrawerState {
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
   resetLogoPosition: () => void;
   setDefaultColor: (color: string) => Promise<void>;
+  setHighlightColor: (highlightId: string, color: string) => Promise<void>;
   importBackup: (jsonString: string) => Promise<void>;
   deleteAllHighlights: () => Promise<void>;
 }
@@ -203,6 +204,9 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
 
   deleteNote: (highlightId: string, noteId: string) =>
     storageService.write({ type: 'deleteNote', highlightId, noteId }),
+
+  setHighlightColor: (highlightId: string, color: string) =>
+    storageService.write({ type: 'setHighlightColor', highlightId, color }),
 
   resetLogoPosition: () => set((state) => ({ logoResetCount: state.logoResetCount + 1 })),
 

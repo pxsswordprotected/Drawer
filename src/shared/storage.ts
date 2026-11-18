@@ -212,6 +212,8 @@ async function applyWrite(op: WriteOp): Promise<void> {
           ? { ...h, notes: h.notes.filter((n) => n.id !== op.noteId) }
           : h
       );
+    case 'setHighlightColor':
+      return updateHighlight(op.highlightId, (h) => (h.color === op.color ? h : { ...h, color: op.color }));
     case 'setPageTitle': {
       // Touches the title's own key only, never highlight data
       const title = op.title.trim();

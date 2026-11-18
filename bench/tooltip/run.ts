@@ -14,6 +14,7 @@ import {
   type Rect,
   type TooltipSide,
 } from '../../src/content/tooltipGeometry';
+import { HIGHLIGHT_COLORS } from '../../src/shared/constants';
 
 declare global {
   interface Window {
@@ -944,6 +945,159 @@ try {
       { tipL: tipL.rect, afterL: afterL?.rect, pointer }
     );
     await park(page);
+  }
+
+  // ── color picker: swatch row in the tooltip header ──
+  {
+    const pickerState = (page: Page) =>
+      ui(page, (r) => {
+        const p = r.querySelector('[data-color-picker]')!;
+        const t = p.querySelector('button[aria-expanded]')!;
+        const others = [...p.querySelectorAll('button:not([aria-expanded])')];
+        const rect = (e: Element) => {
+          const b = e.getBoundingClientRect();
+          return { left: b.left, right: b.right, top: b.top, bottom: b.bottom };
+        };
+        const vis = (e: Element) => {
+          const s = getComputedStyle(e);
+          return s.visibility === 'visible' && Number(s.opacity) > 0.99;
+        };
+        const label = r.querySelector('[data-highlight-tooltip] p') as Element;
+        return {
+          trigger: rect(t),
+          triggerLabel: t.getAttribute('aria-label'),
+          expanded: t.getAttribute('aria-expanded'),
+          outline: getComputedStyle(t).outline,
+          others: others.map((o) => ({ label: o.getAttribute('aria-label'), visible: vis(o), ...rect(o) })),
+          label: rect(label),
+        };
+      });
+    const markColor = (page: Page, id: string) =>
+      page.evaluate((id) => getComputedStyle(document.querySelector(`mark[data-highlight-id="${id}"]`)!).getPropertyValue('--drawer-mark-color').trim(), id);
+    const norm = (page: Page, hex: string) =>
+      page.evaluate((hex) => {
+        const d = document.createElement('div');
+        d.style.color = hex;
+        document.body.appendChild(d);
+        const c = getComputedStyle(d).color;
+        d.remove();
+        return c;
+      }, hex);
+    const storedColor = (page: Page, id: string) =>
+      page.evaluate((id) => (JSON.parse(localStorage.getItem('highlights') ?? '[]') as { id: string; color: string }[]).find((h) => h.id === id)?.color, id);
+    const stillOpen = async () => {
+      const t = await tooltip(page);
+      return !!t && !t.closing;
+    };
+    /** Mouse onto the tooltip's body, then onto the trigger: the pointer enters the swatch fresh */
+    const enterTrigger = async () => {
+      const tip = (await tooltip(page))!;
+      await moveSteps(page, { x: tip.rect.left + 60, y: tip.rect.bottom - 8 }, 4, 100);
+      const s = await pickerState(page);
+      await moveSteps(page, center(s.trigger), 6, 120);
+      await pause(200);
+    };
+    const clickOther = async (label: string) => {
+      const s = await pickerState(page);
+      const o = s.others.find((x) => x.label === label)!;
+      await page.mouse.click((o.left + o.right) / 2, (o.top + o.bottom) / 2);
+    };
+
+    await park(page);
+    await scrollMarkTo(page, ids.right, 500);
+    const tip0 = await hoverOpen(page, ids.right);
+    await moveSteps(page, { x: tip0.rect.left + 60, y: tip0.rect.top + 24 }, 8, 250);
+    await pause(250);
+
+    // 1. collapsed: current color alone at the right edge, vertically level with the label
+    const s1 = await pickerState(page);
+    const tip1 = (await tooltip(page))!;
+    expect('picker collapsed: trigger sits at the content right edge', near(s1.trigger.right, tip1.rect.right - 38, 1), { trigger: s1.trigger, tip: tip1.rect });
+    expect('picker collapsed: swatch and label share a center line', Math.abs(center(s1.trigger).y - center(s1.label).y) <= 1, { trigger: s1.trigger, label: s1.label });
+    expect('picker collapsed: current color outlined', s1.outline.includes('rgb(245, 245, 245)') && s1.outline.includes('2px'), s1.outline);
+    expect('picker collapsed: no other swatch visible, aria-expanded false', s1.others.length === 5 && s1.others.every((o) => !o.visible) && s1.expanded === 'false', s1);
+    expect('picker: header keeps the empty tooltip height, text starts with Notes', tip1.height >= 60 && tip1.height <= TOOLTIP_MIN_HEIGHT && tip1.text.startsWith('Notes'), tip1);
+
+    // 2. hovering the swatch reveals the other five to its left, palette order
+    await moveSteps(page, center(s1.trigger), 6, 150);
+    await pause(300);
+    const s2 = await pickerState(page);
+    const byLeft = [...s2.others].sort((a, b) => a.left - b.left);
+    expect('picker open: aria-expanded true, five others visible', s2.expanded === 'true' && s2.others.length === 5 && s2.others.every((o) => o.visible), s2);
+    expect('picker open: all left of the trigger and inside the tooltip', s2.others.every((o) => o.right <= s2.trigger.left + 0.5 && o.left >= tip1.rect.left), { s2, tip: tip1.rect });
+    expect(
+      'picker open: palette order minus the current color',
+      byLeft.map((o) => o.label).join('|') === ['Green', 'Orange', 'Blue', 'Pink', 'Purple'].map((n) => `${n} highlight color`).join('|'),
+      byLeft.map((o) => o.label)
+    );
+    expect(
+      'picker open: trigger does not move, 12px gaps',
+      near(s2.trigger.left, s1.trigger.left, 0.5) && near(s2.trigger.top, s1.trigger.top, 0.5) && byLeft.every((o, i) => i === 0 || near(o.left - byLeft[i - 1].right, 12, 0.5)),
+      { t1: s1.trigger, t2: s2.trigger }
+    );
+
+    // 3. generous close area
+    const midX = (byLeft[0].right + byLeft[1].left) / 2;
+    const rowY = center(s2.trigger).y;
+    await moveSteps(page, { x: midX, y: rowY }, 5, 150);
+    await pause(400);
+    expect('picker: whitespace between swatches keeps it open', (await pickerState(page)).expanded === 'true');
+    await moveSteps(page, { x: midX, y: s2.trigger.top - 12 }, 3, 100);
+    await pause(300);
+    expect('picker: 12px above the swatches (inside the margin) keeps it open', (await pickerState(page)).expanded === 'true');
+    await moveSteps(page, { x: midX, y: Math.min(s2.trigger.bottom + 40, tip1.rect.bottom - 6) }, 4, 150);
+    await pause(300);
+    expect('picker: leaving the margin collapses it, tooltip stays', (await pickerState(page)).expanded === 'false' && (await stillOpen()));
+
+    // 4. pick Pink
+    await enterTrigger();
+    expect('picker: re-entering the swatch reopens', (await pickerState(page)).expanded === 'true');
+    await clickOther('Pink highlight color');
+    await pause(400);
+    const s4 = await pickerState(page);
+    const pinkRgb = await norm(page, HIGHLIGHT_COLORS.pink);
+    const stored4 = await storedColor(page, ids.right);
+    const mark4 = await markColor(page, ids.right);
+    expect('pick Pink: stored color updated', stored4 === HIGHLIGHT_COLORS.pink, stored4);
+    expect('pick Pink: trigger shows Pink, outlined', s4.triggerLabel === 'Pink highlight color' && s4.outline.includes('rgb(245, 245, 245)'), s4);
+    expect('pick Pink: page mark recolored in place', mark4 === pinkRgb, { mark4, pinkRgb });
+    expect('pick Pink: menu collapsed, tooltip still open', s4.expanded === 'false' && s4.others.every((o) => !o.visible) && (await stillOpen()), s4);
+
+    // 6. no reopen until the cursor has left the swatch and come back
+    const here = await page.evaluate(() => window.__pointer!);
+    await page.mouse.move(here.x + 3, here.y + 3);
+    await pause(300);
+    expect('pick: moving within the old flyout does not reopen it', (await pickerState(page)).expanded === 'false');
+    await enterTrigger();
+    expect('pick: leaving and re-entering the swatch reopens it', (await pickerState(page)).expanded === 'true');
+
+    // 5. crossfade: a second pick (Blue) passes through intermediate colors
+    await page.evaluate((id) => {
+      const m = document.querySelector(`mark[data-highlight-id="${id}"]`)!;
+      const w = window as unknown as { __samples: string[]; __raf: number };
+      w.__samples = [];
+      const tick = () => {
+        w.__samples.push(getComputedStyle(m).getPropertyValue('--drawer-mark-color').trim());
+        w.__raf = requestAnimationFrame(tick);
+      };
+      tick();
+    }, ids.right);
+    await clickOther('Blue highlight color');
+    await pause(400);
+    const samples = (await page.evaluate(() => {
+      const w = window as unknown as { __samples: string[]; __raf: number };
+      cancelAnimationFrame(w.__raf);
+      return w.__samples;
+    })) as string[];
+    const blueRgb = await norm(page, HIGHLIGHT_COLORS.blue);
+    const distinct = new Set(samples);
+    expect('crossfade: at least 3 distinct colors sampled', distinct.size >= 3, [...distinct]);
+    expect('crossfade: ends on Blue', samples[samples.length - 1] === blueRgb && (await storedColor(page, ids.right)) === HIGHLIGHT_COLORS.blue, { last: samples[samples.length - 1], blueRgb });
+
+    // 7. a mouse pick leaves no focus behind: leaving the tooltip closes it
+    await park(page);
+    await pause(700);
+    expect('picker: after a mouse pick, leaving closes the tooltip (no held focus)', (await tooltip(page)) === null);
   }
 
   // ── drag, touch, hold-to-delete, click ──

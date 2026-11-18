@@ -4,7 +4,8 @@ import { DRAWER_CONFIG, PANEL_SURFACE_CLASS } from '@/shared/constants';
 import type { TooltipTarget } from '@/shared/types';
 import { placeTooltip, TOOLTIP_GAP } from '@/content/tooltipGeometry';
 import type { Highlight } from '@/shared/types';
-import { AddNoteRow, NoteRows, NotesLabel, newestFirst } from './Notes';
+import { AddNoteRow, NoteRows, newestFirst } from './Notes';
+import { HighlightColorPicker } from './HighlightColorPicker';
 import styles from './HighlightsDrawer.module.css';
 import tooltipStyles from './HighlightTooltip.module.css';
 
@@ -115,9 +116,12 @@ const TooltipBody: React.FC<{ highlight: Highlight; above: boolean }> = ({ highl
     prevCount.current = count;
   }, [count]);
 
-  const label = (
-    <div className="shrink-0 px-[38px] pt-2">
-      <NotesLabel />
+  const header = (
+    <div className="shrink-0 px-[38px] pt-4 pb-1">
+      <div className="flex h-5 items-center justify-between">
+        <p className="text-text-secondary text-xs">Notes</p>
+        <HighlightColorPicker highlightId={highlight.id} color={highlight.color} />
+      </div>
     </div>
   );
   const list = (
@@ -135,7 +139,7 @@ const TooltipBody: React.FC<{ highlight: Highlight; above: boolean }> = ({ highl
 
   return above ? (
     <>
-      {label}
+      {header}
       {list}
       <div className="shrink-0 px-[38px] pb-2">
         {hasNotes && <div className="border-t border-divider" />}
@@ -144,7 +148,7 @@ const TooltipBody: React.FC<{ highlight: Highlight; above: boolean }> = ({ highl
     </>
   ) : (
     <>
-      {label}
+      {header}
       <div className="shrink-0 px-[38px]">
         <AddNoteRow highlightId={highlight.id} hasNotes={hasNotes} />
         {hasNotes && <div className="border-t border-divider" />}

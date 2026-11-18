@@ -37,10 +37,14 @@ const DIM_VAR = '--drawer-mark-dim';
 const DIM_LEVEL = 0.4; // colour factor for unfocused marks (text keeps full contrast)
 const GROW_TRANSITION = 'background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1)';
 const DIM_TRANSITION = `${DIM_VAR} 150ms cubic-bezier(0.19, 1, 0.22, 1)`; // same duration and easing as the drawer's exit animation
+// Each mark carries its colour in a variable so a recolor is a one-property change that fades
+const COLOR_VAR = '--drawer-mark-color';
+const COLOR_TRANSITION = `${COLOR_VAR} 150ms cubic-bezier(0.19, 1, 0.22, 1)`;
+const MARK_TRANSITION = `${GROW_TRANSITION}, ${DIM_TRANSITION}, ${COLOR_TRANSITION}`;
 
-/** `color` at `alpha`% opacity, scaled by the dim factor (1 normally, lower on unfocused marks) */
-const tint = (color: string, alpha: number) =>
-  `color-mix(in srgb, ${color} calc(${alpha}% * var(${DIM_VAR}, 1)), transparent)`;
+/** The mark's colour at `alpha`% opacity, scaled by the dim factor (1 normally, lower on unfocused marks) */
+const tint = (alpha: number) =>
+  `color-mix(in srgb, var(${COLOR_VAR}) calc(${alpha}% * var(${DIM_VAR}, 1)), transparent)`;
 
 /**
  * Attaches pointer and click handlers directly to a <mark> element.
@@ -102,7 +106,7 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
 
     if (activeFragments.length > 0) {
       activeFragments.forEach((frag) => {
-        frag.style.setProperty('transition', `${GROW_TRANSITION}, ${DIM_TRANSITION}`, 'important');
+        frag.style.setProperty('transition', MARK_TRANSITION, 'important');
         frag.style.setProperty('background-size', '100% 100%', 'important');
       });
     }
@@ -198,7 +202,7 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
       activeFragments.forEach((frag) => {
         frag.style.setProperty(
           'transition',
-          `background-size ${HOLD_DELETE_MS - FEEDBACK_DELAY_MS}ms linear, ${DIM_TRANSITION}`,
+          `background-size ${HOLD_DELETE_MS - FEEDBACK_DELAY_MS}ms linear, ${DIM_TRANSITION}, ${COLOR_TRANSITION}`,
           'important'
         );
         frag.style.setProperty('background-size', '0% 100%', 'important');
@@ -468,8 +472,8 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
   ];
 
   const shadowBlur = clamp(1.5 + rand() * 1, 1.5, 2.5).toFixed(1);
-  const sharedGradient1 = `linear-gradient(${angle1}deg, transparent 20%, ${tint(color, 15)} 50%, transparent 80%)`;
-  const sharedShadow = `inset 0 -1px ${shadowBlur}px ${tint(color, 10)}`;
+  const sharedGradient1 = `linear-gradient(${angle1}deg, transparent 20%, ${tint(15)} 50%, transparent 80%)`;
+  const sharedShadow = `inset 0 -1px ${shadowBlur}px ${tint(10)}`;
 
   // 3. Process grouped chunks (in reverse to safely modify DOM)
   for (let i = chunks.length - 1; i >= 0; i--) {
@@ -507,11 +511,12 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     const fragMid1 = clamp(88 + midDrift1, 86, 92).toFixed(0);
     const fragMid2 = clamp(72 + midDrift2, 70, 76).toFixed(0);
 
-    const gradient2 = `linear-gradient(${angle2}deg, ${tint(color, 100 - Number(startOpacity.toFixed(0)))}, ${tint(color, 100 - Number(fragMid1))} 4%, ${tint(color, 100 - Number(fragMid2))} 96%, ${tint(color, 100 - Number(endOpacity.toFixed(0)))})`;
+    const gradient2 = `linear-gradient(${angle2}deg, ${tint(100 - Number(startOpacity.toFixed(0)))}, ${tint(100 - Number(fragMid1))} 4%, ${tint(100 - Number(fragMid2))} 96%, ${tint(100 - Number(endOpacity.toFixed(0)))})`;
 
     const mark = document.createElement('mark');
     mark.setAttribute('data-highlight-id', highlightId);
     mark.style.cssText = `
+       ${COLOR_VAR}: ${color};
        background-color: transparent !important;
        background-image: ${sharedGradient1}, ${gradient2} !important;
        border-radius: ${fragBorderRadius} !important;
@@ -526,7 +531,7 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
        background-position: ${bgOffsetX}px center !important;
        background-repeat: no-repeat !important;
        background-size: 0% 100% !important;
-       transition: ${GROW_TRANSITION}, ${DIM_TRANSITION} !important;
+       transition: ${MARK_TRANSITION} !important;
      `;
 
     // Wrap the entire chunk in a single <mark>
@@ -586,9 +591,16 @@ export function removeHighlightMarks(
     };
 
     mark.addEventListener('transitionend', onEnd);
-    mark.style.setProperty('transition', `${GROW_TRANSITION}, ${DIM_TRANSITION}`, 'important');
+    mark.style.setProperty('transition', MARK_TRANSITION, 'important');
     mark.style.setProperty('background-size', '0% 100%', 'important');
   });
+}
+
+/** Recolors a highlight's marks in place; the crossfade is the colour variable's transition. */
+export function recolorHighlightMarks(highlightId: string, color: string): void {
+  document
+    .querySelectorAll<HTMLElement>(`mark[data-highlight-id="${highlightId}"]`)
+    .forEach((mark) => mark.style.setProperty(COLOR_VAR, color));
 }
 
 /**
@@ -602,7 +614,9 @@ export function initMarkDimming(): void {
   style.setAttribute('data-drawer-mark-dim', '');
   document.head.appendChild(style);
   // Registered so the variable can transition (unregistered, it still works but snaps)
-  const registration = `@property ${DIM_VAR} { syntax: '<number>'; inherits: false; initial-value: 1; }`;
+  const registration =
+    `@property ${DIM_VAR} { syntax: '<number>'; inherits: false; initial-value: 1; }\n` +
+    `@property ${COLOR_VAR} { syntax: '<color>'; inherits: false; initial-value: transparent; }`;
   const render = (s: DrawerState) => {
     const focusedId = s.isOpen ? s.selectedHighlightId : (s.tooltip?.highlightId ?? null);
     if (!focusedId) {
