@@ -38,6 +38,7 @@ const getInitialPosition = (): Pos => ({
 export const DraggableLogo = React.memo(function DraggableLogo() {
   const [position, setPosition] = useState<Pos>(getInitialPosition);
   const [bounds, setBounds] = useState<Bounds>(getBounds);
+  const positionRef = useRef<Pos>(position); // latest committed position, for the resize handler
 
   const logoRef = useRef<HTMLDivElement>(null);
   const wasDragged = useRef(false);
@@ -69,15 +70,26 @@ export const DraggableLogo = React.memo(function DraggableLogo() {
   }, [logoResetCount, setLogoPosition]);
 
   useEffect(() => {
+    positionRef.current = position;
+  });
+
+  // A viewport resize clamps the logo; the store's center (drawer and toolbar anchor) follows,
+  // otherwise they stay where the logo used to be until the next logo click
+  useEffect(() => {
     const onResize = () => {
       const nextBounds = getBounds();
+      const next = clampPos(positionRef.current, nextBounds);
+      const center = { x: next.x + LOGO_SIZE / 2, y: next.y + LOGO_SIZE / 2 };
+      positionRef.current = next;
+      latestCenterRef.current = center;
       setBounds(nextBounds);
-      setPosition((prev) => clampPos(prev, nextBounds));
+      setPosition(next);
+      setLogoPosition(center);
     };
 
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [setLogoPosition]);
 
   useEffect(() => {
     return () => {
