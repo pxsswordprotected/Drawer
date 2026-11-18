@@ -1,12 +1,14 @@
 import React from 'react';
 import { Settings } from 'lucide-react';
 import styles from './DrawerToolbar.module.css';
+import drawerStyles from './HighlightsDrawer.module.css';
 import { DRAWER_CONFIG } from '../shared/constants';
 
 interface DrawerToolbarProps {
   logoPosition: { x: number; y: number };
   isExportActive: boolean;
   isSettingsActive: boolean;
+  closing: boolean; // exit animation playing: the parent unmounts the toolbar when the drawer finishes closing
   onExportToggle: () => void;
   onSettingsClick: () => void;
 }
@@ -40,6 +42,7 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
   logoPosition,
   isExportActive,
   isSettingsActive,
+  closing,
   onExportToggle,
   onSettingsClick,
 }) => {
@@ -51,11 +54,14 @@ export const DrawerToolbar: React.FC<DrawerToolbarProps> = ({
 
   return (
   <div
-    className="fixed flex flex-col items-center shadow-bevel-raised"
+    // Same keyframes, duration and easing as the drawer, so both land together
+    className={`fixed flex flex-col items-center shadow-bevel-raised ${closing ? `pointer-events-none ${drawerStyles.drawerClosing}` : drawerStyles.drawerEntering}`}
     style={{
       left: logoPosition.x - TOOLBAR_WIDTH / 2,
       top,
       zIndex: 1001,
+      // Scale from the edge facing the logo, so the toolbar grows out of it
+      transformOrigin: fitsAbove ? '50% 100%' : '50% 0%',
       ...toolbarStyle,
     }}
   >
