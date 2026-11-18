@@ -36,7 +36,7 @@ const HOLD_DELETE_MS = 900; // total press length that deletes
 const DIM_VAR = '--drawer-mark-dim';
 const DIM_LEVEL = 0.4; // colour factor for unfocused marks (text keeps full contrast)
 const GROW_TRANSITION = 'background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1)';
-const DIM_TRANSITION = `${DIM_VAR} 200ms ease`;
+const DIM_TRANSITION = `${DIM_VAR} 150ms cubic-bezier(0.19, 1, 0.22, 1)`; // same duration and easing as the drawer's exit animation
 
 /** `color` at `alpha`% opacity, scaled by the dim factor (1 normally, lower on unfocused marks) */
 const tint = (color: string, alpha: number) =>
