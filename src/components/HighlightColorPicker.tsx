@@ -24,15 +24,15 @@ export const HighlightColorPicker: React.FC<{ highlightId: string; color: string
   const reach = others.length * STEP + SWATCH;
 
   const [open, setOpen] = useState(false);
-  const [suppressed, setSuppressed] = useState(false); // from a pick until the cursor leaves the trigger
+  const [suppressed, setSuppressed] = useState(false); // from a pick until the cursor leaves the picker's hover area
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Clears suppression once the cursor is seen away from the trigger
+  // Clears suppression once the cursor is seen outside the picker's hover area
   useEffect(() => {
     if (!suppressed) return;
     const onMove = (e: PointerEvent) => {
-      if (triggerRef.current && !e.composedPath().includes(triggerRef.current)) setSuppressed(false);
+      if (rootRef.current && !e.composedPath().includes(rootRef.current)) setSuppressed(false);
     };
     window.addEventListener('pointermove', onMove, { capture: true, passive: true });
     return () => window.removeEventListener('pointermove', onMove, { capture: true });
@@ -83,7 +83,12 @@ export const HighlightColorPicker: React.FC<{ highlightId: string; color: string
       onBlur={(e) => {
         if (!rootRef.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
       }}
+      onPointerEnter={() => {
+        if (!suppressed) setOpen(true);
+      }}
     >
+      {/* Invisible hover area as wide as the open flyout, so the menu is easy to reach */}
+      <div aria-hidden className={styles.hit} style={{ width: reach }} />
       {others.map((opt, i) => {
         const offset = STEP * (others.length - i);
         return (
@@ -113,9 +118,6 @@ export const HighlightColorPicker: React.FC<{ highlightId: string; color: string
         aria-expanded={open}
         style={highlighterStyle(color, true, SWATCH)}
         onPointerDown={keepFocus}
-        onPointerEnter={() => {
-          if (!suppressed) setOpen(true);
-        }}
         onFocus={() => {
           if (!suppressed) setOpen(true);
         }}

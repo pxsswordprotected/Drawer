@@ -55,6 +55,14 @@
   outline-offset: 2px;
 }
 
+/* Covers the whole header row's swatch span; sits under the swatches */
+.hit {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  height: 20px;
+}
+
 .current {
   z-index: 1;
 }

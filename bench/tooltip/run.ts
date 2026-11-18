@@ -1049,6 +1049,12 @@ try {
     await pause(300);
     expect('picker: leaving the margin collapses it, tooltip stays', (await pickerState(page)).expanded === 'false' && (await stillOpen()));
 
+    // hover area spans the whole flyout: entering at the leftmost swatch's spot opens it
+    await moveSteps(page, { x: tip1.rect.left + 60, y: tip1.rect.bottom - 8 }, 4, 100);
+    await moveSteps(page, { x: center(byLeft[0]).x, y: rowY }, 6, 150);
+    await pause(300);
+    expect('picker: hovering the far-left end of the row opens it', (await pickerState(page)).expanded === 'true');
+
     // 4. pick Pink
     await enterTrigger();
     expect('picker: re-entering the swatch reopens', (await pickerState(page)).expanded === 'true');
