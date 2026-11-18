@@ -15,45 +15,52 @@ export interface Rect {
   bottom: number;
 }
 export type TooltipSide = 'above' | 'below';
+export const TOOLTIP_MIN_HEIGHT = 96; // empty tooltip is ~92 px (label + add-note row + padding); only the floor when neither side has room
+
 export interface TooltipPlacement {
   side: TooltipSide;
-  x: number; // top-left of the tooltip, viewport px
-  y: number;
-  origin: Point; // CSS transform-origin in tooltip-local px: the point on the highlight's near edge, below the cursor
+  x: number; // left edge, viewport px
+  anchorY: number; // y of the edge facing the highlight: the tooltip's bottom (above) or top (below). Never moves as the height changes
+  maxHeight: number; // px the tooltip may grow to
+  originX: number; // transform-origin x, tooltip-local px
 }
 
 const { WIDTH, HEIGHT, EDGE_MARGIN } = DRAWER_CONFIG;
 
-/** Above the highlight when it fits, else below, else the side with more room; clamped into the viewport */
+/**
+ * Above the highlight when the max height fits, else below, else the side with more room.
+ * The side is decided against the max height so it never flips while the tooltip grows or shrinks.
+ */
 export function placeTooltip(
   target: TooltipTarget,
   viewport: { width: number; height: number }
 ): TooltipPlacement {
   const { line, pointerX } = target;
-  const fitsAbove = line.top - TOOLTIP_GAP - HEIGHT >= EDGE_MARGIN;
-  const fitsBelow = viewport.height - line.bottom - TOOLTIP_GAP - HEIGHT >= EDGE_MARGIN;
-  const side: TooltipSide = fitsAbove
-    ? 'above'
-    : fitsBelow
-      ? 'below'
-      : line.top >= viewport.height - line.bottom
-        ? 'above'
-        : 'below';
+  const roomAbove = line.top - TOOLTIP_GAP - EDGE_MARGIN;
+  const roomBelow = viewport.height - line.bottom - TOOLTIP_GAP - EDGE_MARGIN;
+  const side: TooltipSide =
+    roomAbove >= HEIGHT
+      ? 'above'
+      : roomBelow >= HEIGHT
+        ? 'below'
+        : line.top >= viewport.height - line.bottom
+          ? 'above'
+          : 'below';
 
-  const yRaw = side === 'above' ? line.top - TOOLTIP_GAP - HEIGHT : line.bottom + TOOLTIP_GAP;
-  const y = Math.max(EDGE_MARGIN, Math.min(yRaw, viewport.height - HEIGHT - EDGE_MARGIN));
+  const maxHeight = Math.max(
+    TOOLTIP_MIN_HEIGHT,
+    Math.min(HEIGHT, side === 'above' ? roomAbove : roomBelow)
+  );
+  const anchorY = side === 'above' ? line.top - TOOLTIP_GAP : line.bottom + TOOLTIP_GAP;
   const x = Math.max(EDGE_MARGIN, Math.min(pointerX - WIDTH / 2, viewport.width - WIDTH - EDGE_MARGIN));
 
-  return {
-    side,
-    x,
-    y,
-    origin: { x: pointerX - x, y: (side === 'above' ? line.top : line.bottom) - y },
-  };
+  return { side, x, anchorY, maxHeight, originX: pointerX - x };
 }
 
-export function tooltipRect(p: TooltipPlacement): Rect {
-  return { left: p.x, right: p.x + WIDTH, top: p.y, bottom: p.y + HEIGHT };
+export function tooltipRect(p: TooltipPlacement, height: number): Rect {
+  return p.side === 'above'
+    ? { left: p.x, right: p.x + WIDTH, top: p.anchorY - height, bottom: p.anchorY }
+    : { left: p.x, right: p.x + WIDTH, top: p.anchorY, bottom: p.anchorY + height };
 }
 
 /** Edges inclusive */
@@ -85,11 +92,11 @@ function isInTriangle(p: Point, a: Point, b: Point, c: Point): boolean {
 export function isInSafeZone(
   point: Point,
   p: TooltipPlacement,
+  rect: Rect,
   line: Rect,
   apex: Point,
   landed: boolean
 ): boolean {
-  const rect = tooltipRect(p);
   const above = p.side === 'above';
 
   const bridge: Rect = {

@@ -125,36 +125,68 @@ export const NoteItem: React.FC<NoteItemProps> = ({ noteId, highlightId, text })
   );
 };
 
+export const newestFirst = (notes: Note[]): Note[] =>
+  [...notes].sort((a, b) => b.timestamp - a.timestamp);
+
+export const NotesLabel: React.FC = () => (
+  <p className="text-text-secondary text-xs mb-1" style={{ marginTop: '12px' }}>
+    Notes
+  </p>
+);
+
+export const AddNoteRow: React.FC<{ highlightId: string; hasNotes: boolean }> = ({
+  highlightId,
+  hasNotes,
+}) => (
+  <div className="py-3 flex items-center">
+    <NoteInput highlightId={highlightId} hasNotes={hasNotes} />
+  </div>
+);
+
+interface NoteRowsProps {
+  highlightId: string;
+  notes: Note[]; // rendered in the order given
+  borderSide: 'top' | 'bottom'; // which edge of each row carries the divider; the last row has none
+}
+
+export const NoteRows: React.FC<NoteRowsProps> = ({ highlightId, notes, borderSide }) => (
+  <>
+    {notes.map((note, i) => (
+      <div
+        key={note.id}
+        className={`py-3 flex items-center ${
+          i < notes.length - 1
+            ? borderSide === 'bottom'
+              ? 'border-b border-divider'
+              : 'border-t border-divider'
+            : ''
+        }`}
+      >
+        <NoteItem noteId={note.id} highlightId={highlightId} text={note.text} />
+      </div>
+    ))}
+  </>
+);
+
 interface NotesSectionProps {
   highlightId: string;
   notes: Note[];
 }
 
-/** "Notes" label, add-note input and the note list; shared by drawer rows and the hover tooltip */
+/** "Notes" label, add-note input and the note list (newest first); the drawer's layout */
 export const NotesSection: React.FC<NotesSectionProps> = ({ highlightId, notes }) => {
-  const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.timestamp - a.timestamp), [notes]);
+  const sortedNotes = useMemo(() => newestFirst(notes), [notes]);
 
   return (
     <>
-      <p className="text-text-secondary text-xs mb-1" style={{ marginTop: '12px' }}>
-        Notes
-      </p>
+      <NotesLabel />
 
       <div className="space-y-0">
-        <div className="py-3 flex items-center">
-          <NoteInput highlightId={highlightId} hasNotes={sortedNotes.length > 0} />
-        </div>
+        <AddNoteRow highlightId={highlightId} hasNotes={sortedNotes.length > 0} />
 
         {sortedNotes.length > 0 && <div className="border-t border-divider" />}
 
-        {sortedNotes.map((note, i) => (
-          <div
-            key={note.id}
-            className={`py-3 flex items-center ${i < sortedNotes.length - 1 ? 'border-b border-divider' : ''}`}
-          >
-            <NoteItem noteId={note.id} highlightId={highlightId} text={note.text} />
-          </div>
-        ))}
+        <NoteRows highlightId={highlightId} notes={sortedNotes} borderSide="bottom" />
       </div>
     </>
   );

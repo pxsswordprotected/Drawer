@@ -693,7 +693,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
         <div
           ref={innerRef}
           tabIndex={0}
-          className={`${PANEL_SURFACE_CLASS} ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
+          className={`${PANEL_SURFACE_CLASS} w-full h-full ${isClosing ? styles.drawerClosing : styles.drawerEntering}`}
           style={{
             contain: 'paint',
             outline: 'none',

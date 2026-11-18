@@ -7,6 +7,7 @@ import {
   tooltipRect,
   type Point,
   type Rect,
+  type TooltipPlacement,
 } from './tooltipGeometry';
 
 // Timing
@@ -62,6 +63,12 @@ export function initHighlightHover(ui: ShadowRoot): void {
 
   const store = () => useDrawerStore.getState();
 
+  /** The tooltip's live box: its height follows its content (`offsetHeight` ignores the enter/exit scale) */
+  const tooltipBox = (place: TooltipPlacement): Rect => {
+    const el = ui.querySelector<HTMLElement>(TOOLTIP_SELECTOR);
+    return tooltipRect(place, el ? el.offsetHeight : place.maxHeight);
+  };
+
   const focusWithin = () => {
     const active = ui.activeElement;
     return !!active && !!ui.querySelector(TOOLTIP_SELECTOR)?.contains(active);
@@ -116,14 +123,15 @@ export function initHighlightHover(ui: ShadowRoot): void {
       const tip = state.tooltip;
       if (tip) {
         const place = placeTooltip(tip, viewport());
-        if (isInRect(point, tooltipRect(place))) {
+        const rect = tooltipBox(place);
+        if (isInRect(point, rect)) {
           landed = true;
           clearClose();
         } else if (hovered?.id === tip.highlightId) {
           landed = false;
           apex = point;
           clearClose();
-        } else if (isInSafeZone(point, place, tip.line, apex, landed)) {
+        } else if (isInSafeZone(point, place, rect, tip.line, apex, landed)) {
           // Other highlights crossed on the way to the tooltip are ignored
           startClose('stall', CONE_STALL_MS);
         } else if (hovered) {
@@ -161,7 +169,7 @@ export function initHighlightHover(ui: ShadowRoot): void {
       cancelArm();
       const tip = store().tooltip;
       if (!tip) return;
-      const rect = tooltipRect(placeTooltip(tip, viewport()));
+      const rect = tooltipBox(placeTooltip(tip, viewport()));
       if (!isInRect({ x: e.clientX, y: e.clientY }, rect)) store().hideTooltip();
     },
     LISTEN
@@ -195,11 +203,12 @@ export function initHighlightHover(ui: ShadowRoot): void {
       if (!tip || focusWithin()) return;
       if (lastPoint) {
         const place = placeTooltip(tip, viewport());
+        const rect = tooltipBox(place);
         const overMark = markAt(document.elementFromPoint(lastPoint.x, lastPoint.y));
         if (
           overMark?.dataset.highlightId === tip.highlightId ||
-          isInRect(lastPoint, tooltipRect(place)) ||
-          isInSafeZone(lastPoint, place, tip.line, apex, landed)
+          isInRect(lastPoint, rect) ||
+          isInSafeZone(lastPoint, place, rect, tip.line, apex, landed)
         ) {
           return;
         }

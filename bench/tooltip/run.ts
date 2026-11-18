@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import {
   CONE_TOLERANCE,
   TOOLTIP_GAP,
+  TOOLTIP_MIN_HEIGHT,
   isInSafeZone,
   placeTooltip,
   tooltipRect,
@@ -41,33 +42,63 @@ const near = (a: number, b: number, tol = 2) => Math.abs(a - b) <= tol;
   const place = (l: Rect, pointerX: number, v = vp) => placeTooltip({ highlightId: 'x', pointerX, line: l }, v);
 
   const a = place(line, 200);
-  expect('geometry: above, centered, clamped left', a.side === 'above' && a.y === 118 && a.x === 24, a);
-  expect('geometry: transform origin', a.origin.x === 176 && a.origin.y === 282, a.origin);
+  expect(
+    'geometry: above, centered, clamped left',
+    a.side === 'above' && a.anchorY === 388 && a.maxHeight === 270 && a.x === 24 && a.originX === 176,
+    a
+  );
   const fits = place({ ...line, top: 306, bottom: 326 }, 200);
-  expect('geometry: top=306 fits above', fits.side === 'above' && fits.y === 24, fits);
+  expect('geometry: top=306 fits above', fits.side === 'above' && fits.anchorY === 294 && fits.maxHeight === 270, fits);
   const noFit = place({ ...line, top: 305, bottom: 325 }, 200);
-  expect('geometry: top=305 goes below', noFit.side === 'below' && noFit.y === 337, noFit);
+  expect('geometry: top=305 goes below', noFit.side === 'below' && noFit.anchorY === 337 && noFit.maxHeight === 270, noFit);
   const topLine = place({ ...line, top: 30, bottom: 50 }, 200);
-  expect('geometry: page top goes below', topLine.side === 'below' && topLine.y === 62, topLine);
+  expect('geometry: page top goes below', topLine.side === 'below' && topLine.anchorY === 62, topLine);
   const short = place({ ...line, top: 180, bottom: 200 }, 200, { width: 1280, height: 400 });
-  expect('geometry: neither fits, more room below', short.side === 'below' && short.y === 106, short);
+  expect(
+    'geometry: neither fits, more room below, max height capped to it',
+    short.side === 'below' && short.anchorY === 212 && short.maxHeight === 164,
+    short
+  );
   const tie = place({ ...line, top: 190, bottom: 210 }, 200, { width: 1280, height: 400 });
-  expect('geometry: equal room goes above', tie.side === 'above', tie);
+  expect('geometry: equal room goes above', tie.side === 'above' && tie.anchorY === 178 && tie.maxHeight === 154, tie);
+  const tiny = place({ ...line, top: 100, bottom: 120 }, 200, { width: 1280, height: 250 });
+  expect(
+    'geometry: tiny viewport floors at the minimum height',
+    tiny.side === 'below' && tiny.anchorY === 132 && tiny.maxHeight === TOOLTIP_MIN_HEIGHT && TOOLTIP_MIN_HEIGHT === 96,
+    tiny
+  );
   expect('geometry: clamped right', place(line, 1270).x === 880);
   expect('geometry: narrow viewport', place(line, 200, { width: 300, height: 800 }).x === 24);
 
-  const tip = tooltipRect(a);
-  expect('geometry: tooltip rect', tip.left === 24 && tip.right === 400 && tip.top === 118 && tip.bottom === 388, tip);
-  const apex = { x: 200, y: 405 };
+  const tipFull = tooltipRect(a, 270);
+  expect(
+    'geometry: rect at max height',
+    tipFull.left === 24 && tipFull.right === 400 && tipFull.top === 118 && tipFull.bottom === 388,
+    tipFull
+  );
+  const tipShort = tooltipRect(a, 100);
+  expect(
+    'geometry: rect grows upward from the fixed bottom edge',
+    tipShort.top === 288 && tipShort.bottom === 388,
+    tipShort
+  );
+  const below = place({ left: 100, right: 300, top: 300, bottom: 320 }, 200);
+  expect('geometry: below anchors at line.bottom + 12', below.side === 'below' && below.anchorY === 332, below);
+  const belowRect = tooltipRect(below, 270);
+  expect(
+    'geometry: below rect grows downward from the fixed top edge',
+    belowRect.top === 332 && belowRect.bottom === 602 && tooltipRect(below, 100).top === 332,
+    belowRect
+  );
   for (const side of ['above', 'below'] as TooltipSide[]) {
-    // Mirror the above case vertically around the line: below puts the tooltip under the line
-    const l = side === 'above' ? line : { ...line, top: 400, bottom: 420 };
-    const p = side === 'above' ? a : { ...a, side, y: 432, origin: a.origin };
-    const ap = side === 'above' ? apex : { x: 200, y: 415 };
-    const at = (x: number, y: number, landed = false) => isInSafeZone({ x, y }, p, l, ap, landed);
-    const gapY = side === 'above' ? 394 : 426;
-    const edgeY = side === 'above' ? [388, 400] : [420, 432];
-    const insideTipY = side === 'above' ? 387.9 : 432.1;
+    const l = side === 'above' ? line : { left: 100, right: 300, top: 300, bottom: 320 };
+    const p = side === 'above' ? a : below;
+    const rect = side === 'above' ? tipFull : belowRect;
+    const ap = side === 'above' ? { x: 200, y: 405 } : { x: 200, y: 315 };
+    const at = (x: number, y: number, landed = false) => isInSafeZone({ x, y }, p, rect, l, ap, landed);
+    const gapY = side === 'above' ? 394 : 326;
+    const edgeY = side === 'above' ? [388, 400] : [320, 332];
+    const insideTipY = side === 'above' ? 387.9 : 332.1;
     expect(`zone ${side}: bridge`, at(200, gapY));
     expect(`zone ${side}: bridge edges`, at(200, edgeY[0]) && at(200, edgeY[1]));
     expect(`zone ${side}: cone right of bridge, only before landing`, at(340, gapY) && !at(340, gapY, true));
@@ -125,6 +156,45 @@ const tooltip = (page: Page): Promise<Tip | null> =>
       text: el.textContent ?? '',
       placeholder: el.querySelector('textarea')?.getAttribute('placeholder') ?? null,
       closing: /drawerClosing/.test(el.firstElementChild?.className ?? ''),
+    };
+  });
+interface Metrics {
+  top: number;
+  bottom: number;
+  height: number;
+  panelBottom: number;
+  areas: { value: string; placeholder: string | null; top: number; bottom: number }[]; // textareas, visual order
+  scrollTop: number;
+  fadeTop: boolean;
+  fadeBottom: boolean;
+  mask: string;
+  wrapperTransition: string;
+  panelTransition: string;
+}
+const metrics = (page: Page): Promise<Metrics> =>
+  ui(page, (r) => {
+    const el = r.querySelector('[data-highlight-tooltip]') as HTMLElement;
+    const panel = el.firstElementChild as HTMLElement;
+    const list = el.querySelector('[data-tooltip-list]') as HTMLElement;
+    const b = el.getBoundingClientRect();
+    const cs = getComputedStyle(list);
+    return {
+      top: b.top,
+      bottom: b.bottom,
+      height: b.height,
+      panelBottom: panel.getBoundingClientRect().bottom,
+      areas: [...el.querySelectorAll('textarea')]
+        .map((t) => {
+          const tb = t.getBoundingClientRect();
+          return { value: t.value, placeholder: t.getAttribute('placeholder'), top: tb.top, bottom: tb.bottom };
+        })
+        .sort((x, y) => x.top - y.top),
+      scrollTop: list.scrollTop,
+      fadeTop: list.hasAttribute('data-fade-top'),
+      fadeBottom: list.hasAttribute('data-fade-bottom'),
+      mask: cs.maskImage || cs.webkitMaskImage || 'none',
+      wrapperTransition: getComputedStyle(el).transitionDuration,
+      panelTransition: getComputedStyle(panel).transitionDuration,
     };
   });
 const drawerVisible = (page: Page) =>
@@ -383,7 +453,7 @@ try {
     await pause(300);
     const tip = await tooltip(page);
     expect('rest 450ms: tooltip present', !!tip);
-    expect('size 376x270', !!tip && near(tip.width, 376, 1) && near(tip.height, 270, 1), tip);
+    expect('width 376, height fits the empty content', !!tip && near(tip.width, 376, 1) && tip.height >= 60 && tip.height <= TOOLTIP_MIN_HEIGHT, tip);
     expect('starts with "Notes"', !!tip && tip.text.startsWith('Notes'), tip?.text);
     expect(
       'inside viewport with 24px margin',
@@ -627,7 +697,7 @@ try {
     const tip = await hoverOpen(page, ids.mid);
     await moveSteps(page, { x: tip.rect.left + 120, y: tip.rect.bottom - 20 }, 8, 250);
     const typeInto = async (text: string) => {
-      await clickUi(page, '[data-highlight-tooltip] textarea');
+      await clickUi(page, '[data-highlight-tooltip] textarea[placeholder]');
       await page.keyboard.type(text);
       await page.keyboard.press('Enter');
       await pause(400);
@@ -639,7 +709,7 @@ try {
     expect('tooltip note: saved to storage', stored.includes('from tooltip'));
 
     // typing keeps it open with the cursor far away; clicking the page closes it
-    await clickUi(page, '[data-highlight-tooltip] textarea');
+    await clickUi(page, '[data-highlight-tooltip] textarea[placeholder]');
     await page.keyboard.type('draft');
     await page.mouse.move(60, 700);
     await pause(1000);
@@ -658,7 +728,7 @@ try {
     const inDrawer = await ui(page, (r) => [...r.querySelectorAll('[data-drawer] textarea')].some((t) => (t as HTMLTextAreaElement).value === 'from tooltip'));
     expect('tooltip note: present in the drawer', inDrawer);
 
-    // markup parity: the shared section renders the same structure in both places
+    // expand the row
     await ui(page, (r) => {
       const row = [...r.querySelectorAll('[data-drawer] [data-expanded]')].find((e) => e.textContent?.includes('from tooltip')) as HTMLElement | undefined;
       row?.click();
@@ -670,29 +740,17 @@ try {
     await page.keyboard.type('from drawer');
     await page.keyboard.press('Enter');
     await pause(400);
-    const drawerHtml = await ui(page, (r) => {
-      const row = r.querySelector('[data-drawer] [data-expanded="true"]');
-      if (!row) return '';
-      const p = [...row.querySelectorAll('p')].find((x) => x.textContent === 'Notes')!;
-      return p.outerHTML + (row.querySelector('.space-y-0') as HTMLElement).outerHTML.replace(/ style="[^"]*"/g, '');
-    });
     await page.mouse.click(logo.x, logo.y);
     await pause(500);
     await scrollMarkTo(page, ids.mid, 500);
     const tip2 = await hoverOpen(page, ids.mid);
-    const tipHtml = await ui(page, (r) => {
-      const root = r.querySelector('[data-highlight-tooltip]')!;
-      const p = [...root.querySelectorAll('p')].find((x) => x.textContent === 'Notes')!;
-      return p.outerHTML + (root.querySelector('.space-y-0') as HTMLElement).outerHTML.replace(/ style="[^"]*"/g, '');
-    });
-    const values = await ui(page, (r) => [...r.querySelectorAll('[data-highlight-tooltip] textarea')].map((t) => (t as HTMLTextAreaElement).value));
-    expect('drawer note: listed in the tooltip, newest first', values[1] === 'from drawer' && values[2] === 'from tooltip', values);
-    expect('markup parity: tooltip notes section matches the drawer row', strip(tipHtml).length > 0 && strip(tipHtml) === strip(drawerHtml), { tipHtml: strip(tipHtml), drawerHtml: strip(drawerHtml) });
+    const values = (await metrics(page)).areas.map((t) => t.value);
+    expect('drawer note: listed in the tooltip, oldest to newest top to bottom, input last', JSON.stringify(values) === JSON.stringify(['from tooltip', 'from drawer', '']), values);
 
     // edit in the tooltip (blur saves), then clear + Enter deletes
     await moveSteps(page, { x: tip2.rect.left + 120, y: tip2.rect.bottom - 20 }, 8, 250);
     const second = await ui(page, (r) => {
-      const t = [...r.querySelectorAll('[data-highlight-tooltip] textarea')][1] as HTMLElement;
+      const t = [...r.querySelectorAll('[data-highlight-tooltip] textarea')].sort((x, y) => x.getBoundingClientRect().top - y.getBoundingClientRect().top)[1] as HTMLElement;
       const b = t.getBoundingClientRect();
       return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
     });
@@ -701,7 +759,7 @@ try {
     await page.keyboard.press('KeyA');
     await page.keyboard.up('Control');
     await page.keyboard.type('edited here');
-    await clickUi(page, '[data-highlight-tooltip] textarea'); // focus the add box: blur saves the edit
+    await clickUi(page, '[data-highlight-tooltip] textarea[placeholder]'); // focus the add box: blur saves the edit
     await pause(400);
     expect('edit + blur in tooltip: stored', (await page.evaluate(() => localStorage.highlights)).includes('edited here'));
     await page.mouse.click(second.x, second.y);
@@ -722,19 +780,170 @@ try {
     const tip = await hoverOpen(page, ids.left);
     await moveSteps(page, { x: tip.rect.left + 120, y: tip.rect.bottom - 20 }, 8, 250);
     for (let i = 0; i < 8; i++) {
-      await clickUi(page, '[data-highlight-tooltip] textarea');
+      await clickUi(page, '[data-highlight-tooltip] textarea[placeholder]');
       await page.keyboard.type(`note ${i}`);
       await page.keyboard.press('Enter');
       await pause(150);
     }
+    const full = await metrics(page);
+    const before = await ui(page, (r) => (r.querySelector('[data-tooltip-list]') as HTMLElement).scrollTop);
+    expect('wheel: list opens at the input end with a fade only at the far edge', before === 0 && full.fadeTop && !full.fadeBottom, { before, full });
     const scrollY = await page.evaluate(() => window.scrollY);
-    await page.mouse.move(tip.rect.left + 188, tip.rect.top + 135);
-    await page.mouse.wheel({ deltaY: 300 });
+    await page.mouse.move(tip.rect.left + 188, full.top + 135);
+    await page.mouse.wheel({ deltaY: -300 });
     await pause(400);
-    const top = await ui(page, (r) => (r.querySelector('[data-highlight-tooltip] > div > div') as HTMLElement).scrollTop);
-    expect('wheel: notes list scrolls, page does not, tooltip stays', top > 0 && (await page.evaluate(() => window.scrollY)) === scrollY && !!(await tooltip(page)), { top });
+    const top = await ui(page, (r) => (r.querySelector('[data-tooltip-list]') as HTMLElement).scrollTop);
+    expect('wheel: notes list scrolls, page does not, tooltip stays', top < 0 && (await page.evaluate(() => window.scrollY)) === scrollY && !!(await tooltip(page)), { top });
     await page.mouse.click(60, 700);
     await pause(400);
+  }
+
+  // ── adaptive height: the edge facing the highlight stays put, the far edge follows the content ──
+  {
+    const noteText = (i: number) => `note ${i} lorem ipsum dolor sit amet consectetur`;
+    const addNote = async (text: string) => {
+      await clickUi(page, '[data-highlight-tooltip] textarea[placeholder]');
+      await page.keyboard.type(text);
+      await page.keyboard.press('Enter');
+      await pause(150);
+    };
+
+    // Above: grows up
+    await scrollMarkTo(page, ids.adjA, 500);
+    const tip0 = await hoverOpen(page, ids.adjA);
+    const m0 = await metrics(page);
+    await moveSteps(page, { x: tip0.rect.left + 120, y: tip0.rect.bottom - 20 }, 8, 250);
+    const heights = [m0.height];
+    let bottomDrift = 0;
+    let shrank = false;
+    let tooTall = false;
+    for (let i = 1; i <= 8; i++) {
+      await addNote(noteText(i));
+      const m = await metrics(page);
+      bottomDrift = Math.max(bottomDrift, Math.abs(m.bottom - m0.bottom));
+      shrank ||= m.height < heights[heights.length - 1] - 0.5;
+      tooTall ||= m.height > 270.5;
+      heights.push(m.height);
+    }
+    const m8 = await metrics(page);
+    expect('above: bottom edge fixed while notes are added', bottomDrift <= 0.5, bottomDrift);
+    expect('above: height never decreases, never exceeds 270', !shrank && !tooTall, heights);
+    expect('above: first note grows the tooltip', heights[1] > heights[0] + 10, heights);
+    expect('above: height reaches 270 by note 8', near(m8.height, 270, 1), heights);
+    expect(
+      'above: input last in visual order, inside the panel; newest note right above it',
+      m8.areas.at(-1)!.placeholder !== null && m8.areas.at(-1)!.bottom <= m8.panelBottom + 0.5 && m8.areas.at(-2)!.value === noteText(8),
+      m8.areas.slice(-3)
+    );
+    expect('above: list opens at the input end, fade only at the top', m8.scrollTop === 0 && m8.fadeTop && !m8.fadeBottom, m8);
+    expect('above: the fade is a mask on the list', m8.mask !== 'none', m8.mask);
+    expect('instant: no transition on the wrapper or the panel', m8.wrapperTransition === '0s' && m8.panelTransition === '0s', m8);
+
+    // Scroll up, then add: back at the input end
+    await page.mouse.move(tip0.rect.left + 188, m8.top + 135);
+    await page.mouse.wheel({ deltaY: -300 });
+    await pause(300);
+    const scrolled = await metrics(page);
+    expect('scrolled up: fade appears at the input end', scrolled.scrollTop < 0 && scrolled.fadeBottom, scrolled);
+    await addNote(noteText(9));
+    const after = await metrics(page);
+    expect('add a note while scrolled: list returns to the input end', after.scrollTop === 0 && !after.fadeBottom, after);
+    await page.mouse.click(60, 700);
+    await pause(500);
+
+    // Shrinks again when notes are deleted
+    await scrollMarkTo(page, ids.adjB, 500);
+    const tipB = await hoverOpen(page, ids.adjB);
+    const hB = (await metrics(page)).height;
+    await moveSteps(page, { x: tipB.rect.left + 120, y: tipB.rect.bottom - 20 }, 8, 250);
+    await addNote('first');
+    await addNote('second');
+    const grown = (await metrics(page)).height;
+    for (let i = 0; i < 2; i++) {
+      const p = await ui(page, (r) => {
+        const t = [...r.querySelectorAll('[data-highlight-tooltip] textarea')].sort((x, y) => x.getBoundingClientRect().top - y.getBoundingClientRect().top)[0] as HTMLElement;
+        const b = t.getBoundingClientRect();
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+      });
+      await page.mouse.click(p.x, p.y);
+      await ui(page, (r) => (r.activeElement as HTMLTextAreaElement).select());
+      await page.keyboard.press('Backspace');
+      await page.keyboard.press('Enter');
+      await pause(100);
+    }
+    await pause(300);
+    const shrunk = await metrics(page);
+    expect('shrinks: height returns to the empty height after deleting the notes', grown > hB + 20 && near(shrunk.height, hB, 0.5) && near(shrunk.bottom, tipB.rect.bottom, 0.5), { hB, grown, shrunk: shrunk.height });
+
+    // Instant: the height is final two frames after the store update
+    const countBefore = (await metrics(page)).areas.length;
+    await clickUi(page, '[data-highlight-tooltip] textarea[placeholder]');
+    await page.keyboard.type('instant');
+    await page.keyboard.press('Enter');
+    const frames = await ui(
+      page,
+      (r, arg) => {
+        const sel = () => r.querySelector('[data-highlight-tooltip]') as HTMLElement;
+        const count = () => sel().querySelectorAll('textarea').length;
+        const raf = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
+        return new Promise<{ h1: number; h2: number }>((resolve) => {
+          const tick = async () => {
+            if (count() <= Number(arg)) return void requestAnimationFrame(tick);
+            await raf();
+            await raf();
+            const h1 = sel().getBoundingClientRect().height;
+            setTimeout(() => resolve({ h1, h2: sel().getBoundingClientRect().height }), 300);
+          };
+          tick();
+        });
+      },
+      String(countBefore)
+    );
+    expect('instant: height final two frames after the note appears', near(frames.h1, frames.h2, 0.5), frames);
+    await page.mouse.click(60, 700);
+    await pause(500);
+
+    // Below: grows down
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await pause(150);
+    const tipT = await hoverOpen(page, ids.top);
+    const mT = await metrics(page);
+    await moveSteps(page, { x: tipT.rect.left + 120, y: tipT.rect.top + 20 }, 8, 250);
+    const hs = [mT.height];
+    let topDrift = 0;
+    let shrankBelow = false;
+    for (let i = 1; i <= 8; i++) {
+      await addNote(noteText(i));
+      const m = await metrics(page);
+      topDrift = Math.max(topDrift, Math.abs(m.top - mT.top));
+      shrankBelow ||= m.height < hs[hs.length - 1] - 0.5;
+      hs.push(m.height);
+    }
+    const mB = await metrics(page);
+    expect('below: top edge fixed while notes are added', topDrift <= 0.5, topDrift);
+    expect('below: height grows then caps at 270', !shrankBelow && hs[1] > hs[0] + 10 && near(mB.height, 270, 1) && Math.max(...hs) <= 270.5, hs);
+    expect(
+      'below: input first in visual order, newest note right under it',
+      mB.areas[0].placeholder !== null && mB.areas[1].value === noteText(8) && mB.areas[0].top >= mB.top - 0.5,
+      mB.areas.slice(0, 3)
+    );
+    expect('below: list opens at the input end, fade only at the bottom', mB.scrollTop === 0 && mB.fadeBottom && !mB.fadeTop, mB);
+    await page.mouse.click(60, 700);
+    await pause(500);
+
+    // Hit-testing follows the measured height: the 8-note tooltip is 270 tall
+    await scrollMarkTo(page, ids.left, 500);
+    const tipL = await hoverOpen(page, ids.left);
+    await moveSteps(page, { x: tipL.rect.left + 120, y: tipL.rect.bottom - 20 }, 12, 400);
+    await pause(700);
+    const afterL = await tooltip(page);
+    const pointer = await page.evaluate(() => window.__pointer!);
+    expect(
+      'measured height: diagonal path into a 270px tooltip stays open, pointer over it',
+      near(tipL.height, 270, 1) && !!afterL && !afterL.closing && pointer.y >= afterL.rect.top && pointer.y <= afterL.rect.bottom,
+      { tipL: tipL.rect, afterL: afterL?.rect, pointer }
+    );
+    await park(page);
   }
 
   // ── drag, touch, hold-to-delete, click ──
@@ -823,10 +1032,6 @@ try {
 } finally {
   await browser.close();
   server.stop(true);
-}
-
-function strip(html: string) {
-  return html.replace(/ (id|for|value)="[^"]*"/g, '').replace(/<textarea[^>]*>[^<]*<\/textarea>/g, '<textarea/>').replace(/\s+/g, ' ');
 }
 
 console.log(`METRIC tooltip_failures=${failures}`);

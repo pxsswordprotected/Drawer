@@ -1,0 +1,38 @@
+.list {
+  composes: scrollContainer from './HighlightsDrawer.module.css'; /* hidden scrollbar, overflow-y */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  padding: 0 38px;
+  overscroll-behavior: contain;
+}
+
+.list > * {
+  flex-shrink: 0;
+}
+
+.listAbove {
+  flex-direction: column-reverse;
+}
+
+.listBelow {
+  flex-direction: column;
+  padding-bottom: 8px;
+}
+
+/* The mask exists only while an edge has hidden content */
+.list[data-fade-top],
+.list[data-fade-bottom] {
+  --fade-top: 0px;
+  --fade-bottom: 0px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+}
+
+.list[data-fade-top] {
+  --fade-top: 16px;
+}
+
+.list[data-fade-bottom] {
+  --fade-bottom: 16px;
+}
