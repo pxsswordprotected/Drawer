@@ -11,6 +11,7 @@ import { DrawerToolbar } from './DrawerToolbar';
 import { generateMarkdown, downloadMarkdown, copyMarkdown } from '@/shared/exportHighlights';
 import { DrawerSettings } from './DrawerSettings';
 import { PageTitle } from './PageTitle';
+import { FolderList } from './FolderList';
 import { pageUrl } from '@/shared/pageUrl';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
@@ -120,6 +121,11 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }
     return { map, total: idx };
   }, [pageGroups]);
+
+  const folderPages = useMemo(
+    () => pageGroups.map((g) => ({ url: g.url, title: g.pageTitle || g.url })),
+    [pageGroups]
+  );
 
   const drawerRef = useRef<HTMLDivElement | null>(null);
   const innerRef = useRef<HTMLDivElement | null>(null);
@@ -707,6 +713,9 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
             <div style={{ display: settingsMode ? 'none' : undefined }} className="h-full">
               {/* Single scroll container with expandable items */}
               <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
+                {!isLoading && allHighlights.length > 0 && !exportMode && (
+                  <FolderList pages={folderPages} />
+                )}
                 <div
                   className={`px-[38px] py-2 ${exportMode ? 'pb-16' : ''} ${allHighlights.length === 0 && !isLoading ? 'h-full' : ''} ${styles.highlightList}`}
                   data-has-expanded={selectedHighlightId ? '' : undefined}

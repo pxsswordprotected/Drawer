@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import {
+  Folder,
   Highlight,
   Note,
   PageTitles,
+  SiteFolders,
   StoredChange,
   StoredData,
   TooltipTarget,
@@ -19,6 +21,8 @@ export interface DrawerState {
   // through `applyChange`, fed by storage's change events, so every tab shows the same thing
   allHighlights: Highlight[]; // oldest first
   pageTitles: PageTitles; // Custom page titles by URL; a page without one shows its saved title
+  folders: Folder[]; // By name
+  siteFolders: SiteFolders; // Folder id by page URL; a page without one is in no folder
   isLoading: boolean; // True only until the first load completes; refreshes are silent
   logoPosition: { x: number; y: number } | null;
   selectedHighlightId: string | null;
@@ -48,6 +52,9 @@ export interface DrawerState {
   deleteHighlight: (id: string) => Promise<void>;
   deletePageGroup: (url: string) => Promise<void>;
   setPageTitle: (url: string, title: string) => Promise<void>;
+  createFolder: (name: string) => Promise<void>;
+  deleteFolder: (id: string) => Promise<void>;
+  setSiteFolder: (url: string, folderId: string | null) => Promise<void>;
   addNote: (highlightId: string, text: string) => Promise<void>;
   updateNote: (highlightId: string, noteId: string, text: string) => Promise<void>;
   deleteNote: (highlightId: string, noteId: string) => Promise<void>;
@@ -57,6 +64,10 @@ export interface DrawerState {
   importBackup: (jsonString: string) => Promise<void>;
   deleteAllHighlights: () => Promise<void>;
 }
+
+/** Folders list by name (ties: by id) */
+const byName = (a: Folder, b: Folder) =>
+  a.name.localeCompare(b.name) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
  * State after a change to stored data. Items equal to what the store already holds keep their
@@ -99,6 +110,28 @@ function applyChange(state: DrawerState, change: StoredChange): Partial<DrawerSt
   }
   if (titlesChanged) next.pageTitles = pageTitles;
 
+  const folders = new Map(state.folders.map((f) => [f.id, f]));
+  let foldersChanged = false;
+  for (const [id, folder] of Object.entries(change.folders)) {
+    if (folder === null) {
+      if (folders.delete(id)) foldersChanged = true;
+    } else if (JSON.stringify(folders.get(id)) !== JSON.stringify(folder)) {
+      folders.set(id, folder);
+      foldersChanged = true;
+    }
+  }
+  if (foldersChanged) next.folders = [...folders.values()].sort(byName);
+
+  const siteFolders = { ...state.siteFolders };
+  let siteFoldersChanged = false;
+  for (const [url, id] of Object.entries(change.siteFolders)) {
+    if ((siteFolders[url] ?? null) === id) continue;
+    if (id === null) delete siteFolders[url];
+    else siteFolders[url] = id;
+    siteFoldersChanged = true;
+  }
+  if (siteFoldersChanged) next.siteFolders = siteFolders;
+
   if (change.settings && change.settings.defaultColor !== state.defaultColor) {
     next.defaultColor = change.settings.defaultColor;
   }
@@ -107,11 +140,21 @@ function applyChange(state: DrawerState, change: StoredChange): Partial<DrawerSt
 
 /** The change that turns what the store holds into `data`: everything in it, minus the rest */
 function changeTo(state: DrawerState, data: StoredData): StoredChange {
-  const change: StoredChange = { highlights: {}, pageTitles: {}, settings: data.settings };
+  const change: StoredChange = {
+    highlights: {},
+    pageTitles: {},
+    folders: {},
+    siteFolders: {},
+    settings: data.settings,
+  };
   for (const h of state.allHighlights) change.highlights[h.id] = null;
   for (const h of data.highlights) change.highlights[h.id] = h;
   for (const url of Object.keys(state.pageTitles)) change.pageTitles[url] = null;
   Object.assign(change.pageTitles, data.pageTitles);
+  for (const f of state.folders) change.folders[f.id] = null;
+  for (const f of data.folders) change.folders[f.id] = f;
+  for (const url of Object.keys(state.siteFolders)) change.siteFolders[url] = null;
+  Object.assign(change.siteFolders, data.siteFolders);
   return change;
 }
 
@@ -125,6 +168,8 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   isOpen: false,
   allHighlights: [],
   pageTitles: {},
+  folders: [],
+  siteFolders: {},
   isLoading: true,
   logoPosition: null,
   selectedHighlightId: null,
@@ -190,6 +235,18 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
   setPageTitle: (url: string, title: string) =>
     storageService.write({ type: 'setPageTitle', url, title }),
 
+  createFolder: async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    await storageService.write({
+      type: 'createFolder',
+      folder: { id: crypto.randomUUID(), name: trimmed, timestamp: Date.now() },
+    });
+  },
+  deleteFolder: (id: string) => storageService.write({ type: 'deleteFolder', id }),
+  setSiteFolder: (url: string, folderId: string | null) =>
+    storageService.write({ type: 'setSiteFolder', url, folderId }),
+
   addNote: (highlightId: string, text: string) => {
     const note: Note = {
       id: crypto.randomUUID(),
@@ -239,13 +296,15 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
           for (const later of heard) {
             Object.assign(change.highlights, later.highlights);
             Object.assign(change.pageTitles, later.pageTitles);
+            Object.assign(change.folders, later.folders);
+            Object.assign(change.siteFolders, later.siteFolders);
             change.settings = later.settings ?? change.settings;
           }
           return { ...applyChange(state, change), isLoading: false };
         });
       } catch (error) {
         console.error('Failed to load highlights:', error);
-        set({ allHighlights: [], pageTitles: {}, isLoading: false });
+        set({ allHighlights: [], pageTitles: {}, folders: [], siteFolders: {}, isLoading: false });
       } finally {
         heardWhileLoading = null;
         loading = null;

@@ -6,6 +6,8 @@ import { Settings } from './types';
 export const STORAGE_KEYS = {
   HIGHLIGHT_PREFIX: 'h:', // + highlight id → Highlight (with its notes)
   PAGE_TITLE_PREFIX: 't:', // + page URL → custom page title
+  FOLDER_PREFIX: 'f:', // + folder id → Folder
+  SITE_FOLDER_PREFIX: 'p:', // + page URL → id of the folder the page is in
   SETTINGS: 'settings',
 } as const;
 

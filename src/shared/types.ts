@@ -48,10 +48,22 @@ export interface Settings {
 /** User-chosen page titles, keyed by page URL. A page with no entry shows its saved title. */
 export type PageTitles = Record<string, string>;
 
+/** A named group of pages. It exists on its own, so it may hold no pages at all. */
+export interface Folder {
+  id: string; // UUID
+  name: string;
+  timestamp: number; // Creation timestamp
+}
+
+/** Which folder each page is in, keyed by page URL. A page with no entry is in no folder. */
+export type SiteFolders = Record<string, string>;
+
 /** Everything the extension keeps in storage */
 export interface StoredData {
   highlights: Highlight[];
   pageTitles: PageTitles;
+  folders: Folder[];
+  siteFolders: SiteFolders;
   settings: Settings;
 }
 
@@ -65,14 +77,25 @@ export type WriteOp =
   | { type: 'deleteNote'; highlightId: string; noteId: string }
   | { type: 'setHighlightColor'; highlightId: string; color: string }
   | { type: 'setPageTitle'; url: string; title: string } // empty title: back to the saved one
-  | { type: 'importBackup'; highlights: Highlight[]; pageTitles: PageTitles } // stored items win
-  | { type: 'deleteAll' } // highlights and page titles; settings stay
+  | { type: 'createFolder'; folder: Folder }
+  | { type: 'deleteFolder'; id: string } // its pages go back to no folder
+  | { type: 'setSiteFolder'; url: string; folderId: string | null } // null: out of its folder
+  | {
+      type: 'importBackup';
+      highlights: Highlight[];
+      pageTitles: PageTitles;
+      folders: Folder[];
+      siteFolders: SiteFolders;
+    } // stored items win
+  | { type: 'deleteAll' } // highlights, page titles and folder pointers; folders and settings stay
   | { type: 'updateSettings'; updates: Partial<Settings> };
 
 /** What a write changed in storage, as every tab hears it. `null` means deleted. */
 export interface StoredChange {
   highlights: Record<string, Highlight | null>; // by highlight id
   pageTitles: Record<string, string | null>; // by page URL
+  folders: Record<string, Folder | null>; // by folder id
+  siteFolders: Record<string, string | null>; // by page URL
   settings?: Settings;
 }
 

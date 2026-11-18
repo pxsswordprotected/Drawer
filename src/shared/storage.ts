@@ -11,7 +11,16 @@
 // it touches. Tabs read directly and learn of changes, their own included, through
 // `subscribe`.
 
-import type { Highlight, PageTitles, Settings, StoredChange, StoredData, WriteOp } from './types';
+import type {
+  Folder,
+  Highlight,
+  PageTitles,
+  Settings,
+  SiteFolders,
+  StoredChange,
+  StoredData,
+  WriteOp,
+} from './types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, WRITE_MESSAGE } from './constants';
 
 // Detect if we're in a browser extension context
@@ -56,10 +65,15 @@ const extensionBackend: Backend = {
   },
 };
 
+// A folder outlives its pages, so `deleteAll` keeps folders; the page → folder pointers go with the pages
 const isDataKey = (key: string) =>
-  key.startsWith(STORAGE_KEYS.HIGHLIGHT_PREFIX) || key.startsWith(STORAGE_KEYS.PAGE_TITLE_PREFIX);
+  key.startsWith(STORAGE_KEYS.HIGHLIGHT_PREFIX) ||
+  key.startsWith(STORAGE_KEYS.PAGE_TITLE_PREFIX) ||
+  key.startsWith(STORAGE_KEYS.SITE_FOLDER_PREFIX);
 const highlightKey = (id: string) => `${STORAGE_KEYS.HIGHLIGHT_PREFIX}${id}`;
 const pageTitleKey = (url: string) => `${STORAGE_KEYS.PAGE_TITLE_PREFIX}${url}`;
+const folderKey = (id: string) => `${STORAGE_KEYS.FOLDER_PREFIX}${id}`;
+const siteFolderKey = (url: string) => `${STORAGE_KEYS.SITE_FOLDER_PREFIX}${url}`;
 
 // Dev page (no extension): localStorage keeps the layout it has always had there, one
 // `highlights` array and one `pageTitles` map, which the browser benches seed and read. This
@@ -68,6 +82,8 @@ const pageTitleKey = (url: string) => `${STORAGE_KEYS.PAGE_TITLE_PREFIX}${url}`;
 // so it announces changes itself.
 const LOCAL_HIGHLIGHTS = 'highlights';
 const LOCAL_PAGE_TITLES = 'pageTitles';
+const LOCAL_FOLDERS = 'folders';
+const LOCAL_SITE_FOLDERS = 'siteFolders';
 const localListeners: ((changed: Items) => void)[] = [];
 
 function readLocal(): Items {
@@ -78,6 +94,12 @@ function readLocal(): Items {
   }
   for (const [url, title] of Object.entries((parse(LOCAL_PAGE_TITLES) as PageTitles | null) ?? {})) {
     items[pageTitleKey(url)] = title;
+  }
+  for (const folder of (parse(LOCAL_FOLDERS) as Folder[] | null) ?? []) {
+    items[folderKey(folder.id)] = folder;
+  }
+  for (const [url, id] of Object.entries((parse(LOCAL_SITE_FOLDERS) as SiteFolders | null) ?? {})) {
+    items[siteFolderKey(url)] = id;
   }
   const settings = parse(STORAGE_KEYS.SETTINGS);
   if (settings !== null) items[STORAGE_KEYS.SETTINGS] = settings;
@@ -91,9 +113,11 @@ function changeLocal(changed: Items): void {
     if (value === undefined) delete items[key];
     else items[key] = value;
   }
-  const { highlights, pageTitles } = toChange(items);
+  const { highlights, pageTitles, folders, siteFolders } = toChange(items);
   localStorage.setItem(LOCAL_HIGHLIGHTS, JSON.stringify(Object.values(highlights)));
   localStorage.setItem(LOCAL_PAGE_TITLES, JSON.stringify(pageTitles));
+  localStorage.setItem(LOCAL_FOLDERS, JSON.stringify(Object.values(folders)));
+  localStorage.setItem(LOCAL_SITE_FOLDERS, JSON.stringify(siteFolders));
   if (STORAGE_KEYS.SETTINGS in items) {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(items[STORAGE_KEYS.SETTINGS]));
   }
@@ -118,9 +142,9 @@ const localBackend: Backend = {
 
 const backend = isExtensionContext() ? extensionBackend : localBackend;
 
-/** Sorts raw storage items into highlights, page titles and settings; other keys are ignored */
+/** Sorts raw storage items into highlights, page titles, folders and settings; other keys are ignored */
 function toChange(items: Items): StoredChange {
-  const change: StoredChange = { highlights: {}, pageTitles: {} };
+  const change: StoredChange = { highlights: {}, pageTitles: {}, folders: {}, siteFolders: {} };
   for (const [key, value] of Object.entries(items)) {
     if (key.startsWith(STORAGE_KEYS.HIGHLIGHT_PREFIX)) {
       const id = key.slice(STORAGE_KEYS.HIGHLIGHT_PREFIX.length);
@@ -128,6 +152,12 @@ function toChange(items: Items): StoredChange {
     } else if (key.startsWith(STORAGE_KEYS.PAGE_TITLE_PREFIX)) {
       const url = key.slice(STORAGE_KEYS.PAGE_TITLE_PREFIX.length);
       change.pageTitles[url] = (value as string | undefined) ?? null;
+    } else if (key.startsWith(STORAGE_KEYS.FOLDER_PREFIX)) {
+      const id = key.slice(STORAGE_KEYS.FOLDER_PREFIX.length);
+      change.folders[id] = (value as Folder | undefined) ?? null;
+    } else if (key.startsWith(STORAGE_KEYS.SITE_FOLDER_PREFIX)) {
+      const url = key.slice(STORAGE_KEYS.SITE_FOLDER_PREFIX.length);
+      change.siteFolders[url] = (value as string | undefined) ?? null;
     } else if (key === STORAGE_KEYS.SETTINGS) {
       change.settings = { ...DEFAULT_SETTINGS, ...(value as Partial<Settings> | undefined) };
     }
@@ -154,11 +184,11 @@ function withNotes(saved: SavedHighlight): Highlight {
 }
 
 /** What a backup holds */
-type Backup = Pick<StoredData, 'highlights' | 'pageTitles'>;
+type Backup = Pick<StoredData, 'highlights' | 'pageTitles' | 'folders' | 'siteFolders'>;
 
 /**
- * Reads backup data: a `highlights` array, plus `pageTitles` (missing in older backups;
- * entries that aren't non-blank text are skipped).
+ * Reads backup data: a `highlights` array, plus `pageTitles`, `folders` and `siteFolders`
+ * (missing in older backups; entries of the wrong shape are skipped).
  */
 function readBackup(data: unknown): Backup {
   if (!data || typeof data !== 'object' || !('highlights' in data) || !Array.isArray(data.highlights)) {
@@ -172,7 +202,23 @@ function readBackup(data: unknown): Backup {
       if (typeof title === 'string' && title.trim()) pageTitles[url] = title.trim();
     }
   }
-  return { highlights: saved.map(withNotes), pageTitles };
+  const folders: Folder[] = [];
+  const savedFolders = 'folders' in data ? data.folders : null;
+  if (Array.isArray(savedFolders)) {
+    for (const item of savedFolders as Partial<Folder>[]) {
+      if (item && typeof item.id === 'string' && typeof item.name === 'string' && item.name.trim()) {
+        folders.push({ id: item.id, name: item.name.trim(), timestamp: Number(item.timestamp) || 0 });
+      }
+    }
+  }
+  const siteFolders: SiteFolders = {};
+  const savedSiteFolders = 'siteFolders' in data ? data.siteFolders : null;
+  if (savedSiteFolders && typeof savedSiteFolders === 'object' && !Array.isArray(savedSiteFolders)) {
+    for (const [url, id] of Object.entries(savedSiteFolders)) {
+      if (typeof id === 'string') siteFolders[url] = id;
+    }
+  }
+  return { highlights: saved.map(withNotes), pageTitles, folders, siteFolders };
 }
 
 // ─── Writing ───
@@ -191,12 +237,20 @@ async function applyWrite(op: WriteOp): Promise<void> {
   switch (op.type) {
     case 'saveHighlight':
       return backend.set({ [highlightKey(op.highlight.id)]: op.highlight });
-    case 'deleteHighlight':
-      return backend.remove([highlightKey(op.id)]);
+    case 'deleteHighlight': {
+      // A page's folder pointer must not outlive its last highlight
+      const items = await backend.get(null);
+      const { highlights } = toChange(items);
+      const url = highlights[op.id]?.url;
+      const pageEmptied =
+        url !== undefined && !Object.values(highlights).some((h) => h && h.id !== op.id && h.url === url);
+      const pointer = pageEmptied && siteFolderKey(url) in items ? [siteFolderKey(url)] : [];
+      return backend.remove([highlightKey(op.id), ...pointer]);
+    }
     case 'deletePage': {
       const { highlights } = toChange(await backend.get(null));
       const ids = Object.keys(highlights).filter((id) => highlights[id]?.url === op.url);
-      return backend.remove([...ids.map(highlightKey), pageTitleKey(op.url)]);
+      return backend.remove([...ids.map(highlightKey), pageTitleKey(op.url), siteFolderKey(op.url)]);
     }
     case 'addNote':
       return updateHighlight(op.highlightId, (h) => ({ ...h, notes: [...h.notes, op.note] }));
@@ -221,6 +275,24 @@ async function applyWrite(op: WriteOp): Promise<void> {
         ? backend.set({ [pageTitleKey(op.url)]: title })
         : backend.remove([pageTitleKey(op.url)]);
     }
+    case 'createFolder':
+      return backend.set({ [folderKey(op.folder.id)]: op.folder });
+    case 'deleteFolder': {
+      const items = await backend.get(null);
+      const pointers = Object.keys(items).filter(
+        (key) => key.startsWith(STORAGE_KEYS.SITE_FOLDER_PREFIX) && items[key] === op.id
+      );
+      return backend.remove([folderKey(op.id), ...pointers]);
+    }
+    case 'setSiteFolder': {
+      if (op.folderId === null) return backend.remove([siteFolderKey(op.url)]);
+      // Only a page that has highlights can be in a folder, and only an existing folder can hold it
+      const items = await backend.get(null);
+      const { highlights } = toChange(items);
+      const pageExists = Object.values(highlights).some((h) => h?.url === op.url);
+      if (!pageExists || !(folderKey(op.folderId) in items)) return;
+      return backend.set({ [siteFolderKey(op.url)]: op.folderId });
+    }
     case 'importBackup': {
       const stored = await backend.get(null);
       const items: Items = {};
@@ -229,6 +301,17 @@ async function applyWrite(op: WriteOp): Promise<void> {
       };
       for (const highlight of op.highlights) addMissing(highlightKey(highlight.id), highlight);
       for (const [url, title] of Object.entries(op.pageTitles)) addMissing(pageTitleKey(url), title);
+      for (const folder of op.folders) addMissing(folderKey(folder.id), folder);
+      // A pointer needs both ends to exist once the backup is merged
+      const pages = new Set([
+        ...Object.values(toChange(stored).highlights).flatMap((h) => (h ? [h.url] : [])),
+        ...op.highlights.map((h) => h.url),
+      ]);
+      for (const [url, id] of Object.entries(op.siteFolders)) {
+        if (pages.has(url) && (folderKey(id) in stored || folderKey(id) in items)) {
+          addMissing(siteFolderKey(url), id);
+        }
+      }
       if (Object.keys(items).length > 0) await backend.set(items);
       return;
     }
@@ -258,11 +341,15 @@ export const storageService = {
     const stored = toChange(await backend.get(null));
     const pageTitles: PageTitles = {};
     for (const [url, title] of Object.entries(stored.pageTitles)) if (title !== null) pageTitles[url] = title;
+    const siteFolders: SiteFolders = {};
+    for (const [url, id] of Object.entries(stored.siteFolders)) if (id !== null) siteFolders[url] = id;
     return {
       highlights: Object.values(stored.highlights)
         .filter((h) => h !== null)
         .sort(oldestFirst),
       pageTitles,
+      folders: Object.values(stored.folders).filter((f) => f !== null),
+      siteFolders,
       settings: stored.settings ?? DEFAULT_SETTINGS,
     };
   },
@@ -282,12 +369,14 @@ export const storageService = {
 
   /** Export all highlights and custom page titles as JSON */
   async exportHighlights(): Promise<string> {
-    const { highlights, pageTitles } = await this.load();
+    const { highlights, pageTitles, folders, siteFolders } = await this.load();
     const exportData = {
       version: '1.0',
       exportDate: new Date().toISOString(),
       highlights,
       pageTitles,
+      folders,
+      siteFolders,
       metadata: {
         totalCount: highlights.length,
         pageCount: new Set(highlights.map((h) => h.url)).size,
