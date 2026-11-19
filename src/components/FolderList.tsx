@@ -8,6 +8,8 @@ interface FolderListProps {
 }
 
 const titleClass = `text-base font-light text-text-main ${styles.pageTitle} ${styles.pageTitleClamped}`;
+// An open folder reads like an expanded page group: medium weight, whole name
+const openTitleClass = `text-base font-medium text-text-main ${styles.pageTitle}`;
 
 /** Dropdown row ending an open folder, styled like the drawer's add-note row. */
 const AddPageRow: React.FC<{
@@ -28,7 +30,7 @@ const AddPageRow: React.FC<{
         }}
         // The drawer's key handler preventDefaults ArrowUp/Down, which would break the native select
         onKeyDown={(e) => e.stopPropagation()}
-        className="w-full cursor-pointer bg-transparent text-sm text-text-secondary outline-none focus:text-text-main disabled:cursor-default [color-scheme:dark]"
+        className="-ml-1 w-[calc(100%+4px)] cursor-pointer bg-transparent text-sm text-text-secondary outline-none focus:text-text-main disabled:cursor-default [color-scheme:dark]"
       >
         <option value="" disabled>
           {hasPages ? 'Add page' : 'No pages yet'}
@@ -138,10 +140,10 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
               <div ref={isOpen ? openRef : undefined} className="py-4">
                 <div
                   data-folder-header
-                  className={styles.pageHeader}
+                  className={`${styles.pageHeader} ${styles.folderHeader} ${openId && !isOpen ? styles.folderHeaderDim : ''}`}
                   onClick={() => setOpenId(isOpen ? null : folder.id)}
                 >
-                  <p className={titleClass}>
+                  <p className={isOpen ? openTitleClass : titleClass}>
                     {folder.name}
                     <span className="text-text-secondary ml-2 inline-block -translate-y-[0.6px] text-xs">
                       {members.length}
@@ -161,7 +163,7 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
                 </div>
 
                 {isOpen && (
-                  <div className="pl-4">
+                  <>
                     {members.map((page) => (
                       <div key={page.url} className="border-b border-divider py-4">
                         <div className={styles.pageHeader}>
@@ -183,7 +185,7 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
                       hasPages={members.length > 0}
                       unfiled={unfiled}
                     />
-                  </div>
+                  </>
                 )}
               </div>
             </React.Fragment>

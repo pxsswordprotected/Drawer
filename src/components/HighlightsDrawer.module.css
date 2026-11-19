@@ -485,3 +485,19 @@
     transition: none;
   }
 }
+
+/* Folders view: while a folder is open the other folders' headers dim, like the page headers
+   in the list while a group is expanded */
+.folderHeader {
+  transition: opacity 200ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.folderHeaderDim {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folderHeader {
+    transition: none;
+  }
+}

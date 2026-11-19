@@ -7,6 +7,7 @@
     "dev": "vite --mode test",
     "build": "vite build",
     "build:extension": "vite build --mode extension && vite build --mode background",
+    "build:extension:watch": "vite build --mode extension --watch",
     "build:extension:debug": "vite build --mode extension-debug && vite build --mode background",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
