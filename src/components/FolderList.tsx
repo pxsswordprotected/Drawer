@@ -5,6 +5,7 @@ import styles from './HighlightsDrawer.module.css';
 
 interface FolderListProps {
   pages: { url: string; title: string }[]; // every page that has highlights
+  onOpenPage: (url: string) => void; // a page was picked: show it in the list
 }
 
 const titleClass = `text-base font-light text-text-main ${styles.pageTitle} ${styles.pageTitleClamped}`;
@@ -50,7 +51,7 @@ const AddPageRow: React.FC<{
  * the hover minus icon of a page header (deletes it), and its pages indented below, each with a
  * divider and followed by a dropdown row to add a page. A folder may be empty.
  */
-export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
+export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => {
   const folders = useDrawerStore((s) => s.folders);
   const siteFolders = useDrawerStore((s) => s.siteFolders);
   const createFolder = useDrawerStore((s) => s.createFolder);
@@ -166,13 +167,20 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
                   <>
                     {members.map((page) => (
                       <div key={page.url} className="border-b border-divider py-4">
-                        <div className={styles.pageHeader}>
+                        <div
+                          data-folder-page
+                          className={styles.pageHeader}
+                          onClick={() => onOpenPage(page.url)}
+                        >
                           <p className={titleClass}>{page.title}</p>
                           <button
                             type="button"
                             aria-label={`Remove ${page.title} from ${folder.name}`}
                             className={styles.pageTrashIcon}
-                            onClick={() => void setSiteFolder(page.url, null)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void setSiteFolder(page.url, null);
+                            }}
                           >
                             <TrashIcon size={14} tone="neutral" />
                           </button>

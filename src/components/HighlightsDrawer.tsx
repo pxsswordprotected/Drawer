@@ -183,6 +183,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   const [exportIncludePageTitles, setExportIncludePageTitles] = useState(false);
   const [settingsMode, setSettingsMode] = useState(false);
   const [foldersMode, setFoldersMode] = useState(false);
+  const [pendingOpenUrl, setPendingOpenUrl] = useState<string | null>(null); // page to scroll to once the list shows
   const [exportEmptyMessage, setExportEmptyMessage] = useState(false);
 
   const currentPageHighlights = useMemo(
@@ -396,6 +397,28 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     },
     []
   );
+
+  // A page picked in the folders view: back to the list with that page expanded and scrolled to
+  // the top. The list is hidden (display: none) while folders show, so the scroll waits for the
+  // commit that shows it again.
+  const handleOpenPage = useCallback(
+    (url: string) => {
+      if (selectedHighlightId) clearSelectedHighlight();
+      setFoldersMode(false);
+      setExpandedGroupUrl(url);
+      setPendingOpenUrl(url);
+    },
+    [selectedHighlightId, clearSelectedHighlight, setExpandedGroupUrl]
+  );
+
+  useLayoutEffect(() => {
+    if (!pendingOpenUrl || foldersMode || expandedGroupUrl !== pendingOpenUrl) return;
+    const header = scrollContainerRef.current?.querySelector<HTMLElement>(
+      `[data-page-url="${CSS.escape(pendingOpenUrl)}"]`
+    );
+    setPendingOpenUrl(null);
+    if (header) scrollTo(header, 'top', 'instant');
+  }, [pendingOpenUrl, foldersMode, expandedGroupUrl, scrollTo]);
 
   // Stable identity so memoized HighlightItemExpandable rows can skip re-renders
   const handleScrollToItem = useCallback(
@@ -753,7 +776,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
           onKeyDown={handleKeyDown}
         >
           {settingsMode && <DrawerSettings />}
-          {foldersMode && <FolderList pages={folderPages} />}
+          {foldersMode && <FolderList pages={folderPages} onOpenPage={handleOpenPage} />}
             <div style={{ display: settingsMode || foldersMode ? 'none' : undefined }} className="h-full">
               {/* Single scroll container with expandable items */}
               <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
@@ -837,6 +860,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                                 >
                                   <div
                                     data-page-header
+                                    data-page-url={group.url}
                                     className={styles.pageHeader}
                                     onClick={(e) => {
                                       // Always clear selected highlight when switching pages
