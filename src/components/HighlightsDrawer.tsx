@@ -22,6 +22,7 @@ const STAGGER_PER_ITEM = 35;
 
 // A folder's name label sticks to the top of the list: 16 top padding + 20 line + 4 bottom (see .folderLabel)
 const FOLDER_LABEL_HEIGHT = 40;
+const UNFILED_LABEL = 'Unfiled';
 
 // ─── Page grouping types ───
 interface PageGroup {
@@ -995,19 +996,25 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                           </React.Fragment>
                         );
                       };
-                      return sections.map((section) => (
-                        <div
-                          key={section.folderId ?? 'no-folder'}
-                          data-folder-section={section.folderId ? '' : undefined}
-                        >
-                          {section.name !== null && (
-                            <div className={`${styles.folderLabel} text-text-secondary text-xs`}>
-                              {section.name}
-                            </div>
-                          )}
-                          {section.groups.map((group, i) => renderGroup(group, section.groups[i - 1]))}
-                        </div>
-                      ));
+                      // Pages in no folder get a label of their own once any folder section exists,
+                      // so where one section ends and the next begins reads at a glance
+                      const hasFolderSection = sections.some((s) => s.folderId);
+                      return sections.map((section) => {
+                        const label = section.name ?? (hasFolderSection ? UNFILED_LABEL : null);
+                        return (
+                          <div
+                            key={section.folderId ?? 'no-folder'}
+                            data-folder-section={label !== null ? '' : undefined}
+                          >
+                            {label !== null && (
+                              <div className={`${styles.folderLabel} text-text-secondary text-xs`}>
+                                {label}
+                              </div>
+                            )}
+                            {section.groups.map((group, i) => renderGroup(group, section.groups[i - 1]))}
+                          </div>
+                        );
+                      });
                     })()
                   )}
                 </div>
