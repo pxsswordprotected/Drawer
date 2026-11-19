@@ -13,6 +13,7 @@ import { DrawerSettings } from './DrawerSettings';
 import { PageTitle } from './PageTitle';
 import { FolderList } from './FolderList';
 import { pageUrl } from '@/shared/pageUrl';
+import { ChevronDownIcon } from '@/shared/ChevronDownIcon';
 
 const EDGE_MARGIN = DRAWER_CONFIG.EDGE_MARGIN;
 
@@ -185,6 +186,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   const [settingsMode, setSettingsMode] = useState(false);
   const [foldersMode, setFoldersMode] = useState(false);
   const [pendingOpenUrl, setPendingOpenUrl] = useState<string | null>(null); // page to scroll to once the list shows
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set()); // folder sections folded in the list
   const [exportEmptyMessage, setExportEmptyMessage] = useState(false);
 
   const currentPageHighlights = useMemo(
@@ -407,9 +409,19 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
       if (selectedHighlightId) clearSelectedHighlight();
       setFoldersMode(false);
       setExpandedGroupUrl(url);
+      // The page may already be the expanded one inside a collapsed section
+      const key = pageGroups.find((g) => g.url === url)?.folderId;
+      if (key) {
+        setCollapsedSections((prev) => {
+          if (!prev.has(key)) return prev;
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
       setPendingOpenUrl(url);
     },
-    [selectedHighlightId, clearSelectedHighlight, setExpandedGroupUrl]
+    [selectedHighlightId, clearSelectedHighlight, setExpandedGroupUrl, pageGroups]
   );
 
   useLayoutEffect(() => {
@@ -420,6 +432,29 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     setPendingOpenUrl(null);
     if (header) scrollTo(header, 'top', 'instant');
   }, [pendingOpenUrl, foldersMode, expandedGroupUrl, scrollTo]);
+
+  const toggleSectionCollapsed = useCallback((key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Whatever expands a page (opening from its mark, a new highlight, the folders view) also
+  // reopens the folder section holding it
+  useEffect(() => {
+    const group = pageGroups.find((g) => g.url === expandedGroupUrl);
+    if (!group) return;
+    const key = group.folderId;
+    if (!key) return;
+    setCollapsedSections((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, [expandedGroupUrl]);
 
   // Stable identity so memoized HighlightItemExpandable rows can skip re-renders
   const handleScrollToItem = useCallback(
@@ -1001,17 +1036,34 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                       const hasFolderSection = sections.some((s) => s.folderId);
                       return sections.map((section) => {
                         const label = section.name ?? (hasFolderSection ? UNFILED_LABEL : null);
+                        const sectionKey = section.folderId ?? 'no-folder';
+                        const { folderId } = section;
+                        // Folders collapse; "Unfiled" is a plain label and always open
+                        const isSectionCollapsed = folderId !== null && collapsedSections.has(folderId);
                         return (
-                          <div
-                            key={section.folderId ?? 'no-folder'}
-                            data-folder-section={label !== null ? '' : undefined}
-                          >
-                            {label !== null && (
-                              <div className={`${styles.folderLabel} text-text-secondary text-xs`}>
+                          <div key={sectionKey} data-folder-section={label !== null ? '' : undefined}>
+                            {folderId !== null && label !== null ? (
+                              <div
+                                role="button"
+                                aria-expanded={!isSectionCollapsed}
+                                className={`${styles.folderLabel} text-text-secondary hover:text-text-main cursor-pointer text-xs transition-colors`}
+                                onClick={() => toggleSectionCollapsed(folderId)}
+                              >
+                                <ChevronDownIcon
+                                  size={16}
+                                  className={`${styles.folderChevron} ${isSectionCollapsed ? styles.folderChevronCollapsed : ''}`}
+                                />
                                 {label}
                               </div>
+                            ) : (
+                              label !== null && (
+                                <div className={`${styles.folderLabel} text-text-secondary text-xs`}>
+                                  {label}
+                                </div>
+                              )
                             )}
-                            {section.groups.map((group, i) => renderGroup(group, section.groups[i - 1]))}
+                            {!isSectionCollapsed &&
+                              section.groups.map((group, i) => renderGroup(group, section.groups[i - 1]))}
                           </div>
                         );
                       });
