@@ -1079,7 +1079,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                   <div
                     className={`absolute bottom-3 left-1/2 bg-bg-elevated rounded-lg pl-[6px] pr-3.5 py-2.5 shadow-[0_-2px_8px_rgba(0,0,0,0.3)] ring-1 ring-edge ${exportExiting && exportSuccess ? styles.exportBarExiting : styles.exportBarEntering}`}
                     style={{
-                      zIndex: 10,
+                      zIndex: 30, // above the sticky folder labels (z-index 20 in .folderLabel)
                       width: '236px',
                     }}
                   >
