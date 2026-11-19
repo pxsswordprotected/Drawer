@@ -117,7 +117,7 @@ export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => 
               onBlur={() => finishCreate(true)}
               aria-label="Folder name"
               placeholder="Folder name"
-              className="bg-edge text-text-main w-[160px] shrink-0 rounded-sm px-2 text-xs outline-none"
+              className="bg-edge text-text-main w-[160px] shrink-0 rounded-sm px-2 py-0.5 text-xs outline-none"
             />
           ) : (
             <button
