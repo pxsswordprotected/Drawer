@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { TrashIcon } from '@/shared/TrashIcon';
-import { PlusIcon } from '@/shared/PlusIcon';
 import styles from './HighlightsDrawer.module.css';
 
 interface FolderListProps {
@@ -10,10 +9,44 @@ interface FolderListProps {
 
 const titleClass = `text-base font-light text-text-main ${styles.pageTitle} ${styles.pageTitleClamped}`;
 
+/** Dropdown row ending an open folder, styled like the drawer's add-note row. */
+const AddPageRow: React.FC<{
+  folderId: string;
+  folderName: string;
+  hasPages: boolean;
+  unfiled: { url: string; title: string }[];
+}> = ({ folderId, folderName, hasPages, unfiled }) => {
+  const setSiteFolder = useDrawerStore((s) => s.setSiteFolder);
+  return (
+    <div className="py-3 flex items-center">
+      <select
+        aria-label={`Add a page to ${folderName}`}
+        value=""
+        disabled={unfiled.length === 0}
+        onChange={(e) => {
+          if (e.target.value) void setSiteFolder(e.target.value, folderId);
+        }}
+        // The drawer's key handler preventDefaults ArrowUp/Down, which would break the native select
+        onKeyDown={(e) => e.stopPropagation()}
+        className="w-full cursor-pointer bg-transparent text-sm text-text-secondary outline-none focus:text-text-main disabled:cursor-default [color-scheme:dark]"
+      >
+        <option value="" disabled>
+          {hasPages ? 'Add page' : 'No pages yet'}
+        </option>
+        {unfiled.map((page) => (
+          <option key={page.url} value={page.url}>
+            {page.title}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 /**
  * The folders view (toolbar folder button), laid out like the page list: a row per folder with
- * the hover icons of a page header (minus on the right deletes it, plus on the left adds a
- * page), and its pages indented below. A folder may be empty.
+ * the hover minus icon of a page header (deletes it), and its pages indented below, each with a
+ * divider and followed by a dropdown row to add a page. A folder may be empty.
  */
 export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   const folders = useDrawerStore((s) => s.folders);
@@ -25,7 +58,6 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [openId, setOpenId] = useState<string | null>(null); // folder showing its pages
-  const [addingId, setAddingId] = useState<string | null>(null); // folder showing the pages to add
 
   const finishCreate = (save: boolean) => {
     if (save && name.trim()) void createFolder(name);
@@ -69,7 +101,6 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
       {folders.map((folder, i) => {
         const members = pages.filter((p) => siteFolders[p.url] === folder.id);
         const isOpen = openId === folder.id;
-        const isAdding = addingId === folder.id;
         return (
           <React.Fragment key={folder.id}>
             {i > 0 && <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />}
@@ -77,26 +108,11 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
               <div
                 data-folder-header
                 className={styles.pageHeader}
-                onClick={() => {
-                  setOpenId(isOpen ? null : folder.id);
-                  if (isOpen) setAddingId(null);
-                }}
+                onClick={() => setOpenId(isOpen ? null : folder.id)}
               >
-                <button
-                  type="button"
-                  aria-label={`Add a page to ${folder.name}`}
-                  className={styles.pageEditIcon}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenId(folder.id);
-                    setAddingId(isAdding ? null : folder.id);
-                  }}
-                >
-                  <PlusIcon size={14} className="text-text-main" />
-                </button>
                 <p className={titleClass}>
                   {folder.name}
-                  <span className="text-text-secondary ml-2 text-xs">{members.length}</span>
+                  <span className="text-text-secondary ml-2 inline-block -translate-y-[0.6px] text-xs">{members.length}</span>
                 </p>
                 <button
                   type="button"
@@ -112,38 +128,28 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
               </div>
 
               {isOpen && (
-                <div className="flex flex-col gap-4 pl-4 pt-4">
+                <div className="pl-4">
                   {members.map((page) => (
-                    <div key={page.url} className={styles.pageHeader}>
-                      <p className={titleClass}>{page.title}</p>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${page.title} from ${folder.name}`}
-                        className={styles.pageTrashIcon}
-                        onClick={() => void setSiteFolder(page.url, null)}
-                      >
-                        <TrashIcon size={14} />
-                      </button>
+                    <div key={page.url} className="border-b border-divider py-4">
+                      <div className={styles.pageHeader}>
+                        <p className={titleClass}>{page.title}</p>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${page.title} from ${folder.name}`}
+                          className={styles.pageTrashIcon}
+                          onClick={() => void setSiteFolder(page.url, null)}
+                        >
+                          <TrashIcon size={14} />
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  {isAdding &&
-                    (unfiled.length > 0 ? (
-                      unfiled.map((page) => (
-                        <button
-                          key={page.url}
-                          type="button"
-                          onClick={() => {
-                            void setSiteFolder(page.url, folder.id);
-                            setAddingId(null);
-                          }}
-                          className={`text-text-secondary hover:text-text-main cursor-pointer text-left text-base font-light transition-colors ${styles.pageTitle} ${styles.pageTitleClamped}`}
-                        >
-                          {page.title}
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-text-secondary text-xs">No pages left to add</p>
-                    ))}
+                  <AddPageRow
+                    folderId={folder.id}
+                    folderName={folder.name}
+                    hasPages={members.length > 0}
+                    unfiled={unfiled}
+                  />
                 </div>
               )}
             </div>
