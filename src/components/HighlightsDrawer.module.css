@@ -520,3 +520,15 @@
     transition: none;
   }
 }
+
+/* Folders view: a page title firms up on hover to hint that clicking opens it in the list.
+   One step (light to normal), so it stays below an open folder's medium name. */
+.folderPageTitle {
+  transition: font-weight 100ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folderPageTitle {
+    transition: none;
+  }
+}
