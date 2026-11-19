@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
+import { TrashIcon } from '@/shared/TrashIcon';
+import { PlusIcon } from '@/shared/PlusIcon';
+import styles from './HighlightsDrawer.module.css';
 
 interface FolderListProps {
   pages: { url: string; title: string }[]; // every page that has highlights
 }
 
+const titleClass = `text-base font-light text-text-main ${styles.pageTitle} ${styles.pageTitleClamped}`;
+
 /**
- * The folders view (toolbar folder button): make a folder, open it to see its pages, take a page
- * out or put one in, delete it. A folder may be empty. Plain list for now.
+ * The folders view (toolbar folder button), laid out like the page list: a row per folder with
+ * the hover icons of a page header (minus on the right deletes it, plus on the left adds a
+ * page), and its pages indented below. A folder may be empty.
  */
 export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   const folders = useDrawerStore((s) => s.folders);
@@ -18,7 +24,8 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
 
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null); // folder showing its pages
+  const [addingId, setAddingId] = useState<string | null>(null); // folder showing the pages to add
 
   const finishCreate = (save: boolean) => {
     if (save && name.trim()) void createFolder(name);
@@ -29,8 +36,8 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   const unfiled = pages.filter((p) => !siteFolders[p.url]);
 
   return (
-    <div data-folder-list className="flex flex-col gap-2 px-[38px] py-4">
-      <div className="flex h-6 items-center justify-between">
+    <div data-folder-list className="px-[38px] py-2">
+      <div className="flex h-6 items-center justify-between pt-2">
         <span className="text-text-secondary text-xs">Folders</span>
         {creating ? (
           <input
@@ -59,63 +66,88 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
         )}
       </div>
 
-      {folders.map((folder) => {
+      {folders.map((folder, i) => {
         const members = pages.filter((p) => siteFolders[p.url] === folder.id);
         const isOpen = openId === folder.id;
+        const isAdding = addingId === folder.id;
         return (
-          <div key={folder.id} className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                aria-expanded={isOpen}
-                onClick={() => setOpenId(isOpen ? null : folder.id)}
-                className="text-text-main min-w-0 cursor-pointer truncate text-left text-sm"
+          <React.Fragment key={folder.id}>
+            {i > 0 && <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />}
+            <div className="py-4">
+              <div
+                data-folder-header
+                className={styles.pageHeader}
+                onClick={() => {
+                  setOpenId(isOpen ? null : folder.id);
+                  if (isOpen) setAddingId(null);
+                }}
               >
-                {folder.name}
-                <span className="text-text-secondary ml-2 text-xs">{members.length}</span>
-              </button>
-              <button
-                type="button"
-                aria-label={`Delete folder ${folder.name}`}
-                onClick={() => void deleteFolder(folder.id)}
-                className="text-text-secondary hover:text-text-main cursor-pointer text-xs transition-colors"
-              >
-                Delete
-              </button>
-            </div>
-            {isOpen && (
-              <div className="flex flex-col gap-1 pl-4">
-                {members.map((page) => (
-                  <div key={page.url} className="flex items-center justify-between gap-2">
-                    <span className="text-text-secondary min-w-0 truncate text-xs">{page.title}</span>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${page.title} from folder`}
-                      onClick={() => void setSiteFolder(page.url, null)}
-                      className="text-text-secondary hover:text-text-main cursor-pointer text-xs transition-colors"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                {unfiled.length > 0 && (
-                  <select
-                    aria-label={`Add a page to ${folder.name}`}
-                    value=""
-                    onChange={(e) => e.target.value && void setSiteFolder(e.target.value, folder.id)}
-                    className="bg-button text-text-main w-full cursor-pointer rounded-sm text-xs"
-                  >
-                    <option value="">Add page…</option>
-                    {unfiled.map((page) => (
-                      <option key={page.url} value={page.url}>
-                        {page.title}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                <button
+                  type="button"
+                  aria-label={`Add a page to ${folder.name}`}
+                  className={styles.pageEditIcon}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenId(folder.id);
+                    setAddingId(isAdding ? null : folder.id);
+                  }}
+                >
+                  <PlusIcon size={14} className="text-text-main" />
+                </button>
+                <p className={titleClass}>
+                  {folder.name}
+                  <span className="text-text-secondary ml-2 text-xs">{members.length}</span>
+                </p>
+                <button
+                  type="button"
+                  aria-label={`Delete folder ${folder.name}`}
+                  className={styles.pageTrashIcon}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void deleteFolder(folder.id);
+                  }}
+                >
+                  <TrashIcon size={14} />
+                </button>
               </div>
-            )}
-          </div>
+
+              {isOpen && (
+                <div className="flex flex-col gap-4 pl-4 pt-4">
+                  {members.map((page) => (
+                    <div key={page.url} className={styles.pageHeader}>
+                      <p className={titleClass}>{page.title}</p>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${page.title} from ${folder.name}`}
+                        className={styles.pageTrashIcon}
+                        onClick={() => void setSiteFolder(page.url, null)}
+                      >
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {isAdding &&
+                    (unfiled.length > 0 ? (
+                      unfiled.map((page) => (
+                        <button
+                          key={page.url}
+                          type="button"
+                          onClick={() => {
+                            void setSiteFolder(page.url, folder.id);
+                            setAddingId(null);
+                          }}
+                          className={`text-text-secondary hover:text-text-main cursor-pointer text-left text-base font-light transition-colors ${styles.pageTitle} ${styles.pageTitleClamped}`}
+                        >
+                          {page.title}
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-text-secondary text-xs">No pages left to add</p>
+                    ))}
+                </div>
+              )}
+            </div>
+          </React.Fragment>
         );
       })}
     </div>
