@@ -103,7 +103,9 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
         const isOpen = openId === folder.id;
         return (
           <React.Fragment key={folder.id}>
-            {i > 0 && <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />}
+            {i > 0 && openId !== folders[i - 1].id && (
+              <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
+            )}
             <div className="py-4">
               <div
                 data-folder-header
@@ -139,7 +141,7 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
                           className={styles.pageTrashIcon}
                           onClick={() => void setSiteFolder(page.url, null)}
                         >
-                          <TrashIcon size={14} />
+                          <TrashIcon size={14} tone="neutral" />
                         </button>
                       </div>
                     </div>
