@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { TrashIcon } from '@/shared/TrashIcon';
 import styles from './HighlightsDrawer.module.css';
@@ -58,6 +58,9 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [openId, setOpenId] = useState<string | null>(null); // folder showing its pages
+  const [pinned, setPinned] = useState(false); // open folder's header is scrolled under the island
+  const barRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef<HTMLDivElement>(null);
 
   const finishCreate = (save: boolean) => {
     if (save && name.trim()) void createFolder(name);
@@ -66,98 +69,127 @@ export const FolderList: React.FC<FolderListProps> = ({ pages }) => {
   };
 
   const unfiled = pages.filter((p) => !siteFolders[p.url]);
+  const openFolder = folders.find((f) => f.id === openId);
+
+  // The open folder's name replaces "Folders" while its header is hidden under the island but
+  // some of its pages are still in view.
+  const syncPinned = () => {
+    const bar = barRef.current;
+    const section = openRef.current;
+    const header = section?.querySelector('[data-folder-header]');
+    let next = false;
+    if (bar && section && header) {
+      const edge = bar.getBoundingClientRect().bottom;
+      next =
+        header.getBoundingClientRect().bottom <= edge &&
+        section.getBoundingClientRect().bottom > edge;
+    }
+    setPinned(next);
+  };
+  // After every render: opening, closing and page moves change the layout without a scroll event
+  useLayoutEffect(syncPinned);
 
   return (
-    <div data-folder-list className="px-[38px] py-2">
-      <div className="flex h-6 items-center justify-between pt-2">
-        <span className="text-text-secondary text-xs">Folders</span>
-        {creating ? (
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              // Keep typing keys away from the drawer (Escape closes it)
-              e.stopPropagation();
-              if (e.key === 'Enter') finishCreate(true);
-              else if (e.key === 'Escape') finishCreate(false);
-            }}
-            onBlur={() => finishCreate(true)}
-            aria-label="Folder name"
-            placeholder="Folder name"
-            className="bg-edge text-text-main w-[160px] rounded-sm px-2 text-xs outline-none"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="text-text-secondary hover:text-text-main cursor-pointer text-xs transition-colors"
-          >
-            New folder
-          </button>
-        )}
-      </div>
+    <div className={`${styles.scrollContainer} h-full`} onScroll={syncPinned}>
+      <div data-folder-list className="px-[38px] pb-2">
+        {/* Sticky island: "Folders" turns into the open folder's name once its header has scrolled away */}
+        <div
+          ref={barRef}
+          className={`${styles.folderLabel} justify-between gap-4 text-text-secondary text-xs`}
+        >
+          <span className="min-w-0 truncate">
+            {pinned && openFolder ? openFolder.name : 'Folders'}
+          </span>
+          {creating ? (
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                // Keep typing keys away from the drawer (Escape closes it)
+                e.stopPropagation();
+                if (e.key === 'Enter') finishCreate(true);
+                else if (e.key === 'Escape') finishCreate(false);
+              }}
+              onBlur={() => finishCreate(true)}
+              aria-label="Folder name"
+              placeholder="Folder name"
+              className="bg-edge text-text-main w-[160px] shrink-0 rounded-sm px-2 text-xs outline-none"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="text-text-secondary hover:text-text-main shrink-0 cursor-pointer text-xs transition-colors"
+            >
+              New folder
+            </button>
+          )}
+        </div>
 
-      {folders.map((folder, i) => {
-        const members = pages.filter((p) => siteFolders[p.url] === folder.id);
-        const isOpen = openId === folder.id;
-        return (
-          <React.Fragment key={folder.id}>
-            {i > 0 && openId !== folders[i - 1].id && (
-              <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
-            )}
-            <div className="py-4">
-              <div
-                data-folder-header
-                className={styles.pageHeader}
-                onClick={() => setOpenId(isOpen ? null : folder.id)}
-              >
-                <p className={titleClass}>
-                  {folder.name}
-                  <span className="text-text-secondary ml-2 inline-block -translate-y-[0.6px] text-xs">{members.length}</span>
-                </p>
-                <button
-                  type="button"
-                  aria-label={`Delete folder ${folder.name}`}
-                  className={styles.pageTrashIcon}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void deleteFolder(folder.id);
-                  }}
-                >
-                  <TrashIcon size={14} />
-                </button>
-              </div>
-
-              {isOpen && (
-                <div className="pl-4">
-                  {members.map((page) => (
-                    <div key={page.url} className="border-b border-divider py-4">
-                      <div className={styles.pageHeader}>
-                        <p className={titleClass}>{page.title}</p>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${page.title} from ${folder.name}`}
-                          className={styles.pageTrashIcon}
-                          onClick={() => void setSiteFolder(page.url, null)}
-                        >
-                          <TrashIcon size={14} tone="neutral" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  <AddPageRow
-                    folderId={folder.id}
-                    folderName={folder.name}
-                    hasPages={members.length > 0}
-                    unfiled={unfiled}
-                  />
-                </div>
+        {folders.map((folder, i) => {
+          const members = pages.filter((p) => siteFolders[p.url] === folder.id);
+          const isOpen = openId === folder.id;
+          return (
+            <React.Fragment key={folder.id}>
+              {i > 0 && openId !== folders[i - 1].id && (
+                <div className="border-t border-divider mx-auto" style={{ width: '300px' }} />
               )}
-            </div>
-          </React.Fragment>
-        );
-      })}
+              <div ref={isOpen ? openRef : undefined} className="py-4">
+                <div
+                  data-folder-header
+                  className={styles.pageHeader}
+                  onClick={() => setOpenId(isOpen ? null : folder.id)}
+                >
+                  <p className={titleClass}>
+                    {folder.name}
+                    <span className="text-text-secondary ml-2 inline-block -translate-y-[0.6px] text-xs">
+                      {members.length}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    aria-label={`Delete folder ${folder.name}`}
+                    className={styles.pageTrashIcon}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void deleteFolder(folder.id);
+                    }}
+                  >
+                    <TrashIcon size={14} />
+                  </button>
+                </div>
+
+                {isOpen && (
+                  <div className="pl-4">
+                    {members.map((page) => (
+                      <div key={page.url} className="border-b border-divider py-4">
+                        <div className={styles.pageHeader}>
+                          <p className={titleClass}>{page.title}</p>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${page.title} from ${folder.name}`}
+                            className={styles.pageTrashIcon}
+                            onClick={() => void setSiteFolder(page.url, null)}
+                          >
+                            <TrashIcon size={14} tone="neutral" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <AddPageRow
+                      folderId={folder.id}
+                      folderName={folder.name}
+                      hasPages={members.length > 0}
+                      unfiled={unfiled}
+                    />
+                  </div>
+                )}
+              </div>
+            </React.Fragment>
+          );
+        })}
+      </div>
     </div>
   );
 };

@@ -753,11 +753,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
           onKeyDown={handleKeyDown}
         >
           {settingsMode && <DrawerSettings />}
-          {foldersMode && (
-            <div className={`${styles.scrollContainer} h-full`}>
-              <FolderList pages={folderPages} />
-            </div>
-          )}
+          {foldersMode && <FolderList pages={folderPages} />}
             <div style={{ display: settingsMode || foldersMode ? 'none' : undefined }} className="h-full">
               {/* Single scroll container with expandable items */}
               <div ref={scrollContainerRef} className={`${styles.scrollContainer} h-full`}>
