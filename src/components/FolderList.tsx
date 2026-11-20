@@ -172,11 +172,7 @@ export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => 
                           className={`group ${styles.pageHeader}`}
                           onClick={() => onOpenPage(page.url)}
                         >
-                          <p
-                            className={`${titleClass} ${styles.folderPageTitle} group-hover:font-normal`}
-                          >
-                            {page.title}
-                          </p>
+                          <p className={`${titleClass} ${styles.folderPageTitle}`}>{page.title}</p>
                           <button
                             type="button"
                             aria-label={`Remove ${page.title} from ${folder.name}`}

@@ -522,9 +522,16 @@
 }
 
 /* Folders view: a page title firms up on hover to hint that clicking opens it in the list.
-   One step (light to normal), so it stays below an open folder's medium name. */
+   A text stroke thickens the glyphs without changing their advance widths (a heavier font
+   weight is wider), so the text never reflows or re-wraps on hover. Stays below an open
+   folder's medium-weight name. */
 .folderPageTitle {
-  transition: font-weight 100ms ease;
+  -webkit-text-stroke: 0 currentColor;
+  transition: -webkit-text-stroke-width 100ms ease;
+}
+
+:global(.group):hover .folderPageTitle {
+  -webkit-text-stroke-width: 0.35px;
 }
 
 @media (prefers-reduced-motion: reduce) {
