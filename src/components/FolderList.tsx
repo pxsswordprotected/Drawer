@@ -12,7 +12,7 @@ const titleClass = `text-base font-light text-text-main ${styles.pageTitle} ${st
 // An open folder reads like an expanded page group: medium weight, whole name
 const openTitleClass = `text-base font-medium text-text-main ${styles.pageTitle}`;
 
-/** Dropdown row ending an open folder, styled like the drawer's add-note row. */
+/** Dropdown row opening an open folder (always in view, never below the pages), styled like the drawer's add-note row. */
 const AddPageRow: React.FC<{
   folderId: string;
   folderName: string;
@@ -21,7 +21,7 @@ const AddPageRow: React.FC<{
 }> = ({ folderId, folderName, hasPages, unfiled }) => {
   const setSiteFolder = useDrawerStore((s) => s.setSiteFolder);
   return (
-    <div className="py-3 flex items-center">
+    <div className="border-b border-divider py-3 flex items-center">
       <select
         aria-label={`Add a page to ${folderName}`}
         value=""
@@ -165,6 +165,12 @@ export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => 
 
                 {isOpen && (
                   <>
+                    <AddPageRow
+                      folderId={folder.id}
+                      folderName={folder.name}
+                      hasPages={members.length > 0}
+                      unfiled={unfiled}
+                    />
                     {members.map((page) => (
                       <div key={page.url} className="border-b border-divider py-4">
                         <div
@@ -187,12 +193,6 @@ export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => 
                         </div>
                       </div>
                     ))}
-                    <AddPageRow
-                      folderId={folder.id}
-                      folderName={folder.name}
-                      hasPages={members.length > 0}
-                      unfiled={unfiled}
-                    />
                   </>
                 )}
               </div>
