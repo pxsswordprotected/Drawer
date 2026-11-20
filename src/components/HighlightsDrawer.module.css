@@ -539,3 +539,18 @@
     transition: none;
   }
 }
+
+/* Chevron on the folders view's add-page dropdown: flips up while the menu is open */
+.dropdownChevron {
+  transition: transform 100ms ease;
+}
+
+.dropdownChevronOpen {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdownChevron {
+    transition: none;
+  }
+}

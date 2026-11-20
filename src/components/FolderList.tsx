@@ -1,6 +1,7 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useDrawerStore } from '@/store/drawerStore';
 import { TrashIcon } from '@/shared/TrashIcon';
+import { ChevronDownIcon } from '@/shared/ChevronDownIcon';
 import styles from './HighlightsDrawer.module.css';
 
 interface FolderListProps {
@@ -12,7 +13,16 @@ const titleClass = `text-base font-light text-text-main ${styles.pageTitle} ${st
 // An open folder reads like an expanded page group: medium weight, whole name
 const openTitleClass = `text-base font-medium text-text-main ${styles.pageTitle}`;
 
-/** Dropdown row opening an open folder (always in view, never below the pages), styled like the drawer's add-note row. */
+const MENU_MAX_HEIGHT = 200;
+const MENU_MIN_HEIGHT = 96;
+const MENU_GAP = 8;
+const STICKY_BAR_HEIGHT = 40; // the pinned "Folders" bar (.folderLabel) covers the top of the list
+
+/**
+ * Row opening an open folder (always in view, never below the pages), styled like the drawer's
+ * add-note row. A custom dropdown of the pages in no folder: the native select's popup cannot be
+ * styled. The menu opens below the row, or above it when the list ends too close to fit.
+ */
 const AddPageRow: React.FC<{
   folderId: string;
   folderName: string;
@@ -20,28 +30,138 @@ const AddPageRow: React.FC<{
   unfiled: { url: string; title: string }[];
 }> = ({ folderId, folderName, hasPages, unfiled }) => {
   const setSiteFolder = useDrawerStore((s) => s.setSiteFolder);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0); // highlighted option; focus stays on the trigger
+  const [placement, setPlacement] = useState({ up: false, maxHeight: MENU_MAX_HEIGHT });
+  const rowRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  const listId = useId();
+  const disabled = unfiled.length === 0;
+
+  const openMenu = () => {
+    if (disabled) return;
+    const row = rowRef.current;
+    const scroller = row?.closest('[data-folder-list]')?.parentElement;
+    if (row && scroller) {
+      const r = row.getBoundingClientRect();
+      const s = scroller.getBoundingClientRect();
+      const below = s.bottom - r.bottom - MENU_GAP;
+      const above = r.top - s.top - STICKY_BAR_HEIGHT - MENU_GAP;
+      const up = below < MENU_MIN_HEIGHT && above > below;
+      const room = up ? above : below;
+      setPlacement({ up, maxHeight: Math.min(MENU_MAX_HEIGHT, Math.max(MENU_MIN_HEIGHT, room)) });
+    }
+    setActive(0);
+    setOpen(true);
+  };
+
+  const choose = (url: string) => {
+    setOpen(false);
+    void setSiteFolder(url, folderId);
+  };
+
+  // A press anywhere else in the drawer closes the menu
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!open || !row) return;
+    const root: EventTarget = row.getRootNode();
+    const closeOutside = (e: Event) => {
+      if (!e.composedPath().includes(row)) setOpen(false);
+    };
+    root.addEventListener('pointerdown', closeOutside);
+    return () => root.removeEventListener('pointerdown', closeOutside);
+  }, [open]);
+
+  // Keep the highlighted option inside the menu's scroll window
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    const item = menu?.children[active] as HTMLElement | undefined;
+    if (!open || !menu || !item) return;
+    const pad = 4;
+    if (item.offsetTop - pad < menu.scrollTop) menu.scrollTop = item.offsetTop - pad;
+    else if (item.offsetTop + item.offsetHeight + pad > menu.scrollTop + menu.clientHeight)
+      menu.scrollTop = item.offsetTop + item.offsetHeight + pad - menu.clientHeight;
+  }, [open, active]);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    // Escape closes the drawer, so only the open menu takes it; the drawer's handler also
+    // preventDefaults ArrowUp/Down, so every other key stays here
+    if (e.key === 'Escape' && !open) return;
+    e.stopPropagation();
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        openMenu();
+      }
+      return;
+    }
+    const last = unfiled.length - 1;
+    if (e.key === 'ArrowDown') setActive((i) => Math.min(i + 1, last));
+    else if (e.key === 'ArrowUp') setActive((i) => Math.max(i - 1, 0));
+    else if (e.key === 'Home') setActive(0);
+    else if (e.key === 'End') setActive(last);
+    else if (e.key === 'Enter' || e.key === ' ') {
+      const page = unfiled[active];
+      if (page) choose(page.url);
+    } else if (e.key === 'Escape' || e.key === 'Tab') {
+      setOpen(false);
+      return; // Tab still moves focus on
+    } else return;
+    e.preventDefault();
+  };
+
   return (
-    <div className="border-b border-divider py-3 flex items-center">
-      <select
+    <div
+      ref={rowRef}
+      onKeyDown={onKeyDown}
+      className="relative flex items-center border-b border-divider py-3"
+    >
+      <button
+        type="button"
+        role="combobox"
         aria-label={`Add a page to ${folderName}`}
-        value=""
-        disabled={unfiled.length === 0}
-        onChange={(e) => {
-          if (e.target.value) void setSiteFolder(e.target.value, folderId);
-        }}
-        // The drawer's key handler preventDefaults ArrowUp/Down, which would break the native select
-        onKeyDown={(e) => e.stopPropagation()}
-        className="-ml-1 w-[calc(100%+4px)] cursor-pointer bg-transparent text-sm text-text-secondary outline-none focus:text-text-main disabled:cursor-default [color-scheme:dark]"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        disabled={disabled}
+        onClick={() => (open ? setOpen(false) : openMenu())}
+        className={`flex w-full cursor-pointer items-center justify-between gap-2 text-left text-sm outline-none transition-colors hover:text-text-main focus-visible:text-text-main disabled:cursor-default disabled:hover:text-text-secondary ${open ? 'text-text-main' : 'text-text-secondary'}`}
       >
-        <option value="" disabled>
-          {hasPages ? 'Add page' : 'No pages yet'}
-        </option>
-        {unfiled.map((page) => (
-          <option key={page.url} value={page.url}>
-            {page.title}
-          </option>
-        ))}
-      </select>
+        <span className="truncate">{hasPages ? 'Add page' : 'No pages yet'}</span>
+        {!disabled && (
+          <ChevronDownIcon
+            size={16}
+            className={`shrink-0 ${styles.dropdownChevron} ${open ? styles.dropdownChevronOpen : ''}`}
+          />
+        )}
+      </button>
+      {open && (
+        <ul
+          ref={menuRef}
+          id={listId}
+          role="listbox"
+          aria-label={`Pages to add to ${folderName}`}
+          style={{ maxHeight: placement.maxHeight }}
+          className={`absolute left-0 right-0 z-10 overflow-y-auto rounded-lg bg-button p-1 shadow-bevel-raised ring-1 ring-edge [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${placement.up ? 'bottom-full mb-2' : 'top-full mt-2'}`}
+        >
+          {unfiled.map((page, i) => (
+            <li
+              key={page.url}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active}
+              title={page.title}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseMove={() => i !== active && setActive(i)}
+              onClick={() => choose(page.url)}
+              className={`cursor-pointer truncate rounded px-2 py-2 text-sm text-text-main ${i === active ? 'bg-button-hover' : ''}`}
+            >
+              {page.title}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };
