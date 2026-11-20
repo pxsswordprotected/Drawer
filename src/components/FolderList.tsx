@@ -16,7 +16,7 @@ const openTitleClass = `text-base font-medium text-text-main ${styles.pageTitle}
 const MENU_MAX_HEIGHT = 200;
 const MENU_MIN_HEIGHT = 96;
 const MENU_GAP = 8;
-const STICKY_BAR_HEIGHT = 40; // the pinned "Folders" bar (.folderLabel) covers the top of the list
+const STICKY_BAR_HEIGHT = 40; // the sticky top row (.folderLabel) covers the top of the list
 
 /**
  * Row opening an open folder (always in view, never below the pages), styled like the drawer's
@@ -167,9 +167,11 @@ const AddPageRow: React.FC<{
 };
 
 /**
- * The folders view (toolbar folder button), laid out like the page list: a row per folder with
- * the hover minus icon of a page header (deletes it), and its pages indented below, each with a
- * divider and followed by a dropdown row to add a page. A folder may be empty.
+ * The folders view (toolbar folder button), laid out like the page list: a sticky top row with
+ * the new-folder input (it turns into the open folder's name while you scroll through that
+ * folder), then a row per folder with the hover minus icon of a page header (deletes it). An open
+ * folder shows a dropdown row to add a page, then its pages, each with a divider. A folder may be
+ * empty.
  */
 export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => {
   const folders = useDrawerStore((s) => s.folders);
@@ -178,24 +180,23 @@ export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => 
   const deleteFolder = useDrawerStore((s) => s.deleteFolder);
   const setSiteFolder = useDrawerStore((s) => s.setSiteFolder);
 
-  const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [openId, setOpenId] = useState<string | null>(null); // folder showing its pages
-  const [pinned, setPinned] = useState(false); // open folder's header is scrolled under the island
+  const [pinned, setPinned] = useState(false); // open folder's header is scrolled under the top row
   const barRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<HTMLDivElement>(null);
 
-  const finishCreate = (save: boolean) => {
-    if (save && name.trim()) void createFolder(name);
-    setCreating(false);
+  const submit = () => {
+    if (!name.trim()) return;
+    void createFolder(name);
     setName('');
   };
 
   const unfiled = pages.filter((p) => !siteFolders[p.url]);
   const openFolder = folders.find((f) => f.id === openId);
 
-  // The open folder's name replaces "Folders" while its header is hidden under the island but
-  // some of its pages are still in view.
+  // The row shows the open folder's name while that folder's header is hidden under it but some
+  // of the folder's pages are still in view.
   const syncPinned = () => {
     const bar = barRef.current;
     const section = openRef.current;
@@ -215,38 +216,28 @@ export const FolderList: React.FC<FolderListProps> = ({ pages, onOpenPage }) => 
   return (
     <div className={`${styles.scrollContainer} h-full`} onScroll={syncPinned}>
       <div data-folder-list className="px-[38px] pb-2">
-        {/* Sticky island: "Folders" turns into the open folder's name once its header has scrolled away */}
-        <div
-          ref={barRef}
-          className={`${styles.folderLabel} justify-between gap-4 text-text-secondary text-xs`}
-        >
-          <span className="min-w-0 truncate">
-            {pinned && openFolder ? openFolder.name : 'Folders'}
-          </span>
-          {creating ? (
+        {/* Sticky top-left row. Normally the new-folder input, styled like the drawer's note input:
+            Enter adds the folder and the field stays put for the next one. While you scroll
+            through an open folder (its header out of view) it shows that folder's name instead. */}
+        <div ref={barRef} className={styles.folderLabel}>
+          {pinned && openFolder ? (
+            <span className="min-w-0 truncate text-sm text-text-secondary">{openFolder.name}</span>
+          ) : (
             <input
-              autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
-                // Keep typing keys away from the drawer (Escape closes it)
+                // Escape closes the drawer, so only a draft takes it (clearing it); every other
+                // key stays out of the drawer's handlers
+                if (e.key === 'Escape' && !name) return;
                 e.stopPropagation();
-                if (e.key === 'Enter') finishCreate(true);
-                else if (e.key === 'Escape') finishCreate(false);
+                if (e.key === 'Enter') submit();
+                else if (e.key === 'Escape') setName('');
               }}
-              onBlur={() => finishCreate(true)}
-              aria-label="Folder name"
-              placeholder="Folder name"
-              className="bg-edge text-text-main w-[160px] shrink-0 rounded-sm px-2 py-0.5 text-xs outline-none"
+              aria-label="New folder"
+              placeholder="New folder"
+              className={`w-full bg-transparent text-sm outline-none placeholder:text-text-secondary focus:text-text-main ${name ? 'text-text-main' : 'text-text-secondary'}`}
             />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="text-text-secondary hover:text-text-main shrink-0 cursor-pointer text-xs transition-colors"
-            >
-              New folder
-            </button>
           )}
         </div>
 

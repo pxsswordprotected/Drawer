@@ -1046,7 +1046,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                               <div
                                 role="button"
                                 aria-expanded={!isSectionCollapsed}
-                                className={`${styles.folderLabel} text-text-secondary hover:text-text-main cursor-pointer text-xs transition-colors`}
+                                className={`${styles.folderLabel} text-text-secondary hover:text-text-main cursor-pointer text-sm transition-colors`}
                                 onClick={() => toggleSectionCollapsed(folderId)}
                               >
                                 <ChevronDownIcon
@@ -1057,7 +1057,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
                               </div>
                             ) : (
                               label !== null && (
-                                <div className={`${styles.folderLabel} text-text-secondary text-xs`}>
+                                <div className={`${styles.folderLabel} text-text-secondary text-sm`}>
                                   {label}
                                 </div>
                               )
