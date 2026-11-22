@@ -84,7 +84,10 @@ export const PageTitle: React.FC<PageTitleProps> = ({ url, title, isCollapsed, e
           onClick={(e) => e.stopPropagation()}
           aria-label="Page title"
           rows={1}
-          className={`relative block w-full resize-none rounded-sm bg-edge text-base text-text-main ring-4 ring-edge outline-none ${weight}`}
+          // overflow-hidden: the height is fitted to the text, so a scrollbar is never needed, and
+          // a classic one appearing while it is measured would narrow the text, wrap it onto an
+          // extra line and leave an empty last line behind
+          className={`relative block w-full resize-none overflow-hidden rounded-sm bg-edge text-base text-text-main ring-4 ring-edge outline-none ${weight}`}
         />
       ) : (
         <p
