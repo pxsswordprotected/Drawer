@@ -651,6 +651,23 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
   const lastPendingIdRef = useRef<string | null>(null);
   const pendingScrollInstantRef = useRef(false);
 
+  // A mark click on a page inside a collapsed folder reopens that folder first: its rows are not
+  // rendered while it is folded. This does not rely on the page's group changing, because the
+  // clicked page is usually already the expanded one. The scroll effect below reruns once the
+  // section is open (it depends on collapsedSections), when the rows exist to scroll to.
+  useLayoutEffect(() => {
+    if (!pendingScrollHighlightId) return;
+    const url = allHighlights.find((h) => h.id === pendingScrollHighlightId)?.url;
+    const folderId = pageGroups.find((g) => g.url === url)?.folderId;
+    if (!folderId) return;
+    setCollapsedSections((prev) => {
+      if (!prev.has(folderId)) return prev;
+      const next = new Set(prev);
+      next.delete(folderId);
+      return next;
+    });
+  }, [pendingScrollHighlightId, allHighlights, pageGroups]);
+
   useLayoutEffect(() => {
     if (pendingScrollHighlightId !== lastPendingIdRef.current) {
       lastPendingIdRef.current = pendingScrollHighlightId;
@@ -688,7 +705,7 @@ export const HighlightsDrawer = React.memo(function HighlightsDrawer() {
     }, 50);
 
     return () => clearTimeout(timeoutId);
-  }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, isVisible, scrollTo]);
+  }, [pendingScrollHighlightId, isLoading, highlightGlobalIndices, isVisible, scrollTo, collapsedSections]);
 
   // Put the current page's group at the list's top edge each time the drawer opens, instead of
   // keeping wherever the list was last scrolled. Runs before the first painted frame, and only
