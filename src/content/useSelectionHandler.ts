@@ -4,7 +4,7 @@ import { Highlight } from '@/shared/types';
 import { debugLog, describeRangeEnds, errorInfo, excerpt, snippetOf } from '@/shared/debugLog';
 import { useDrawerStore } from '@/store/drawerStore';
 import { applyHighlightToRange, trackHighlight } from './pageHighlighter';
-import { describeRange, trimRangeToText } from './anchoring';
+import { describeRange, domTextOf, trimRangeToText } from './anchoring';
 import { pageUrl } from '@/shared/pageUrl';
 
 interface SelectionState {
@@ -162,7 +162,9 @@ export function useSelectionHandler() {
 
     const highlight: Highlight = {
       id: crypto.randomUUID(),
-      text: selectionState.selectedText,
+      // The page's own text, not the browser's rendered selection text: they differ under
+      // text-transform and hidden text, and restoring a highlight matches against the DOM
+      text: (range && domTextOf(range, document.body)) || selectionState.selectedText,
       url: pageUrl(),
       pageTitle: document.title,
       notes: [],

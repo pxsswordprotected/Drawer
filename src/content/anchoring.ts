@@ -97,6 +97,31 @@ function rangeText(r: Range, nodes: Text[]): string {
   return out;
 }
 
+/**
+ * The text of `range` as it is in the page's DOM, with a newline where it crosses from one block
+ * to another (the way the browser's selection text separates paragraphs and list items).
+ * This is what a highlight must save: the browser's selection text is the *rendered* text, which
+ * differs from the DOM for text-transform (upper/lower/capitalize) and leaves out hidden
+ * (display:none / visibility:hidden) text, and the matcher compares against the DOM.
+ */
+export function domTextOf(range: Range, root: Node): string {
+  let out = '';
+  let prevBlock: Element | null = null;
+  let first = true;
+  for (const n of textNodes(root)) {
+    if (!range.intersectsNode(n)) continue;
+    const s = n === range.startContainer ? range.startOffset : 0;
+    const e = n === range.endContainer ? range.endOffset : n.length;
+    if (e <= s) continue;
+    const block = blockElement(n, root);
+    if (!first && block !== prevBlock) out += '\n';
+    out += n.data.slice(s, e);
+    prevBlock = block;
+    first = false;
+  }
+  return out.trim();
+}
+
 const BLOCK_TAGS: Record<string, true> = {
   P: true, LI: true, TD: true, TH: true, DT: true, DD: true, BLOCKQUOTE: true, PRE: true,
   H1: true, H2: true, H3: true, H4: true, H5: true, H6: true, FIGCAPTION: true, CAPTION: true,

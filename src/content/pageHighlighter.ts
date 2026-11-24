@@ -239,6 +239,9 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
 
   mark.addEventListener('click', (e) => {
     e.stopPropagation();
+    // A mark inside a link must not follow it: the click opens the highlight. Covers the click
+    // that ends a hold-to-delete too (the mark is gone, the page must not navigate).
+    e.preventDefault();
 
     if (__DRAWER_DEBUG__) {
       const store = useDrawerStore.getState();
