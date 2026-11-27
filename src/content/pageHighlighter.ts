@@ -35,16 +35,36 @@ const HOLD_DELETE_MS = 900; // total press length that deletes
 // Unfocused marks fade their colour while another highlight is focused (see initMarkDimming)
 const DIM_VAR = '--drawer-mark-dim';
 const DIM_LEVEL = 0.4; // colour factor for unfocused marks (text keeps full contrast)
-const GROW_TRANSITION = 'background-size 0.8s cubic-bezier(0.25, 1, 0.5, 1)';
+// Each line's own strength, a small ± around 1 (see markCss); separate from the focus dimming
+const TONE_VAR = '--drawer-mark-tone';
+
+// Per-line strokes (see "Per-line strokes" below)
+const WOBBLE_PX = 1.2; // each line's paint sits up to this far above or below centre
+const OVERSHOOT_SPREAD_EM = 0.12; // a line's ends reach up to this much past the base 0.34em / 0.16em
+const THICKNESS_SPREAD = 0.15; // each line's height varies by up to this share
+const TONE_SPREAD = 0.15; // each line's strength varies by up to this share
+const GROW_MS = 450; // one line drawing in
+const EXIT_MS = 180; // every line leaving at once
+// The last line starts this long after the first when a highlight has two lines; each extra line adds
+// STAGGER_GROWTH_MS to that span, up to STAGGER_CAP_MS (see staggerStep)
+const STAGGER_PAIR_MS = 100;
+const STAGGER_GROWTH_MS = 30;
+const STAGGER_CAP_MS = 600;
+const RELAYOUT_DEBOUNCE_MS = 150;
+const EASE = 'cubic-bezier(0.25, 1, 0.5, 1)';
+const GROW_TRANSITION = `background-size ${GROW_MS}ms ${EASE}`;
+const EXIT_TRANSITION = `background-size ${EXIT_MS}ms ${EASE}`;
 const DIM_TRANSITION = `${DIM_VAR} 150ms cubic-bezier(0.19, 1, 0.22, 1)`; // same duration and easing as the drawer's exit animation
 // Each mark carries its colour in a variable so a recolor is a one-property change that fades
 const COLOR_VAR = '--drawer-mark-color';
 const COLOR_TRANSITION = `${COLOR_VAR} 150ms cubic-bezier(0.19, 1, 0.22, 1)`;
 const MARK_TRANSITION = `${GROW_TRANSITION}, ${DIM_TRANSITION}, ${COLOR_TRANSITION}`;
+const EXIT_MARK_TRANSITION = `${EXIT_TRANSITION}, ${DIM_TRANSITION}, ${COLOR_TRANSITION}`;
+const MARK_SELECTOR = 'mark[data-highlight-id]';
 
-/** The mark's colour at `alpha`% opacity, scaled by the dim factor (1 normally, lower on unfocused marks) */
+/** The mark's colour at `alpha`% opacity, scaled by the focus dimming and the line's own strength */
 const tint = (alpha: number) =>
-  `color-mix(in srgb, var(${COLOR_VAR}) calc(${alpha}% * var(${DIM_VAR}, 1)), transparent)`;
+  `color-mix(in srgb, var(${COLOR_VAR}) calc(${alpha}% * var(${DIM_VAR}, 1) * var(${TONE_VAR}, 1)), transparent)`;
 
 /**
  * Attaches pointer and click handlers directly to a <mark> element.
@@ -66,9 +86,6 @@ function attachMarkClickHandler(mark: HTMLElement, highlightId: string): void {
   let isSelectionLocked = false;
   let originalUserSelect = '';
   let originalWebkitUserSelect = '';
-
-  mark.style.setProperty('background-position', 'left center', 'important');
-  mark.style.setProperty('background-repeat', 'no-repeat', 'important');
 
   const preventSelect = (e: Event) => {
     if (isSelectionLocked) e.preventDefault();
@@ -436,29 +453,58 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     chunks.push(currentChunk);
   }
 
-  // Pre-calculations for styles
-  const rand = mulberry32(hashSeed(highlightId));
+  // 3. Wrap each chunk in a <mark>. layoutHighlight cuts them into one mark per wrapped line and
+  // gives them their look.
+  for (const chunk of chunks) {
+    const mark = document.createElement('mark');
+    mark.setAttribute('data-highlight-id', highlightId);
+    mark.style.setProperty(COLOR_VAR, color);
+    chunk[0].parentNode!.insertBefore(mark, chunk[0]);
+    chunk.forEach((node) => mark.appendChild(node));
+  }
+  layoutHighlight(highlightId, true);
+  return skippedWhitespaceNodes;
+}
+
+// ─── Per-line strokes ───
+//
+// A highlight is drawn as one <mark> per wrapped line, like a highlighter lifted between lines: each
+// line gets its own small variation (reach past the text at its ends, height, wobble, strength) and
+// the lines draw in one after another. The variation is seeded from where a mark's text starts inside
+// the highlight, not from its line number, so a re-wrap leaves unchanged lines looking the same.
+// Padding only ever grows past the old 0.34em / 0.16em, so click targets never get smaller.
+
+interface MarkLook {
+  id: string;
+  offset: number; // characters of the highlight before this mark
+  lineOffset: number; // same, for the first mark on this mark's line (vertical look is shared per line)
+  totalLen: number; // characters in the whole highlight
+  startsLine: boolean; // the mark begins a visual line: it gets the rounded, padded start
+  endsLine: boolean; // ...or ends one: the rounded, padded end (marks inside a line meet flat)
+  rtl: boolean;
+}
+
+/** The mark's whole inline style. `size` is its background-size, `transition` the full transition list. */
+function markCss(look: MarkLook, color: string, size: string, transition: string): string {
+  const rand = mulberry32(hashSeed(`${look.id}@${look.offset}`));
   const angle1 = clamp(173 + rand() * 4, 173, 177).toFixed(1);
   const angle2 = clamp(81 + rand() * 5, 81, 86).toFixed(1);
-
-  const isRTL =
-    getComputedStyle(range.commonAncestorContainer.parentElement ?? document.body).direction ===
-    'rtl';
-
   const leadRaw = clamp(25 + (rand() * 6 - 3), 22, 28);
   const trailRaw = clamp(40 + (rand() * 6 - 3), 37, 43);
-  const startOpacity = isRTL ? trailRaw : leadRaw;
-  const endOpacity = isRTL ? leadRaw : trailRaw;
+  const startOpacity = look.rtl ? trailRaw : leadRaw;
+  const endOpacity = look.rtl ? leadRaw : trailRaw;
 
-  const totalLen = range.toString().length;
-  const lengthFactor = totalLen < 15 ? 1.08 : totalLen > 80 ? 0.93 : 1.0;
-  const thicknessBias = clamp(0.96 + rand() * 0.08, 0.96, 1.04);
-  const finalThickness = clamp(lengthFactor * thicknessBias, 0.92, 1.1);
+  // One line's height, wobble and strength, shared by every mark on that line so they meet cleanly
+  const lineRand = mulberry32(hashSeed(`${look.id}@${look.lineOffset}#line`));
+  const lengthFactor = look.totalLen < 15 ? 1.08 : look.totalLen > 80 ? 0.93 : 1.0;
+  const thicknessBias = clamp(0.96 + lineRand() * 0.08, 0.96, 1.04);
+  const spread = (amount: number) => 1 + (lineRand() - 0.5) * 2 * amount;
+  const finalThickness = clamp(lengthFactor * thicknessBias, 0.92, 1.1) * spread(THICKNESS_SPREAD);
+  const wobble = (lineRand() - 0.5) * 2 * WOBBLE_PX;
+  const tone = spread(TONE_SPREAD);
 
-  const padTop = (0.27 * finalThickness).toFixed(2);
-  const padBot = (0.03 * finalThickness).toFixed(2);
-  const margTop = (-0.27 * finalThickness).toFixed(2);
-  const margBot = (-0.03 * finalThickness).toFixed(2);
+  const padTop = (0.27 * finalThickness).toFixed(3);
+  const padBot = (0.03 * finalThickness).toFixed(3);
 
   const rLeft = clamp(0.1 + (rand() * 0.12 - 0.06), 0.04, 0.58);
   const rRight = clamp(0.5 + (rand() * 0.12 - 0.06), 0.04, 0.58);
@@ -473,86 +519,259 @@ export function applyHighlightToRange(range: Range, highlightId: string, color: 
     clamp(0.4 + rWobble, 0.04, 0.58).toFixed(2),
     clamp(0.15 + rWobble, 0.04, 0.58).toFixed(2),
   ];
+  const midDrift1 = clamp(rand() * 4 - 2, -2, 2);
+  const midDrift2 = clamp(rand() * 4 - 2, -2, 2);
+  const mid1 = clamp(88 + midDrift1, 86, 92).toFixed(0);
+  const mid2 = clamp(72 + midDrift2, 70, 76).toFixed(0);
 
-  const shadowBlur = clamp(1.5 + rand() * 1, 1.5, 2.5).toFixed(1);
-  const sharedGradient1 = `linear-gradient(${angle1}deg, transparent 20%, ${tint(15)} 50%, transparent 80%)`;
-  const sharedShadow = `inset 0 -1px ${shadowBlur}px ${tint(10)}`;
+  // How far the stroke reaches past the text at each end: the line's own luck, per end
+  const endRand = mulberry32(hashSeed(`${look.id}@${look.offset}#ends`));
+  const applyLeftEdge = look.rtl ? look.endsLine : look.startsLine;
+  const applyRightEdge = look.rtl ? look.startsLine : look.endsLine;
+  const pLeft = applyLeftEdge ? (0.34 + endRand() * OVERSHOOT_SPREAD_EM).toFixed(3) : '0';
+  const pRight = applyRightEdge ? (0.16 + endRand() * OVERSHOOT_SPREAD_EM).toFixed(3) : '0';
 
-  // 3. Process grouped chunks (in reverse to safely modify DOM)
-  for (let i = chunks.length - 1; i >= 0; i--) {
-    const chunk = chunks[i];
+  const radius = `${applyLeftEdge ? br[0] : '0'}em ${applyRightEdge ? br[1] : '0'}em ${applyRightEdge ? br[2] : '0'}em ${applyLeftEdge ? br[3] : '0'}em / ${applyLeftEdge ? br[4] : '0'}em ${applyRightEdge ? br[5] : '0'}em ${applyRightEdge ? br[6] : '0'}em ${applyLeftEdge ? br[7] : '0'}em`;
+  const gradient1 = `linear-gradient(${angle1}deg, transparent 20%, ${tint(15)} 50%, transparent 80%)`;
+  const gradient2 = `linear-gradient(${angle2}deg, ${tint(100 - Number(startOpacity.toFixed(0)))}, ${tint(100 - Number(mid1))} 4%, ${tint(100 - Number(mid2))} 96%, ${tint(100 - Number(endOpacity.toFixed(0)))})`;
+  // The soft lift along the bottom edge is part of the drawn paint (not a box-shadow), so it grows and
+  // shrinks with the stroke instead of showing as an empty outline before the line is drawn
+  const lift = `linear-gradient(to top, ${tint(10)}, transparent 3px)`;
+  const position = `left calc(50% + ${wobble.toFixed(2)}px)`; // the offset moves only the paint, never the text
 
-    const isFirstChunk = i === 0;
-    const isLastChunk = i === chunks.length - 1;
-
-    // Apply flat "puzzle piece" edges only if the chunks are separated by HTML elements
-    const applyLeftEdge = isRTL ? isLastChunk : isFirstChunk;
-    const applyRightEdge = isRTL ? isFirstChunk : isLastChunk;
-
-    const pLeft = applyLeftEdge ? '0.34em' : '0em';
-    const pRight = applyRightEdge ? '0.16em' : '0em';
-    const mLeft = applyLeftEdge ? '-0.34em' : '0em';
-    const mRight = applyRightEdge ? '-0.16em' : '0em';
-
-    const fragPadding = `${padTop}em ${pRight} ${padBot}em ${pLeft}`;
-    const fragMargin = `${margTop}em ${mRight} ${margBot}em ${mLeft}`;
-
-    const brTL = applyLeftEdge ? br[0] : '0';
-    const brTR = applyRightEdge ? br[1] : '0';
-    const brBR = applyRightEdge ? br[2] : '0';
-    const brBL = applyLeftEdge ? br[3] : '0';
-    const brTLV = applyLeftEdge ? br[4] : '0';
-    const brTRV = applyRightEdge ? br[5] : '0';
-    const brBRV = applyRightEdge ? br[6] : '0';
-    const brBLV = applyLeftEdge ? br[7] : '0';
-
-    const fragBorderRadius = `${brTL}em ${brTR}em ${brBR}em ${brBL}em / ${brTLV}em ${brTRV}em ${brBRV}em ${brBLV}em`;
-
-    const bgOffsetX = clamp(rand() * 4 - 2, -2, 2).toFixed(1);
-    const midDrift1 = clamp(rand() * 4 - 2, -2, 2);
-    const midDrift2 = clamp(rand() * 4 - 2, -2, 2);
-    const fragMid1 = clamp(88 + midDrift1, 86, 92).toFixed(0);
-    const fragMid2 = clamp(72 + midDrift2, 70, 76).toFixed(0);
-
-    const gradient2 = `linear-gradient(${angle2}deg, ${tint(100 - Number(startOpacity.toFixed(0)))}, ${tint(100 - Number(fragMid1))} 4%, ${tint(100 - Number(fragMid2))} 96%, ${tint(100 - Number(endOpacity.toFixed(0)))})`;
-
-    const mark = document.createElement('mark');
-    mark.setAttribute('data-highlight-id', highlightId);
-    mark.style.cssText = `
+  return `
        ${COLOR_VAR}: ${color};
+       ${TONE_VAR}: ${tone.toFixed(3)};
        background-color: transparent !important;
-       background-image: ${sharedGradient1}, ${gradient2} !important;
-       border-radius: ${fragBorderRadius} !important;
-       margin: ${fragMargin} !important;
-       padding: ${fragPadding} !important;
-       box-shadow: ${sharedShadow} !important;
+       background-image: ${gradient1}, ${gradient2}, ${lift} !important;
+       border-radius: ${radius} !important;
+       margin: -${padTop}em -${pRight}em -${padBot}em -${pLeft}em !important;
+       padding: ${padTop}em ${pRight}em ${padBot}em ${pLeft}em !important;
+       box-shadow: none !important;
        -webkit-box-decoration-break: clone !important;
        box-decoration-break: clone !important;
        color: inherit !important;
        cursor: pointer !important;
        display: inline !important;
-       background-position: ${bgOffsetX}px center !important;
+       background-position: ${position}, ${position}, ${position} !important;
        background-repeat: no-repeat !important;
-       background-size: 0% 100% !important;
-       transition: ${MARK_TRANSITION} !important;
+       background-size: ${size} !important;
+       transition: ${transition} !important;
      `;
+}
 
-    // Wrap the entire chunk in a single <mark>
-    const firstNode = chunk[0];
-    firstNode.parentNode!.insertBefore(mark, firstNode);
+const LINE_TOLERANCE = 0.5; // boxes sharing more than this share of the shorter one's height are on one line
+const sameLine = (a: DOMRect, b: DOMRect) =>
+  Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) >
+  LINE_TOLERANCE * Math.min(a.height, b.height);
+const visibleBoxes = (el: Element | Range) =>
+  Array.from(el.getClientRects()).filter((r) => r.height > 0);
 
-    chunk.forEach((node) => mark.appendChild(node));
+/** Top of the first box at or after `from` (characters collapsed to no box are skipped), or null */
+function textTop(node: Text, from: number, range: Range): number | null {
+  for (let k = from; k < node.length; k++) {
+    range.setStart(node, k);
+    range.setEnd(node, k + 1);
+    const box = visibleBoxes(range)[0];
+    if (box) return box.top;
+  }
+  return null;
+}
 
-    // Compute the 0% start style now, then grow to 100% so the transition always runs.
+/** Offsets in `node` where a new visual line starts (each at the line's first visible character). */
+function lineStarts(node: Text, range: Range): number[] {
+  range.selectNodeContents(node);
+  if (visibleBoxes(range).length <= 1) return [];
+  let top = textTop(node, 0, range);
+  if (top === null) return [];
+  const starts: number[] = [];
+  let from = 0;
+  for (;;) {
+    // Tops never decrease along the text, so the first character below this line is found by bisection
+    let lo = from + 1;
+    let hi = node.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      const t = textTop(node, mid, range);
+      if (t !== null && t > top + 4) hi = mid;
+      else lo = mid + 1;
+    }
+    let at = lo;
+    while (at < node.length && /\s/.test(node.data[at])) at++;
+    if (at >= node.length) break;
+    starts.push(at);
+    top = textTop(node, at, range) ?? top;
+    from = at;
+  }
+  return starts;
+}
+
+/** Cuts a mark (text nodes only) into one mark per visual line; returns them in order. */
+function splitIntoLines(mark: HTMLElement, id: string, range: Range): HTMLElement[] {
+  const kids = Array.from(mark.childNodes);
+  if (kids.length === 0 || !kids.every((n) => n.nodeType === Node.TEXT_NODE)) return [mark];
+  const parent = mark.parentElement;
+  if (parent && getComputedStyle(parent).writingMode !== 'horizontal-tb') return [mark];
+
+  const pieces: Text[] = [];
+  for (const node of kids as Text[]) {
+    const tails: Text[] = [];
+    const cuts = lineStarts(node, range);
+    for (let i = cuts.length - 1; i >= 0; i--) tails.unshift(node.splitText(cuts[i]));
+    pieces.push(node, ...tails);
+  }
+
+  const groups: Text[][] = [];
+  let previous: DOMRect | null = null;
+  for (const piece of pieces) {
+    range.selectNodeContents(piece);
+    const box = visibleBoxes(range)[0] ?? null;
+    if (groups.length === 0 || (box && previous && !sameLine(previous, box))) groups.push([piece]);
+    else groups[groups.length - 1].push(piece);
+    if (box) previous = box;
+  }
+
+  const marks = [mark];
+  for (let g = 1; g < groups.length; g++) {
+    const next = document.createElement('mark');
+    next.setAttribute('data-highlight-id', id);
+    marks[g - 1].after(next);
+    next.append(...groups[g]);
+    marks.push(next);
+  }
+  return marks;
+}
+
+interface MarkLines {
+  startsLine: boolean[];
+  endsLine: boolean[];
+  wrapped: boolean; // some mark is still broken over several lines (the page reflowed)
+}
+
+function measureLines(marks: HTMLElement[]): MarkLines {
+  const boxes = marks.map((m) => visibleBoxes(m)[0] ?? null);
+  const joined = (i: number) => {
+    const a = boxes[i];
+    const b = boxes[i + 1];
+    return !!a && !!b && sameLine(a, b);
+  };
+  return {
+    startsLine: marks.map((_, i) => i === 0 || !joined(i - 1)),
+    endsLine: marks.map((_, i) => i === marks.length - 1 || !joined(i)),
+    wrapped: marks.some((m) => visibleBoxes(m).length > 1),
+  };
+}
+
+const lineFlags = (m: MarkLines) => m.startsLine.map((s) => (s ? '1' : '0')).join('');
+const laidOut = new Map<string, string>(); // highlight id -> line structure it was last drawn for
+const handled = new WeakSet<HTMLElement>(); // marks that already have their press handlers
+
+/**
+ * Delay between one line starting and the next, from how many lines the highlight has. Few lines get a
+ * wide gap so the staggering can be seen (two lines: STAGGER_PAIR_MS); the total span grows with every
+ * extra line, so a long highlight gets a tight gap and still finishes drawing quickly (capped).
+ */
+function staggerStep(lineCount: number): number {
+  if (lineCount < 2) return 0; // a single line just draws
+  const span = Math.min(STAGGER_CAP_MS, STAGGER_PAIR_MS + STAGGER_GROWTH_MS * (lineCount - 2));
+  return span / (lineCount - 1);
+}
+
+/**
+ * (Re)draws a highlight: joins its marks back into whole chunks, cuts them at the current line
+ * breaks, and styles every piece. `animate` draws the lines in one after another (a new or restored
+ * highlight); a re-layout after the page reflowed just swaps the shapes in place.
+ */
+function layoutHighlight(id: string, animate: boolean): void {
+  const found = Array.from(
+    document.querySelectorAll<HTMLElement>(`mark[data-highlight-id="${id}"]`)
+  );
+  if (found.length === 0) return;
+  const color = found[0].style.getPropertyValue(COLOR_VAR);
+  const range = document.createRange();
+
+  const chunks: HTMLElement[] = [];
+  for (const mark of found) {
+    const previous = chunks[chunks.length - 1];
+    // Adjacent sibling marks of one highlight are pieces of the same chunk
+    if (previous && mark.previousSibling === previous) {
+      while (mark.firstChild) previous.appendChild(mark.firstChild);
+      mark.remove();
+    } else {
+      chunks.push(mark);
+    }
+  }
+  const marks = chunks.flatMap((chunk) => splitIntoLines(chunk, id, range));
+  const lines = measureLines(marks);
+
+  let offset = 0;
+  let lineOffset = 0;
+  let line = -1;
+  const placed = marks.map((mark, i) => {
+    if (lines.startsLine[i]) {
+      lineOffset = offset;
+      line++;
+    }
+    const at = { offset, lineOffset, line };
+    offset += mark.textContent?.length ?? 0;
+    return at;
+  });
+  const lineCount = line + 1;
+  const step = staggerStep(lineCount);
+
+  marks.forEach((mark, i) => {
+    const look: MarkLook = {
+      id,
+      ...placed[i],
+      totalLen: offset,
+      startsLine: lines.startsLine[i],
+      endsLine: lines.endsLine[i],
+      rtl: getComputedStyle(mark.parentElement ?? document.body).direction === 'rtl',
+    };
+    const delay = Math.round(placed[i].line * step);
+    const transition = animate
+      ? `background-size ${GROW_MS}ms ${EASE} ${delay}ms, ${DIM_TRANSITION}, ${COLOR_TRANSITION}`
+      : MARK_TRANSITION;
+    mark.style.cssText = markCss(look, color, animate ? '0% 100%' : '100% 100%', transition);
+  });
+
+  if (animate) {
+    // Commit the 0% start style now, then grow to 100% so the transition always runs.
     // A requestAnimationFrame alone races: its callback runs before the browser has ever
     // computed this new element's style, so 0% -> 100% often collapsed to "no change" and
     // the mark appeared without animating (always, when restored from a timer).
-    void getComputedStyle(mark).backgroundSize;
-    mark.style.backgroundSize = '100% 100%';
-
-    attachMarkClickHandler(mark, highlightId);
+    void marks[0].offsetWidth;
+    for (const mark of marks) mark.style.setProperty('background-size', '100% 100%', 'important');
   }
-  return skippedWhitespaceNodes;
+  for (const mark of marks) {
+    if (handled.has(mark)) continue;
+    handled.add(mark);
+    attachMarkClickHandler(mark, id);
+  }
+  laidOut.set(id, lineFlags(measureLines(marks)));
+}
+
+/** True when the page reflowed since the highlight was drawn: a mark wraps, or lines joined or split. */
+function needsLayout(id: string): boolean {
+  const marks = Array.from(
+    document.querySelectorAll<HTMLElement>(`mark[data-highlight-id="${id}"]`)
+  );
+  const lines = measureLines(marks);
+  return lines.wrapped || lineFlags(lines) !== laidOut.get(id);
+}
+
+let relayoutTimer: ReturnType<typeof setTimeout> | undefined;
+/** Redraws highlights whose lines changed (window resize, late fonts or images, a hidden tab shown). */
+function scheduleRelayout(): void {
+  clearTimeout(relayoutTimer);
+  relayoutTimer = setTimeout(() => {
+    if (document.hidden) return;
+    const ids = new Set<string>();
+    document
+      .querySelectorAll<HTMLElement>(MARK_SELECTOR)
+      .forEach((m) => ids.add(m.dataset.highlightId ?? ''));
+    for (const id of ids) if (id && needsLayout(id)) layoutHighlight(id, false);
+  }, RELAYOUT_DEBOUNCE_MS);
 }
 
 /**
@@ -594,7 +813,7 @@ export function removeHighlightMarks(
     };
 
     mark.addEventListener('transitionend', onEnd);
-    mark.style.setProperty('transition', MARK_TRANSITION, 'important');
+    mark.style.setProperty('transition', EXIT_MARK_TRANSITION, 'important');
     mark.style.setProperty('background-size', '0% 100%', 'important');
   });
 }
@@ -698,13 +917,21 @@ export function restoreHighlights(highlights: Highlight[]): void {
 
 function watchPageChanges(): void {
   if (restoreObserver) return;
-  restoreObserver = new MutationObserver(() => (restoreReady ? scheduleRestore() : armSettleGate()));
+  restoreObserver = new MutationObserver(() =>
+    restoreReady ? scheduleRestore() : armSettleGate()
+  );
   restoreObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
   window.addEventListener('load', armSettleGate, { once: true });
   // Retry when the user comes back to a tab that changed while hidden
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && restoreReady) scheduleRestore();
+    if (document.hidden) return;
+    scheduleRelayout(); // marks drawn while the tab was hidden had no line boxes to measure
+    if (restoreReady) scheduleRestore();
   });
+  // Redraw per-line marks when the page reflows: resize, late images, web fonts
+  window.addEventListener('resize', scheduleRelayout);
+  new ResizeObserver(scheduleRelayout).observe(document.documentElement);
+  document.fonts?.addEventListener('loadingdone', scheduleRelayout);
   armSettleGate();
 }
 

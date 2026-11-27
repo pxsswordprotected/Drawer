@@ -53,3 +53,5 @@ bench/seed/*.json
 
 # Storage bench build output
 bench/storage/.build/
+
+rauno_notes.md
